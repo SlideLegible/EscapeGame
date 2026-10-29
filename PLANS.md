@@ -6,7 +6,7 @@
 ## 步驟
 
 ### 第 0 批 環境
-- [ ] **0a Python 測試環境**：`tools/run_tests.sh` 一行跑全部 Python 測試；確認設計文件存在 → STEP 0（第 1、2、4、5 條）
+- [x] **0a Python 測試環境**：`tools/run_tests.sh` 一行跑全部 Python 測試；確認設計文件存在 → STEP 0（第 1、2、4、5 條）
 - [ ] **0b 工具可行性（人工）**：使用者安裝 UE 5.8；Epic MCP 連線並列出 Actor；Flopperam plugin 在 Linux 編譯；PixelStreaming2 範本在 Firefox 可玩；實測單一實例資源；確認 MCP 只聽 localhost → STEP 0b
   - **Go/No-Go**：Epic MCP 在 Linux 不能用 → 改用 Flopperam 為主，加 `UnrealEditor-Cmd -run=pythonscript` 跑官方 Python 編輯器腳本當後備，寫進調整紀錄
 - [ ] **0c UE 專案與 UE 測試環境**：repo 根目錄建 C++ ThirdPerson 專案 `EscapeGame.uproject`；`tools/run_tests.sh` 加上 headless UE 自動化測試 → STEP 0（第 3、4 條）
@@ -131,3 +131,7 @@ deploy/                      Pixel Streaming：Wilbur 設定、配對頁、實�
 ## 調整紀錄
 
 （邊做邊調整時寫在這裡，說明改了什麼、為什麼。）
+
+- **2026-10-30 步驟 0a**：`tools/run_tests.sh` 用 `python3 -I -m unittest discover -s tests -t .`；`tests/` 也做成套件（`tests/__init__.py`），`-t .` 才能 import `tools`。
+  測試裡會巢狀執行 `run_tests.sh`，用環境變數 `ESCAPEGAME_NESTED_TEST_RUN` 讓巢狀那次跳過自己，避免無限遞迴。
+  「不可以需要網路／螢幕／GPU」目前只有標準函式庫檢查守著（沒有網路呼叫），0c 加 UE 測試時用 `-nullrhi` 守住。

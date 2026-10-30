@@ -9,6 +9,7 @@
 - [x] **0a Python 測試環境**：`tools/run_tests.sh` 一行跑全部 Python 測試；確認設計文件存在 → STEP 0（第 1、2、4、5 條）
 - [ ] **0b 工具可行性（人工）**：使用者安裝 UE 5.8；Epic MCP 連線並列出 Actor；Flopperam plugin 在 Linux 編譯；PixelStreaming2 範本在 Firefox 可玩；實測單一實例資源；確認 MCP 只聽 localhost → STEP 0b
   - **Go/No-Go**：Epic MCP 在 Linux 不能用 → 改用 Flopperam 為主，加 `UnrealEditor-Cmd -run=pythonscript` 跑官方 Python 編輯器腳本當後備，寫進調整紀錄
+  - **2026-10-30 結果：Go**（細節見調整紀錄）。AI 能驗的都驗完了；**剩人工：在 Firefox 用真的鍵盤滑鼠操控角色**，確認後人在 VERIFY 打勾、在這裡勾掉。
 - [ ] **0c UE 專案與 UE 測試環境**：repo 根目錄建 C++ ThirdPerson 專案 `EscapeGame.uproject`；`tools/run_tests.sh` 加上 headless UE 自動化測試 → STEP 0（第 3、4 條）
 
 ### 第 1 批 資料管線
@@ -74,17 +75,18 @@ deploy/                      Pixel Streaming：Wilbur 設定、配對頁、實�
 | CPU | Ryzen 7 7700 8C/16T | `BuildConfiguration.xml` 限制平行數 |
 | RAM | 30 GiB + 16 GiB swap，平常已用 18 GiB（一個 python 行程約 8 GB） | **最大瓶頸**。開 UE 時關大型行程；`MaxParallelActions=10`；不從原始碼編譯引擎 → v1 不做 Dedicated Server |
 | GPU | RTX 5060 Ti 16 GB，驅動 580 | Lumen、NVENC 可用 |
-| 顯示輸出 | HDMI 接在 AMD 610M 內顯 | 改插 5060 Ti，避免 PRIME 複製 |
-| 硬碟 | NVMe，`/home` 剩 246 GB | 引擎裝在 `~/UnrealEngine/5.8`，DDC 也在 `/home` |
+| 顯示輸出 | ~~HDMI 接在 AMD 610M 內顯~~ 已改插 5060 Ti（2026-10-30 確認） | — |
+| 硬碟 | NVMe，`/home` 剩 246 GB | 引擎實際裝在 `~/UnrealEngine`（5.8.3，73 GB），DDC 也在 `/home` |
 | OS | EndeavourOS、Hyprland／Wayland | UnrealEditor 設 windowrule float；必要時走 XWayland |
 | Windows | 沒有 | 只打包 Linux；沒有 Live Coding：改完 C++ 關編輯器，用 `Engine/Build/BatchFiles/Linux/Build.sh EscapeGameEditor Linux Development -project=...` 編，再開 |
-| Python | 3.14 | Flopperam 要 `<3.14`：`uv python install 3.12` |
+| Python | 3.14 | ~~Flopperam 要 `<3.14`~~ Flopperam 已放棄，不需要 |
 
-**Pixel Streaming 容量**：估計本機撐 3～4 位玩家（每實例約 2～3 GB VRAM、2～3 GB RAM），瓶頸是 RAM → 人數上限建議 4（BRIEF 待人決定），步驟 0b、18 實測修正。
+**Pixel Streaming 容量**：0b 實測單一實例（未打包、用 `UnrealEditor -game` 跑 ThirdPerson 範本、720p、畫質預設、FPS 不限）約 **3.6 GB RAM、3.9 GB VRAM、1.6 核心、GPU 89%、NVENC 8%**，比原本估的高。
+照這個數字本機只撐 **2～3 位玩家**；要到 4 位，步驟 16 要靠：打包成 Shipping（比 editor 執行檔省 RAM）、`t.MaxFPS 30`、串流專用低畫質。人數上限仍建議 4，但步驟 18 實測不到就降成 3（BRIEF 待人決定）。
 
 ### 工具分工
-- **Epic UE Skills plugin + UE 5.8 內建 MCP（主力）**：擺放 Actor、BP 子類別、UMG、PIE、跑測試。Experimental，Linux 支援在 0b 驗證。
-- **Flopperam MCP（選用）**：只在步驟 9 搭灰盒牆面房間，用完停用；Linux 編不過就放棄，不影響主線。
+- **Epic UE Skills plugin + UE 5.8 內建 MCP（唯一的 MCP）**：擺放 Actor、BP 子類別、UMG、DataTable、PIE、跑測試。0b 已確認在 Linux 可用。灰盒房間也用它（`SceneTools.add_to_scene_from_asset` 放基本形狀）。
+- ~~Flopperam MCP（選用）~~：**0b 放棄**，在 UE 5.8.3 編譯失敗（見調整紀錄）。
 - **gamedev skills**：只裝 router + unreal，加 level-design、game-ui-ux、game-feel、camera、puzzle。
 - 原則：
   - 邏輯寫在 C++ 和 CSV，Claude Code 直接改文字檔（可 diff、可測、省 token）；MCP 只做編輯器端的資產操作。
@@ -98,7 +100,10 @@ deploy/                      Pixel Streaming：Wilbur 設定、配對頁、實�
 - 只有 `Forms/`、`UI/` 可以 include 畫面相關標頭。
 - 資料唯一來源是設計文件 → `design_to_csv.py` → CSV → DataTable。
 - 多人：密碼只在伺服器、不複製；`FormPawn.OccupiedBy` 伺服器鎖定；互動射線忽略其他玩家的 Pawn；伺服器驗證每個 RPC（ID 存在、距離內）。
-- Pixel Streaming：PixelStreaming2 + Wilbur；實例 `-RenderOffscreen -ResX=1280 -ResY=720`；多人用 Listen Server（開房者的實例當 host）；公網要 coturn，先在 LAN 展示。
+- Pixel Streaming：PixelStreaming2 + Wilbur；實例 `-RenderOffscreen -ResX=1280 -ResY=720 -PixelStreamingConnectionURL=ws://127.0.0.1:8888`；多人用 Listen Server（開房者的實例當 host）；公網要 coturn，先在 LAN 展示。
+  - Wilbur 用 `get_ps_servers.sh` 抓（目前是 `UE5.7-0.1.2`），**不用它的 `start.sh`**（會呼叫 sudo、apt）；改成 `npm install --ignore-scripts -w …` 只裝需要的 workspace，再 `npm run build:all:cjs`。
+  - Wilbur 沒有 bind address 選項，會聽所有介面 → 步驟 17 用防火牆只開放配對頁和 player port。
+  - UE 的 Trace 控制埠 1985 也聽 `0.0.0.0` → 步驟 17 一併擋掉，Shipping 版確認有沒有開。
 
 ### 素材來源
 （步驟 15 開始填：素材名稱、來源網址、授權。）
@@ -126,7 +131,7 @@ deploy/                      Pixel Streaming：Wilbur 設定、配對頁、實�
 - 形態表（`item_interactions.md` §1）裡混進了 X027、X032、X035 三列 → `design_to_csv.py` 依 ID 前綴歸類即可，不需改文件。
 - 成就沒有 A05 → 刻意保留還是漏掉？
 - 互動沒有 X019 → 刻意保留還是漏掉？
-- 人數上限建議 4 → 待人決定後寫進 BRIEF。
+- 人數上限建議 4 → 待人決定後寫進 BRIEF。0b 實測後本機可能只撐 3，見「Pixel Streaming 容量」。
 
 ## 調整紀錄
 
@@ -135,3 +140,14 @@ deploy/                      Pixel Streaming：Wilbur 設定、配對頁、實�
 - **2026-10-30 步驟 0a**：`tools/run_tests.sh` 用 `python3 -I -m unittest discover -s tests -t .`；`tests/` 也做成套件（`tests/__init__.py`），`-t .` 才能 import `tools`。
   測試裡會巢狀執行 `run_tests.sh`，用環境變數 `ESCAPEGAME_NESTED_TEST_RUN` 讓巢狀那次跳過自己，避免無限遞迴。
   「不可以需要網路／螢幕／GPU」目前只有標準函式庫檢查守著（沒有網路呼叫），0c 加 UE 測試時用 `-nullrhi` 守住。
+
+- **2026-10-30 步驟 0b 工具可行性（Go）**：UE 5.8.3（CL 58210709）裝在 `~/UnrealEngine`；HDMI 已改插 5060 Ti。用 scratchpad 的拋棄式專案驗證，沒有動 repo。
+  - **Epic MCP ✅**：`ModelContextProtocol`、`AllToolsets` 都有 Linux 預編譯檔。啟動參數 `-ExecCmds="ModelContextProtocol.StartServer"` → `127.0.0.1:8000/mcp`（Streamable HTTP），`ss` 確認**只聽 127.0.0.1**（HTTPServer 預設 bind `localhost`）。
+    用 JSON-RPC 直接呼叫：`list_toolsets` 列出 57 個 toolset；`SceneTools.find_actors` 讀到關卡 Actor；`add_to_scene_from_asset` 放一個 Cube、`find_actors` 找得到、`remove_from_scene` 刪掉後找不到 → **讀寫都可以**。
+    呼叫格式：`call_tool` 帶 `toolset_name`、`tool_name`、`arguments`；`find_actors` 要給 `name`、`tag`、`collision_channels`（可空）。編輯器空專案約 3 GB RAM。
+  - **Flopperam ❌ 放棄**：`BuildPlugin` 什麼都沒編（Editor 模組被略過，`.uplugin` 還用舊的 `WhitelistPlatforms`）；放進 C++ 宿主專案編 `Editor` target → 2 個錯誤（`BPVariables.cpp` 用 `FindRef("…")`，5.8 的 JSON map key 改成 `TSharedString`），另有 61 個「下一版就會編不過」的 deprecation 警告。照計畫放棄，不修第三方程式碼。Epic MCP 能放基本形狀，灰盒改用它。
+  - **Pixel Streaming ✅（操控待人確認）**：`PixelStreaming2` 支援 Linux。ThirdPerson 範本（含 LevelPrototyping、Characters、Input 共用素材）用 `UnrealEditor -game -RenderOffscreen` 跑，首次啟動編 shader 約 2 分鐘後連上 Wilbur；Chrome 開 `http://localhost:8080` 按一下就看到畫面，log 顯示 video、audio、data channel 都是 Active。
+    自動化工具只能送「瞬間按放」的按鍵，角色看不出移動 → **鍵盤滑鼠操控要人在 Firefox 實際試**。
+  - **資源（單一實例，有一位觀看者）**：RSS 3.6 GB、VRAM 3.9 GB、CPU 160%、GPU 89%（FPS 未限制）、NVENC 8%。沒有觀看者時 RSS 3.5 GB、VRAM 3.4 GB。→ 已更新「Pixel Streaming 容量」。
+  - **連接埠**：MCP 8000 只聽 127.0.0.1 ✅；另外發現 UE Trace 控制埠 1985、Wilbur 的 8080／8888 聽所有介面 → 寫進「做法」，步驟 17 處理。
+  - **還沒做、要人做的**：Claude Code 裝 Epic 的 skills plugin 與 gamedev skills（plugin 設定是使用者的，見回報）；`.mcp.json` 在 0c 建好真正的專案後用 `ModelContextProtocol.GenerateClientConfig ClaudeCode` 產生。

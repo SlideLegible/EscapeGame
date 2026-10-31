@@ -18,7 +18,7 @@
 ### 第 2 批 核心邏輯（`Source/EscapeGame/Logic/`，UE 自動化測試，固定種子、固定 dt）
 - [x] **2 互動判定**：Resolver 優先序（X033 鑰匙圈碰門 → 精確 → 其他／非人類形態 → 任一形態 → 預設嘲諷）；CSV 每列 X 一個 test case → STEP 2
 - [x] **3 生命值**：初始 5、無上限、不為負、歸零 → E05 重啟但保留成就 → STEP 3
-- [ ] **4 時間**：30:00 倒數、時鐘自身互動 → E04 + A06；已逃出者不受影響 → STEP 4
+- [x] **4 時間**：30:00 倒數、時鐘自身互動 → E04 + A06；已逃出者不受影響 → STEP 4
 - [ ] **5 大門密碼**：可注入種子的亂數、排除 1031、輸錯 1/1000 扣血、試過 1031 的旗標 → STEP 5
 - [ ] **6 變身**：身體留原地、變回人類、物品互換、物品唯一、L01／L02 進入規則、監視器形態 → STEP 6
 - [ ] **7 場景狀態**：電閘不可逆、教室門、辦公室門、儲物間門 → STEP 7
@@ -58,12 +58,12 @@ Config/ Content/ThirdPerson/ Content/{LevelPrototyping,Characters,Input}/   Thir
 Source/EscapeGame/
   Logic/                     純邏輯，只依賴 Core；不可 include Engine 的 Actor／畫面標頭
     InteractionResolver.*    （形態, 對象, 狀態快照）→ 互動結果（步驟 2，純函式）
-    TeamState.*              全隊狀態：生命值、玩家名單、已觸發、成就、E05 重啟（步驟 3）；倒數、密碼、旗標之後加
+    TeamState.*              全隊狀態：生命值、玩家名單、已觸發、成就、E05 重啟（步驟 3）；倒數與 E04（步驟 4）；密碼、旗標之後加
     AchievementTracker.*     成就計數與解鎖
   Core/                      組合層：GameMode、GameState、PlayerState（複製、伺服器權威）
   Forms/                     畫面層：HumanCharacter、FormPawn 與各形態
   UI/                        畫面層：HUD、文字框、密碼鍵盤、結局、成就提示
-  Tests/                     UE 自動化測試，StepN_名稱.spec.cpp（Step2_InteractionResolver.spec.cpp、Step3_TeamState.spec.cpp）
+  Tests/                     UE 自動化測試，StepN_名稱.spec.cpp（Step2_InteractionResolver.spec.cpp、Step3_TeamState.spec.cpp、Step4_Clock.spec.cpp）
 Content/Data/                DT_*.csv 與匯入後的 DataTable
 Content/Maps/                主關卡
 deploy/                      Pixel Streaming：Wilbur 設定、配對頁、實例管理腳本（第 6 批）
@@ -167,6 +167,11 @@ deploy/                      Pixel Streaming：Wilbur 設定、配對頁、實�
   - `ExtraTriggers`（X034）的互動 ID 與成就也記進已觸發／成就集合。
   - 結局欄 `EndingId`（E01～E04）這一步不處理，步驟 4、8 做。
   - 已逃出的玩家不算重啟的「受影響玩家」，也不會被重啟帶回遊戲。
+- **步驟 4 的詮釋（待人確認，選了最保守的做法）**：
+  - 倒數不倒數的條件：玩家名單**至少一位**、而且全部已結束時 `Tick` 不倒數；沒有任何玩家時照常倒數（方便單元測試與開局前）。
+  - X021（時鐘自身互動）觸發 E04 時**不改剩餘秒數**（剩幾秒就顯示幾秒），只是把還沒結束的玩家全部標成 E04，並記下「這一局的 E04 已發生」，之後 `Tick` 不倒數、也不會再有第二個 E04。E05 重啟才把這個記號清掉。
+  - 同一局裡 E04 已發生後，又有 X021 → 不再回傳 E04 事件（`ApplyInteraction` 仍會記已觸發與成就）。
+  - 結局成就（E04 這個成就本身）這一步**沒有**解鎖，步驟 8 做；A06 由成就欄流程加進 `UnlockedAchievements`。
 - 形態表（`item_interactions.md` §1）裡混進了 X027、X032、X035 三列 → `design_to_csv.py` 依 ID 前綴歸類即可，不需改文件。
 - ~~成就沒有 A05~~ → **刻意跳過**（2026-10-31 人確認）。
 - ~~互動沒有 X019~~ → **刻意跳過**（2026-10-31 人確認）。
@@ -247,3 +252,12 @@ deploy/                      Pixel Streaming：Wilbur 設定、配對頁、實�
   - `bHasHpChance`（X017）不擲骰，步驟 5 處理。
   - X004／X026／X027 的測試走真流程：CSV → Resolver → `MakeSnapshot()` 組 query → `ApplyInteraction` 回 TeamState。
   - **時間**：一次完整 `tools/run_tests.sh`（含增量編譯與 UE 53 條）約 20 秒（Python 35 條）。測試當時沒有別的 UnrealEditor 行程，可用記憶體約 12 GB。
+
+- **2026-10-31 步驟 4 時間**：只改 `Logic/TeamState.h/.cpp`（沒有建 EscapeGameLogic，那是步驟 5），新增 `Tests/Step4_Clock.spec.cpp`（`EscapeGame.Step4`，7 條 It）。
+  - **介面**：`static constexpr int32 RoundSeconds = 1800`、`TArray<FTeamEvent> Tick(float Dt)`、`int32 GetRemainingSeconds() const`、`static FString FormatClock(int32)`（1800 → `30:00`、59 → `00:59`、0 → `00:00`）、`ApplyInteraction(Result, PlayerId = FString())`（舊呼叫方式不變，步驟 3 測試沒動）。`PlayerId` 這一步沒用到，步驟 5 的 E01～E03 才用。
+  - **倒數**：用 `double` 累計已過秒數；`GetRemainingSeconds` = `ceil(1800 - 已過 - 1e-4)`，夾在 0～1800。固定 dt 1/60 跑 60 格剛好 1799；整局 108000 格（float 的 1/60）在第 108000 格（±1）觸發 E04，且只有一次。
+  - **E04**：時間到 0 或 `ApplyInteraction` 的 `Result.EndingId == "E04"`（X021）→ `EndRoundWithDawn()`：受影響＝`GetRemainingPlayers()`，全部 `MarkEscaped(…, "E04")`（沿用 `bEscaped`／`EndingId`），已逃出的玩家（例 P2 結局 E01）不受影響。時間到與 X021 兩條路徑都有測「不可以已逃出再收到 E04」。A06 由原本的成就欄流程進 `UnlockedAchievements`（確認即可，沒改）。
+  - **E05 重啟**：倒數回到 30:00、E04 記號清掉（另有一條 It）；密碼與旗標是之後的步驟。
+  - **X021 測試**走真流程：CSV → `Load` → query（F09、`SELF`、`MakeSnapshot()`）→ `ApplyInteraction(R, "P1")`。
+  - **沒有碰** E01～E03（步驟 5）、結局成就（步驟 8）。詮釋與取捨見「待人確認」的步驟 4 一項。
+  - **時間／測試**：整個 `tools/run_tests.sh` 約 20 秒（含增量編譯）。紅的時候 Step4 的 7 條都失敗、舊的全綠（UE 53/60）。最後 Python 35/35；UE 60/60。第一次實作就全綠，沒有改過測試。

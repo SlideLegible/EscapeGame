@@ -19,15 +19,55 @@ TArray<FTeamEvent> FTeamState::ApplyHpDelta(int32 Delta)
 		Hp = StartingHp;
 		TriggeredIds.Empty();
 		++RestartCount;
+		// 重啟＝新的一局：倒數回到 30:00（密碼與旗標之後的步驟處理）
+		ElapsedSeconds = 0.0;
+		bDawnTriggered = false;
 	}
 	return Events;
 }
 
-// 步驟 4 還沒實作（紅）：先放空殼
-TArray<FTeamEvent> FTeamState::Tick(float Dt) { return TArray<FTeamEvent>(); }
-int32 FTeamState::GetRemainingSeconds() const { return 0; }
-FString FTeamState::FormatClock(int32 Seconds) { return FString(); }
-FTeamEvent FTeamState::EndRoundWithDawn() { return FTeamEvent(); }
+namespace
+{
+	// 無條件進位前先扣掉的容差：1/60 秒累加 108000 次的浮點誤差遠小於這個值
+	constexpr double ClockEpsilon = 1e-4;
+}
+
+TArray<FTeamEvent> FTeamState::Tick(float Dt)
+{
+	TArray<FTeamEvent> Events;
+	if (bDawnTriggered || Dt <= 0.0f) { return Events; }
+	// 有玩家、而且全都結束了 → 不倒數
+	if (Players.Num() > 0 && GetRemainingPlayers().Num() == 0) { return Events; }
+
+	ElapsedSeconds += static_cast<double>(Dt);
+	if (GetRemainingSeconds() == 0)
+	{
+		Events.Add(EndRoundWithDawn());
+	}
+	return Events;
+}
+
+int32 FTeamState::GetRemainingSeconds() const
+{
+	const double Remaining = static_cast<double>(RoundSeconds) - ElapsedSeconds;
+	return FMath::Clamp(static_cast<int32>(FMath::CeilToDouble(Remaining - ClockEpsilon)), 0, RoundSeconds);
+}
+
+FString FTeamState::FormatClock(int32 Seconds)
+{
+	Seconds = FMath::Max(0, Seconds);
+	return FString::Printf(TEXT("%02d:%02d"), Seconds / 60, Seconds % 60);
+}
+
+FTeamEvent FTeamState::EndRoundWithDawn()
+{
+	FTeamEvent E4;
+	E4.EndingId = TEXT("E04");
+	E4.AffectedPlayers = GetRemainingPlayers();  // 已經結束的玩家不會再收到
+	for (const FString& Id : E4.AffectedPlayers) { MarkEscaped(Id, E4.EndingId); }
+	bDawnTriggered = true;  // 這一局的 E04 已發生：Tick 不再倒數，也不會再有 E04
+	return E4;
+}
 
 void FTeamState::AddPlayer(const FString& PlayerId)
 {
@@ -85,8 +125,16 @@ TArray<FTeamEvent> FTeamState::ApplyInteraction(const FInteractionResult& Result
 	}
 	for (const FString& A : Result.AchievementIds) { UnlockedAchievements.Add(A); }
 
+	TArray<FTeamEvent> Events;
+	// X021 這類 E04：同時間到。這一局的 E04 只發生一次。
+	if (Result.EndingId == TEXT("E04") && !bDawnTriggered)
+	{
+		Events.Add(EndRoundWithDawn());
+	}
+	// E01～E03 只有 PlayerId 結束，在步驟 5 做。
 	// X017 的機率扣血（bHasHpChance）在步驟 5 才擲骰，這裡不處理。
-	return ApplyHpDelta(Result.HpDelta);
+	Events.Append(ApplyHpDelta(Result.HpDelta));
+	return Events;
 }
 
 FInteractionState FTeamState::MakeSnapshot() const

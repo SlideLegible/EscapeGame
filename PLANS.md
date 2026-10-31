@@ -31,7 +31,7 @@
 - [ ] **12 單人全路線**：Functional Test 跑 E01、E03 路線；開發版測試模式讀密碼 → STEP 12
 
 ### 第 4 批 多人
-- [ ] **13 連線與伺服器權威**：Listen Server、上限 4 人、Server RPC 驗證（ID 存在、距離）、密碼不複製 → STEP 13
+- [ ] **13 連線與伺服器權威**：Listen Server、上限 3 人、Server RPC 驗證（ID 存在、距離）、密碼不複製 → STEP 13
 - [ ] **14 多人規則**：共用血量、各自逃出、逃生方法可重複、E04／E05 全隊、監視器看到其他玩家、玩家間不能互動 → STEP 14
 
 ### 第 5 批 美術與手感
@@ -40,7 +40,7 @@
 ### 第 6 批 網頁遊玩
 - [ ] **16 打包**：Linux Shipping；Shipping 排除測試模式與 MCP plugin；串流用畫質設定 → STEP 16
 - [ ] **17 串流與實例管理**：PixelStreaming2 + Wilbur、配對頁、斷線／重新整理回收重置、訊息 64 KB 上限、只開放必要連接埠 → STEP 17
-- [ ] **18 容量**：4 人同房實測，資源數字寫進調整紀錄 → STEP 18
+- [ ] **18 容量**：3 人同房實測，資源數字寫進調整紀錄 → STEP 18
 
 ## 檔案怎麼放
 
@@ -82,7 +82,7 @@ deploy/                      Pixel Streaming：Wilbur 設定、配對頁、實�
 | Python | 3.14 | ~~Flopperam 要 `<3.14`~~ Flopperam 已放棄，不需要 |
 
 **Pixel Streaming 容量**：0b 實測單一實例（未打包、用 `UnrealEditor -game` 跑 ThirdPerson 範本、720p、畫質預設、FPS 不限）約 **3.6 GB RAM、3.9 GB VRAM、1.6 核心、GPU 89%、NVENC 8%**，比原本估的高。
-照這個數字本機只撐 **2～3 位玩家**；要到 4 位，步驟 16 要靠：打包成 Shipping（比 editor 執行檔省 RAM）、`t.MaxFPS 30`、串流專用低畫質。人數上限仍建議 4，但步驟 18 實測不到就降成 3（BRIEF 待人決定）。
+照這個數字本機只撐 **2～3 位玩家**。**人數上限：3 人**（2026-10-31 人決定）。步驟 16 仍要打包成 Shipping（比 editor 執行檔省 RAM）、`t.MaxFPS 30`、串流專用低畫質，讓 3 人穩定在 30 fps 以上。
 
 ### 工具分工
 - **Epic UE Skills plugin + UE 5.8 內建 MCP（唯一的 MCP）**：擺放 Actor、BP 子類別、UMG、DataTable、PIE、跑測試。0b 已確認在 Linux 可用。灰盒房間也用它（`SceneTools.add_to_scene_from_asset` 放基本形狀）。
@@ -129,9 +129,9 @@ deploy/                      Pixel Streaming：Wilbur 設定、配對頁、實�
 
 ### 待人確認的設計問題（不改設計文件）
 - 形態表（`item_interactions.md` §1）裡混進了 X027、X032、X035 三列 → `design_to_csv.py` 依 ID 前綴歸類即可，不需改文件。
-- 成就沒有 A05 → 刻意保留還是漏掉？
-- 互動沒有 X019 → 刻意保留還是漏掉？
-- 人數上限建議 4 → 待人決定後寫進 BRIEF。0b 實測後本機可能只撐 3，見「Pixel Streaming 容量」。
+- ~~成就沒有 A05~~ → **刻意跳過**（2026-10-31 人確認）。
+- ~~互動沒有 X019~~ → **刻意跳過**（2026-10-31 人確認）。
+- ~~人數上限~~ → **3 人**（2026-10-31 人決定），已寫進 BRIEF。⚠️ VERIFY STEP 18 還寫 4 人（「4 個瀏覽器」「第 5 個瀏覽器」），VERIFY 是人的文件，待人改成 3。
 
 ## 調整紀錄
 
@@ -151,3 +151,6 @@ deploy/                      Pixel Streaming：Wilbur 設定、配對頁、實�
   - **資源（單一實例，有一位觀看者）**：RSS 3.6 GB、VRAM 3.9 GB、CPU 160%、GPU 89%（FPS 未限制）、NVENC 8%。沒有觀看者時 RSS 3.5 GB、VRAM 3.4 GB。→ 已更新「Pixel Streaming 容量」。
   - **連接埠**：MCP 8000 只聽 127.0.0.1 ✅；另外發現 UE Trace 控制埠 1985、Wilbur 的 8080／8888 聽所有介面 → 寫進「做法」，步驟 17 處理。
   - **還沒做、要人做的**：Claude Code 裝 Epic 的 skills plugin 與 gamedev skills（plugin 設定是使用者的，見回報）；`.mcp.json` 在 0c 建好真正的專案後用 `ModelContextProtocol.GenerateClientConfig ClaudeCode` 產生。
+
+- **2026-10-31 人確認**：BRIEF、VERIFY 確認；A05、X019 刻意跳過；人數上限 3 人；授權 MIT（加 `LICENSE`）。
+  步驟 13 改「上限 3 人」、步驟 18 改「3 人同房」、「Pixel Streaming 容量」改寫成 3 人。Claude Code 的 Epic skills plugin 與 gamedev skills 人已安裝。

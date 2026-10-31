@@ -1,7 +1,6 @@
 # BRIEF — 逃離學院
 
-> ⚠️ **AI 草稿，需人確認。** 依 `docs/design/escape_room_script.md` 與 `docs/design/item_interactions.md` 整理。
-> 這份是人的文件：確認或修改後，請刪掉這段提示。
+> 依 `docs/design/escape_room_script.md` 與 `docs/design/item_interactions.md` 整理；AI 起草，2026-10-31 人確認。
 
 ## 目的
 
@@ -61,4 +60,4 @@
 ### 對限制的做法說明
 
 - 「網頁遊戲」用 **Unreal Engine + Pixel Streaming** 實現：遊戲在伺服器上執行，畫面串流到玩家的瀏覽器，玩家端不用安裝。這不算放寬限制，只是實作方式；若之後認為「網頁遊戲」必須是瀏覽器內執行（WebGL），就要另開分支重新評估引擎。
-- 「人數上限之後再定」：受伺服器硬體限制（見 PLANS.md），建議暫定 4 人，等人決定。
+- 「人數上限之後再定」：受伺服器硬體限制（見 PLANS.md），**定為 3 人**（2026-10-31 人決定）。

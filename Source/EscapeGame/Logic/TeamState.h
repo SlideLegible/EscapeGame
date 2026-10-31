@@ -1,4 +1,4 @@
-// 步驟 3 生命值、步驟 4 時間、步驟 5 大門密碼：全隊共用狀態，純邏輯，只依賴 Core。
+// 步驟 3 生命值、步驟 4 時間、步驟 5 大門密碼（步驟 6 加骰子）：全隊共用狀態，純邏輯，只依賴 Core。
 // 變身（6）、場景狀態（7）、成就計數（8）、網路複製（13）都還沒做。
 #pragma once
 
@@ -61,6 +61,9 @@ public:
 	// 大門密碼（步驟 5）：每局一組 0000～9999 的四位數，不是 1031。Shipping 沒有任何途徑讀出密碼。
 	/** 等於當局密碼 → Correct；其他（包括不是 4 位數字）→ Wrong */
 	EPasswordInput CheckPassword(const FString& Code) const;
+
+	/** 用同一顆亂數抽 Min～Max（含）的整數（骰子 X020）。Max < Min 時兩者對調。 */
+	int32 RollRange(int32 Min, int32 Max);
 
 	// 旗標（例：Tried1031）；E05 重啟清空
 	void AddFlag(const FString& Flag);

@@ -87,6 +87,26 @@ const FEscapeGameLogic::FPlayerInfo* FEscapeGameLogic::FindPlayer(const FString&
 	return Players.FindByPredicate([&](const FPlayerInfo& P) { return P.PlayerId == PlayerId; });
 }
 
+FEscapeGameLogic::FPlayerInfo* FEscapeGameLogic::FindPlayer(const FString& PlayerId)
+{
+	return Players.FindByPredicate([&](const FPlayerInfo& P) { return P.PlayerId == PlayerId; });
+}
+
+const FEscapeGameLogic::FItemState* FEscapeGameLogic::FindItem(const FString& ItemId) const
+{
+	return Items.FindByPredicate([&](const FItemState& I) { return I.ItemId == ItemId; });
+}
+
+FEscapeGameLogic::FItemState* FEscapeGameLogic::FindItem(const FString& ItemId)
+{
+	return Items.FindByPredicate([&](const FItemState& I) { return I.ItemId == ItemId; });
+}
+
+const FEscapeGameLogic::FLocationInfo* FEscapeGameLogic::FindLocation(const FString& LocationId) const
+{
+	return Locations.FindByPredicate([&](const FLocationInfo& L) { return L.LocationId == LocationId; });
+}
+
 FInteractOutcome FEscapeGameLogic::Interact(const FString& PlayerId, const FString& TargetId)
 {
 	FInteractOutcome Outcome;  // 預設 Rejected
@@ -151,3 +171,18 @@ TArray<FTeamEvent> FEscapeGameLogic::Tick(float Dt)
 {
 	return Team.Tick(Dt);
 }
+
+// ---- 步驟 6 變身：空殼（測試先紅），之後實作 ----
+void FEscapeGameLogic::RegisterObjectLocation(const FString&, const FVector&) {}
+void FEscapeGameLogic::SetObjectLocation(const FString&, const FVector&) {}
+void FEscapeGameLogic::SetPlayerLocation(const FString&, const FVector&) {}
+bool FEscapeGameLogic::ReturnToHuman(const FString&) { return false; }
+FString FEscapeGameLogic::GetPlayerForm(const FString&) const { return FString(); }
+FVector FEscapeGameLogic::GetPlayerLocation(const FString&) const { return FVector::ZeroVector; }
+FVector FEscapeGameLogic::GetBodyLocation(const FString&) const { return FVector::ZeroVector; }
+FString FEscapeGameLogic::GetPlayerLocationId(const FString&) const { return FString(); }
+bool FEscapeGameLogic::CanSeeWholeMap(const FString&) const { return false; }
+FVector FEscapeGameLogic::GetItemLocation(const FString&) const { return FVector::ZeroVector; }
+bool FEscapeGameLogic::IsItemPresent(const FString&) const { return false; }
+FString FEscapeGameLogic::GetItemOccupant(const FString&) const { return FString(); }
+FString FEscapeGameLogic::GetItemLocationId(const FString&) const { return FString(); }

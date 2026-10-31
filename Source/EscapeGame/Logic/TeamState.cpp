@@ -1,24 +1,59 @@
 // 步驟 3 生命值、步驟 4 時間、步驟 5 大門密碼：全隊共用狀態（純邏輯）
 #include "Logic/TeamState.h"
 
-FTeamState::FTeamState() {}
+namespace
+{
+	// 設計文件把 1031 當紅鯡魚（老師生日），所以大門密碼絕不是它
+	constexpr int32 RedHerringCode = 1031;
+	constexpr int32 PasswordCount = 10000;
+}
 
-FTeamState::FTeamState(int32 Seed) {}
+FTeamState::FTeamState() : FTeamState(0) {}
 
-EPasswordInput FTeamState::CheckPassword(const FString& Code) const { return EPasswordInput::Wrong; }
+FTeamState::FTeamState(int32 Seed) : Stream(Seed)
+{
+	GeneratePassword();
+}
 
-void FTeamState::AddFlag(const FString& Flag) {}
+void FTeamState::GeneratePassword()
+{
+	// 在 0～9998 均勻抽一個，>= 1031 的加 1：剛好跳過 1031，其餘 9999 個密碼機率相同，不用重抽迴圈
+	int32 Code = Stream.RandRange(0, PasswordCount - 2);
+	if (Code >= RedHerringCode) { ++Code; }
+	Password = FString::Printf(TEXT("%04d"), Code);
+}
 
-bool FTeamState::HasFlag(const FString& Flag) const { return false; }
+void FTeamState::StartNewRound()
+{
+	Flags.Empty();
+	GeneratePassword();
+}
 
-void FTeamState::StartNewRound() {}
+EPasswordInput FTeamState::CheckPassword(const FString& Code) const
+{
+	return Code == Password ? EPasswordInput::Correct : EPasswordInput::Wrong;
+}
 
-void FTeamState::GeneratePassword() {}
+void FTeamState::AddFlag(const FString& Flag)
+{
+	if (!Flag.IsEmpty()) { Flags.Add(Flag); }
+}
+
+bool FTeamState::HasFlag(const FString& Flag) const
+{
+	return Flags.Contains(Flag);
+}
 
 #if !UE_BUILD_SHIPPING
-FString FTeamState::GetPasswordForDevOnly() const { return FString(); }
+FString FTeamState::GetPasswordForDevOnly() const
+{
+	return Password;
+}
 
-void FTeamState::StartNewRoundForTesting() {}
+void FTeamState::StartNewRoundForTesting()
+{
+	StartNewRound();
+}
 #endif
 
 TArray<FTeamEvent> FTeamState::ApplyHpDelta(int32 Delta)
@@ -37,9 +72,10 @@ TArray<FTeamEvent> FTeamState::ApplyHpDelta(int32 Delta)
 		Hp = StartingHp;
 		TriggeredIds.Empty();
 		++RestartCount;
-		// 重啟＝新的一局：倒數回到 30:00（密碼與旗標之後的步驟處理）
+		// 重啟＝新的一局：倒數回到 30:00、旗標清空、重新產生密碼
 		ElapsedSeconds = 0.0;
 		bDawnTriggered = false;
+		StartNewRound();
 	}
 	return Events;
 }
@@ -135,6 +171,7 @@ TArray<FString> FTeamState::GetRemainingPlayers() const
 
 TArray<FTeamEvent> FTeamState::ApplyInteraction(const FInteractionResult& Result, const FString& PlayerId, bool* OutChanceHit)
 {
+	if (OutChanceHit) { *OutChanceHit = false; }
 	if (!Result.InteractionId.IsEmpty()) { TriggeredIds.Add(Result.InteractionId); }
 	for (const FExtraTrigger& Extra : Result.ExtraTriggers)
 	{
@@ -149,9 +186,23 @@ TArray<FTeamEvent> FTeamState::ApplyInteraction(const FInteractionResult& Result
 	{
 		Events.Add(EndRoundWithDawn());
 	}
-	// E01～E03 只有 PlayerId 結束，在步驟 5 做。
-	// X017 的機率扣血（bHasHpChance）在步驟 5 才擲骰，這裡不處理。
+	// E01～E03：只有這位玩家結束（玩家空、不存在、已結束 → 沒有事件）
+	if ((Result.EndingId == TEXT("E01") || Result.EndingId == TEXT("E02") || Result.EndingId == TEXT("E03"))
+		&& !PlayerId.IsEmpty() && MarkEscaped(PlayerId, Result.EndingId))
+	{
+		FTeamEvent Ending;
+		Ending.EndingId = Result.EndingId;
+		Ending.AffectedPlayers.Add(PlayerId);
+		Events.Add(MoveTemp(Ending));
+	}
 	Events.Append(ApplyHpDelta(Result.HpDelta));
+	// X017 這類機率扣血：用內部亂數擲骰，擲中才扣
+	if (Result.bHasHpChance && Result.HpChanceDenominator > 0)
+	{
+		const bool bHit = Stream.RandHelper(Result.HpChanceDenominator) < Result.HpChanceNumerator;
+		if (OutChanceHit) { *OutChanceHit = bHit; }
+		if (bHit) { Events.Append(ApplyHpDelta(Result.HpChanceDelta)); }
+	}
 	return Events;
 }
 
@@ -159,5 +210,6 @@ FInteractionState FTeamState::MakeSnapshot() const
 {
 	FInteractionState S;
 	S.TriggeredIds = TriggeredIds;
+	S.Flags = Flags;
 	return S;
 }

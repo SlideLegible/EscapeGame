@@ -19,7 +19,7 @@
 - [x] **2 互動判定**：Resolver 優先序（X033 鑰匙圈碰門 → 精確 → 其他／非人類形態 → 任一形態 → 預設嘲諷）；CSV 每列 X 一個 test case → STEP 2
 - [x] **3 生命值**：初始 5、無上限、不為負、歸零 → E05 重啟但保留成就 → STEP 3
 - [x] **4 時間**：30:00 倒數、時鐘自身互動 → E04 + A06；已逃出者不受影響 → STEP 4
-- [ ] **5 大門密碼**：可注入種子的亂數、排除 1031、輸錯 1/1000 扣血、試過 1031 的旗標 → STEP 5
+- [x] **5 大門密碼**：可注入種子的亂數、排除 1031、輸錯 1/1000 扣血、試過 1031 的旗標 → STEP 5
 - [ ] **6 變身**：身體留原地、變回人類、物品互換、物品唯一、L01／L02 進入規則、監視器形態 → STEP 6
 - [ ] **7 場景狀態**：電閘不可逆、教室門、辦公室門、儲物間門 → STEP 7
 - [ ] **8 成就**：A01／A02／A03 計數、A04／A06／A07、E01～E05；不重複、不寫磁碟 → STEP 8
@@ -52,18 +52,19 @@ tools/
   run_ue_tests.py            編譯 EscapeGameEditor + headless（-nullrhi）跑 UE 自動化測試（0c）
   design_to_csv.py           設計文件 → Content/Data/DT_*.csv（步驟 1）；可用 --interactions／--script／--out 指定輸入輸出
   design_to_responses.py     設計文件 §5 → Content/Data/DT_Responses.csv（步驟 2）；--interactions／--out
-tests/                       Python 測試，test_stepN_名稱.py
+tests/                       Python 測試，test_stepN_名稱.py（test_step5_password_secrecy.py：掃 Source/ 的 log 與 DevOnly 函式）
 EscapeGame.uproject          （0c）UE 專案；.mcp.json 是 Claude Code 連 MCP 的設定（只指向 127.0.0.1:8000）
 Config/ Content/ThirdPerson/ Content/{LevelPrototyping,Characters,Input}/   ThirdPerson 範本與共用素材（Content 約 130 MB，*.uasset／*.umap 走 LFS）
 Source/EscapeGame/
   Logic/                     純邏輯，只依賴 Core；不可 include Engine 的 Actor／畫面標頭
     InteractionResolver.*    （形態, 對象, 狀態快照）→ 互動結果（步驟 2，純函式）
-    TeamState.*              全隊狀態：生命值、玩家名單、已觸發、成就、E05 重啟（步驟 3）；倒數與 E04（步驟 4）；密碼、旗標之後加
+    TeamState.*              全隊狀態：生命值、玩家名單、已觸發、成就、E05 重啟（步驟 3）；倒數與 E04（步驟 4）；密碼、旗標、E01～E03、機率扣血（步驟 5）
+    EscapeGameLogic.*        組合層（步驟 5 建立）：Resolver + TeamState，`Interact`／`SubmitPassword`／`Tick`、`FInteractOutcome`；形態、場景、成就之後加
     AchievementTracker.*     成就計數與解鎖
   Core/                      組合層：GameMode、GameState、PlayerState（複製、伺服器權威）
   Forms/                     畫面層：HumanCharacter、FormPawn 與各形態
   UI/                        畫面層：HUD、文字框、密碼鍵盤、結局、成就提示
-  Tests/                     UE 自動化測試，StepN_名稱.spec.cpp（Step2_InteractionResolver.spec.cpp、Step3_TeamState.spec.cpp、Step4_Clock.spec.cpp）
+  Tests/                     UE 自動化測試，StepN_名稱.spec.cpp（Step2_InteractionResolver.spec.cpp、Step3_TeamState.spec.cpp、Step4_Clock.spec.cpp、Step5_DoorPassword.spec.cpp）
 Content/Data/                DT_*.csv 與匯入後的 DataTable
 Content/Maps/                主關卡
 deploy/                      Pixel Streaming：Wilbur 設定、配對頁、實例管理腳本（第 6 批）
@@ -172,6 +173,16 @@ deploy/                      Pixel Streaming：Wilbur 設定、配對頁、實�
   - X021（時鐘自身互動）觸發 E04 時**不改剩餘秒數**（剩幾秒就顯示幾秒），只是把還沒結束的玩家全部標成 E04，並記下「這一局的 E04 已發生」，之後 `Tick` 不倒數、也不會再有第二個 E04。E05 重啟才把這個記號清掉。
   - 同一局裡 E04 已發生後，又有 X021 → 不再回傳 E04 事件（`ApplyInteraction` 仍會記已觸發與成就）。
   - 結局成就（E04 這個成就本身）這一步**沒有**解鎖，步驟 8 做；A06 由成就欄流程加進 `UnlockedAchievements`。
+- **步驟 5 的詮釋（待人確認，選了最保守的做法）**：
+  - 密碼用一顆 `FRandomStream`（`FTeamState(int32 Seed)`；無參數版本 = 種子 0）。這顆亂數**同時**給密碼與 X017 的機率骰子，所以每次輸錯、每次 E05 重啟都會讓之後的密碼序列不同（固定種子下仍完全可重現）。
+  - X017 的 `HpDelta` 先套、再擲機率骰；擲中才套 `HpChanceDelta`（-1），扣到 0 照常 E05 重啟。X017 本身 `HpDelta` 是 0，所以順序沒有影響。
+  - 輸入 1031 失敗的旗標 `Tried1031` 在**套用互動之前**加進去，所以這次輸錯若剛好擲中並歸零（E05），新的一局從沒有旗標開始。
+  - 密碼 `CheckPassword` 要**完全等於**四位數字字串：「 1031」、空字串、五位數都算輸錯（也會走 X017 並擲骰）。
+  - 輸入密碼的對象（S01）從 Resolver 資料找 `PasswordRequirement` 不是 NotRequired 的列，不寫死；載入時要求所有密碼鎖列同一個對象。
+  - X017 的 Messages 是「第一段」、擲中再多「第二段」，內文不含「」；其他互動的 Messages 就是 `Result.Text` 原樣（X035 的文字因此仍帶外層「」）。
+  - 被拒絕（`Rejected`）的情形：玩家不存在、已結束、`SubmitPassword` 時不是 F00。物件 ID 不存在這一步**不**拒絕（交給 Resolver 的預設回應），步驟 6 再處理。
+  - `Interact` 碰大門回傳 `NeedsPassword` 時完全不改狀態（不記已觸發、不擲骰）。
+  - X022 停電後密碼一律當輸錯是步驟 7 的事，這一步沒做。
 - 形態表（`item_interactions.md` §1）裡混進了 X027、X032、X035 三列 → `design_to_csv.py` 依 ID 前綴歸類即可，不需改文件。
 - ~~成就沒有 A05~~ → **刻意跳過**（2026-10-31 人確認）。
 - ~~互動沒有 X019~~ → **刻意跳過**（2026-10-31 人確認）。
@@ -261,3 +272,11 @@ deploy/                      Pixel Streaming：Wilbur 設定、配對頁、實�
   - **X021 測試**走真流程：CSV → `Load` → query（F09、`SELF`、`MakeSnapshot()`）→ `ApplyInteraction(R, "P1")`。
   - **沒有碰** E01～E03（步驟 5）、結局成就（步驟 8）。詮釋與取捨見「待人確認」的步驟 4 一項。
   - **時間／測試**：整個 `tools/run_tests.sh` 約 20 秒（含增量編譯）。紅的時候 Step4 的 7 條都失敗、舊的全綠（UE 53/60）。最後 Python 35/35；UE 60/60。第一次實作就全綠，沒有改過測試。
+
+- **2026-10-31 步驟 5 大門密碼**：改 `Logic/TeamState.h/.cpp`，新建 `Logic/EscapeGameLogic.h/.cpp`，新增 `Tests/Step5_DoorPassword.spec.cpp`（`EscapeGame.Step5`，8 條 VERIFY + 5 條 PLANS 詮釋，共 13 條 It）與 `tests/test_step5_password_secrecy.py`（6 條）。
+  - **FTeamState**：`explicit FTeamState(int32 Seed)`（無參數 = 種子 0，舊測試沒動）；內部 `FRandomStream`；密碼 `RandRange(0, 9998)`，≥1031 加 1，`%04d`。`CheckPassword(Code)` → `EPasswordInput`；`AddFlag`／`HasFlag`／`GetFlags`，`MakeSnapshot()` 帶旗標；E05 重啟＝`StartNewRound()`：清旗標、重抽密碼（和倒數、已觸發一起重置）。`ApplyInteraction(Result, PlayerId = {}, bool* OutChanceHit = nullptr)`：E01～E03 → 只 `MarkEscaped(PlayerId)` 並回傳 `FTeamEvent{結局, [PlayerId]}`（PlayerId 空／不存在／已結束 → 沒事件）；`bHasHpChance` → `RandHelper(Den) < Num` 才套 `HpChanceDelta`。
+  - **密碼不外洩**：`GetPasswordForDevOnly()` 與 `StartNewRoundForTesting()` 只在 `#if !UE_BUILD_SHIPPING` 裡；`Password` 是 private，沒有 getter、沒有任何 log。Step5 spec 整個檔案包在 `#if !UE_BUILD_SHIPPING`（因為它要呼叫 DevOnly 函式）。Python 檢查器（`strip_comments` 處理字串裡的 `//`、輸出類呼叫的整個陳述句、`#if` 堆疊追蹤 `#else`／`#elif`）掃整個 `Source/EscapeGame/`，另有 3 條測檢查器本身會抓到故意寫壞的範例。
+  - **FEscapeGameLogic**：`Load(五份 CSV, Seed, Out, OutError)`（Locations 先只存起來；X017 文字不是剛好兩段「…」→ 失敗並寫出 `X017`；所有密碼鎖列要同一個對象）、`AddPlayer`、`Interact`、`SubmitPassword`、`Tick`、`GetTeam`、`GetResolver`；`FInteractOutcome{Kind, Result, Messages, Events, bHpChanceHit}`、`EInteractKind{Rejected, Blocked, NeedsPassword, Resolved}`（`Blocked` 這一步還用不到）。旗標名稱 `Tried1031` 與 Resolver 解析「曾在大門輸入 1031 且失敗」/「已試過 1031」產生的相同（X035 測試走真流程確認）。
+  - **測試**：10,000 局用兩種做法（10,000 個種子各一局；同一個種子 `StartNewRoundForTesting` 10,000 次），都沒有 1031，並確認 1031 兩邊的數字都出得來。100,000 次輸錯用種子 20261031（第一個選的種子，沒有挑），擲中 117 次（70～130 內）、E05 重啟 23 次（= 117 / 5）、每一次都是 `Resolved` + X017。密碼不外洩：30 個種子 × 每個 S 物件 + 各種錯碼 + 正確碼，收集所有 `Messages` 與 `Result.Text`，沒有一則含當局密碼。
+  - **偏離 PLANS 架構的地方**：沒有。`FInteractOutcome` 的欄位照派工單（`Events` 一個陣列、`bHpChanceHit`），「新解鎖成就、變身前後形態、進入的特殊地點」留給步驟 6、8。
+  - **時間／測試**：每輪 `tools/run_tests.sh` 約 20～40 秒（含增量編譯）。紅的時候 Step5 的 13 條都失敗（空殼）、舊的 UE 測試全綠、Python 41 條裡只有 UE 那條失敗；第一次紅跑時我的測試輔助函式拿空密碼取 `Out[0]` 讓測試行程當掉（segfault），改成密碼不是四位時回傳一定錯的碼，再重跑才是乾淨的「斷言失敗」。最後 Python 41/41；UE 73/73。綠的階段第一次實作就全綠，沒有改過測試。詮釋與取捨見「待人確認」的步驟 5 一項。

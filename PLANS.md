@@ -13,7 +13,7 @@
 - [x] **0c UE 專案與 UE 測試環境**：repo 根目錄建 C++ ThirdPerson 專案 `EscapeGame.uproject`；`tools/run_tests.sh` 加上 headless UE 自動化測試 → STEP 0（第 3、4 條）
 
 ### 第 1 批 資料管線
-- [ ] **1 設計文件轉 CSV**：`tools/design_to_csv.py` 依 ID 前綴分類，輸出 `Content/Data/DT_*.csv`；格式錯誤時指出 ID 與行號 → STEP 1
+- [x] **1 設計文件轉 CSV**：`tools/design_to_csv.py` 依 ID 前綴分類，輸出 `Content/Data/DT_*.csv`；格式錯誤時指出 ID 與行號 → STEP 1
 
 ### 第 2 批 核心邏輯（`Source/EscapeGame/Logic/`，UE 自動化測試，固定種子、固定 dt）
 - [ ] **2 互動判定**：Resolver 優先序（X033 鑰匙圈碰門 → 精確 → 其他／非人類形態 → 任一形態 → 預設嘲諷）；CSV 每列 X 一個 test case → STEP 2
@@ -50,7 +50,7 @@ docs/design/                 設計文件（素材，不修改）
 tools/
   run_tests.sh               一行跑全部測試（Python；UE 測試由 test_step0c_ue_project.py 呼叫 run_ue_tests.py）
   run_ue_tests.py            編譯 EscapeGameEditor + headless（-nullrhi）跑 UE 自動化測試（0c）
-  design_to_csv.py           設計文件 → Content/Data/DT_*.csv（步驟 1）
+  design_to_csv.py           設計文件 → Content/Data/DT_*.csv（步驟 1）；可用 --interactions／--script／--out 指定輸入輸出
 tests/                       Python 測試，test_stepN_名稱.py
 EscapeGame.uproject          （0c）UE 專案；.mcp.json 是 Claude Code 連 MCP 的設定（只指向 127.0.0.1:8000）
 Config/ Content/ThirdPerson/ Content/{LevelPrototyping,Characters,Input}/   ThirdPerson 範本與共用素材（Content 約 130 MB，*.uasset／*.umap 走 LFS）
@@ -179,3 +179,18 @@ deploy/                      Pixel Streaming：Wilbur 設定、配對頁、實�
   - **0c 修正（驗收時發現的兩個問題）**：
     1. `run_ue_tests.py` 會卡住：UE 啟動的 `UnrealTraceServer fork` 繼承了 stdout／stderr 管道，`subprocess.run(stdout=PIPE)` 等不到 EOF（UE 本身早已結束）。修法：編譯與 UE 的輸出都改寫到 `Saved/Automation/build.log`、`ue_tests.log`，不用 PIPE，stdin 接 DEVNULL；失敗時印 log 最後 4000 字。另外查引擎原始碼（`TraceAuxiliary.cpp`）確認 `-notraceserver` 會跳過自動啟動 Trace 伺服器（也就不會聽 0.0.0.0:1985），已加進測試命令列；實測跑完沒有 UnrealTraceServer 留下。
     2. `run_tests.sh` 最後一行不是 `OK`：stdout 非 tty 時有緩衝，UE 清單在 unittest 總結（stderr）之後才出現。修法：`python3 -I -u`（不緩衝），沒有改測試。
+
+- **2026-10-31 人接受 5d60e51**（0c 修改 spec 測試名稱）；之後 UE spec 的 Describe/It 名稱不可以含「.」。
+
+- **2026-10-31 步驟 1 設計文件轉 CSV**：`tools/design_to_csv.py`（標準函式庫），輸出 4 個 `Content/Data/DT_*.csv` 並 commit（`.gitattributes` 只有 uasset／umap 走 LFS，csv 不是）。列數：Forms 13、SceneObjects 20、Locations 2、Interactions 36。
+  - **歸類**：依每列第一欄 ID 前綴（F／S／L／X），不看它在哪一節。X027、X032、X035 因此進 DT_Interactions。其他表（結局 E、成就 A、基本資料……）不處理；§5 預設回應、成就、結局這一步都**沒做**。
+  - **欄數**：以前綴自己的表頭為準，所以形態表裡的 X 列要 11 欄（不是形態表的 6 欄）。
+  - **CSV 格式**：UTF-8、無 BOM、`\n` 換行、`csv` 模組處理引號；第一欄 `Name` 放 ID；儲存格只去前後空白，其餘原樣（中文、全形標點、`🎂`、反引號）。列順序＝設計文件出現順序（S10 在 S09 前面、X027／X032／X035 在 X018 前面）。沒有加「所屬區域小節」欄（步驟 2 用不到）。
+  - **欄名對照**（步驟 2 的 USTRUCT 要一致；也寫在腳本最上面）：
+    - Forms：形態 ID→Name、形態名稱→FormName、取得方式→Acquisition、位置→Location、形態能力／限制→Ability、說明→Description
+    - SceneObjects：物件 ID→Name、名稱→ObjectName、位置→Location、說明→Description
+    - Locations：地點 ID→Name、地點名稱→LocationName、入口→Entrance、可進入形態→AllowedForms、進入後內容→Contents、離開方式→ExitMethod
+    - Interactions：互動 ID→Name、玩家形態→PlayerForm、互動對象→Target、事件類型→EventType、事件描述→EventText、變身結果→TransformResult、出現物品→SpawnedItem、生命值變化→HpChange、成就→Achievement、前置條件→Precondition、備註→Notes
+  - **錯誤處理**：欄位數不對、ID 重複、表頭和預期不同、我們的表裡第一欄不是 ID → 結束碼 1，stderr 寫「檔名:行號: ID …」。全部在記憶體解析成功後才寫暫存檔再一起替換，出錯不動既有 CSV、也不建立新檔。
+  - **給步驟 2 的建議**：所有欄位目前都是字串（含 HpChange 如「-1」、「每次輸錯有 1/1000 機率 -1」）；結構化（機率、前置條件、形態 ID 與對象 ID 拆開）要在步驟 2 的 Resolver 或另一層做，或之後再請人決定是否在設計文件加機器可讀欄位。步驟 2 若要「預設嘲諷」文字、成就名稱、結局，需要另外的 CSV（DT_Achievements／DT_Endings），到時再加進腳本。
+  - **遇到的問題**：形態表混入的 X 列欄數和形態表表頭不同，所以不能用「同一個表的表頭」檢查欄數。

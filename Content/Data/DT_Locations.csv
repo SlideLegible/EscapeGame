@@ -1,0 +1,3 @@
+Name,LocationName,Entrance,AllowedForms,Contents,ExitMethod
+L01,飲料機內部,S03 飲料機,F01 飲料罐垃圾,飲料（F02）,變回人類或變成其他物品（依變身規則）
+L02,飲料機底下,S04 飲料機底下,F01 飲料罐垃圾,學生證（F03）,變回人類或變成其他物品（依變身規則）

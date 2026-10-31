@@ -92,9 +92,11 @@ def run():
 
     # 2. 清掉上次蓋的（Graybox 資料夾）和範本的地板
     removed = 0
-    for actor in call("scene.SceneTools.get_actors_in_folder", folder_path=GRAYBOX_FOLDER, recursive=True)["returnValue"]:
-        if call("scene.SceneTools.remove_from_scene", actor=actor)["returnValue"]:
-            removed += 1
+    folders = call("scene.SceneTools.get_folders")["returnValue"]
+    if GRAYBOX_FOLDER in folders:  # 第一次跑還沒有這個資料夾；查不存在的資料夾會丟錯
+        for actor in call("scene.SceneTools.get_actors_in_folder", folder_path=GRAYBOX_FOLDER, recursive=True)["returnValue"]:
+            if call("scene.SceneTools.remove_from_scene", actor=actor)["returnValue"]:
+                removed += 1
     for actor in call("scene.SceneTools.find_actors", name="Floor", tag="", collision_channels=[])["returnValue"]:
         if call("actor.ActorTools.get_label", actor=actor)["returnValue"] == "Floor":
             if call("scene.SceneTools.remove_from_scene", actor=actor)["returnValue"]:

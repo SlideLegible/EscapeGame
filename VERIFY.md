@@ -75,13 +75,13 @@
 - [x] **不可以** 輸入次數有上限（AI 補充）（AI 代理驗證 2026-10-31：`Step5_DoorPassword.spec.cpp` 13 條 It 全綠（UE 73/73、Python 41/41），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit 與實作）
 
 ### STEP 6 變身
-- [ ] 人類與可變身的物品互動 → 玩家變成該物品；人類身體留在原地（AI 補充）
-- [ ] 物品形態選「變回人類」→ 玩家回到人類身體的位置，變回人類（AI 補充）
-- [ ] 從飲料罐垃圾直接變成學生證 → 飲料罐垃圾留在原地、維持當時的狀態（AI 補充）
-- [ ] 變成飲料罐垃圾碰飲料機（X002）→ 進入飲料機內部（L01），看到飲料；碰飲料機底下（X003）→ 進入 L02，看到學生證（AI 補充）
-- [ ] 監視器（X023）→ 變成監視器後看得到整張地圖（AI 補充）
-- [ ] **不可以** 兩位玩家同時變成同一個物品：第二位玩家互動時，該物品的回應和「別人變成的物品」一樣不能互動（AI 補充）
-- [ ] **不可以** 飲料罐垃圾以外的形態（包含人類）進入特殊地點（例：學生證碰飲料機 → 預設回應，不進入 L01）（AI 補充）
+- [x] 人類與可變身的物品互動 → 玩家變成該物品；人類身體留在原地（AI 補充）（AI 代理驗證 2026-10-31：`Step6_Transform.spec.cpp` 15 條 It 全綠（UE 88/88、Python 41/41），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit 與 Interact／ReleasePlayerForm 實作；邏輯層驗證，畫面上的鏡頭與移動在 STEP 9～12 驗）
+- [x] 物品形態選「變回人類」→ 玩家回到人類身體的位置，變回人類（AI 補充）（AI 代理驗證 2026-10-31：`Step6_Transform.spec.cpp` 15 條 It 全綠（UE 88/88、Python 41/41），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit 與 Interact／ReleasePlayerForm 實作；邏輯層驗證，畫面上的鏡頭與移動在 STEP 9～12 驗）
+- [x] 從飲料罐垃圾直接變成學生證 → 飲料罐垃圾留在原地、維持當時的狀態（AI 補充）（AI 代理驗證 2026-10-31：`Step6_Transform.spec.cpp` 15 條 It 全綠（UE 88/88、Python 41/41），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit 與 Interact／ReleasePlayerForm 實作；邏輯層驗證，畫面上的鏡頭與移動在 STEP 9～12 驗；「狀態」解讀為仍存在、沒人占用、留在放開的位置，見 PLANS 待人確認）
+- [x] 變成飲料罐垃圾碰飲料機（X002）→ 進入飲料機內部（L01），看到飲料；碰飲料機底下（X003）→ 進入 L02，看到學生證（AI 補充）（AI 代理驗證 2026-10-31：`Step6_Transform.spec.cpp` 15 條 It 全綠（UE 88/88、Python 41/41），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit 與 Interact／ReleasePlayerForm 實作；邏輯層驗證，畫面上的鏡頭與移動在 STEP 9～12 驗）
+- [x] 監視器（X023）→ 變成監視器後看得到整張地圖（AI 補充）（AI 代理驗證 2026-10-31：`Step6_Transform.spec.cpp` 15 條 It 全綠（UE 88/88、Python 41/41），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit 與 Interact／ReleasePlayerForm 實作；邏輯層驗證，畫面上的鏡頭與移動在 STEP 9～12 驗；邏輯層 `CanSeeWholeMap` 為真，實際畫面在 STEP 11 驗）
+- [x] **不可以** 兩位玩家同時變成同一個物品：第二位玩家互動時，該物品的回應和「別人變成的物品」一樣不能互動（AI 補充）（AI 代理驗證 2026-10-31：`Step6_Transform.spec.cpp` 15 條 It 全綠（UE 88/88、Python 41/41），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit 與 Interact／ReleasePlayerForm 實作；邏輯層驗證，畫面上的鏡頭與移動在 STEP 9～12 驗）
+- [x] **不可以** 飲料罐垃圾以外的形態（包含人類）進入特殊地點（例：學生證碰飲料機 → 預設回應，不進入 L01）（AI 補充）（AI 代理驗證 2026-10-31：`Step6_Transform.spec.cpp` 15 條 It 全綠（UE 88/88、Python 41/41），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit 與 Interact／ReleasePlayerForm 實作；邏輯層驗證，畫面上的鏡頭與移動在 STEP 9～12 驗）
 
 ### STEP 7 場景狀態
 - [ ] 人類拉下總電閘（X022）→ 顯示「喀——整棟樓瞬間安靜了下來，門禁機的燈也熄了」（AI 補充）

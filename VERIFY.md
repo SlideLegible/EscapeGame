@@ -65,14 +65,14 @@
 - [x] **不可以** 已經逃出的玩家再收到 E04（AI 補充）（AI 代理驗證 2026-10-31：`Step4_Clock.spec.cpp` 7 條 It 全綠（UE 60/60），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit 與實作；畫面上的顯示在 STEP 10 驗）
 
 ### STEP 5 大門密碼
-- [ ] 每局開始 → 產生一組 0000～9999 的四位數密碼（AI 補充）
-- [ ] 用固定種子產生 10,000 局 → 沒有一局的密碼是 1031（AI 補充）
-- [ ] 人類在大門輸入正確密碼（X016）→ 大門打開，該玩家觸發 E02（AI 補充）
-- [ ] 輸入錯誤 →「門紋絲不動，好像有點死了」，不顯示大小、不顯示哪幾位對（AI 補充）
-- [ ] 用固定種子連續輸錯 100,000 次 → 「手指抽筋了」扣血的次數在 70～130 之間（期望 100）（AI 補充）
-- [ ] 輸入 1031 失敗後再看月曆（X035）→ 顯示「旁邊多了一行小字：老師生日🎂」；沒試過 1031 時看月曆（X032）→ 沒有這行字（AI 補充）
-- [ ] **不可以** 遊戲內任何文字、畫面、log（Shipping 版）出現當局密碼（AI 補充）
-- [ ] **不可以** 輸入次數有上限（AI 補充）
+- [x] 每局開始 → 產生一組 0000～9999 的四位數密碼（AI 補充）（AI 代理驗證 2026-10-31：`Step5_DoorPassword.spec.cpp` 13 條 It 全綠（UE 73/73、Python 41/41），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit 與實作）
+- [x] 用固定種子產生 10,000 局 → 沒有一局的密碼是 1031（AI 補充）（AI 代理驗證 2026-10-31：`Step5_DoorPassword.spec.cpp` 13 條 It 全綠（UE 73/73、Python 41/41），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit 與實作）
+- [x] 人類在大門輸入正確密碼（X016）→ 大門打開，該玩家觸發 E02（AI 補充）（AI 代理驗證 2026-10-31：`Step5_DoorPassword.spec.cpp` 13 條 It 全綠（UE 73/73、Python 41/41），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit 與實作）
+- [x] 輸入錯誤 →「門紋絲不動，好像有點死了」，不顯示大小、不顯示哪幾位對（AI 補充）（AI 代理驗證 2026-10-31：`Step5_DoorPassword.spec.cpp` 13 條 It 全綠（UE 73/73、Python 41/41），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit 與實作）
+- [x] 用固定種子連續輸錯 100,000 次 → 「手指抽筋了」扣血的次數在 70～130 之間（期望 100）（AI 補充）（AI 代理驗證 2026-10-31：`Step5_DoorPassword.spec.cpp` 13 條 It 全綠（UE 73/73、Python 41/41），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit 與實作；種子 20261031 擲中 117 次）
+- [x] 輸入 1031 失敗後再看月曆（X035）→ 顯示「旁邊多了一行小字：老師生日🎂」；沒試過 1031 時看月曆（X032）→ 沒有這行字（AI 補充）（AI 代理驗證 2026-10-31：`Step5_DoorPassword.spec.cpp` 13 條 It 全綠（UE 73/73、Python 41/41），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit 與實作）
+- [x] **不可以** 遊戲內任何文字、畫面、log（Shipping 版）出現當局密碼（AI 補充）（AI 代理驗證 2026-10-31：`Step5_DoorPassword.spec.cpp` 13 條 It 全綠（UE 73/73、Python 41/41），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit 與實作；另有 `tests/test_step5_password_secrecy.py` 靜態掃描輸出呼叫與 DevOnly 函式都在 `#if !UE_BUILD_SHIPPING`；實際 Shipping 版在 STEP 16 再確認）
+- [x] **不可以** 輸入次數有上限（AI 補充）（AI 代理驗證 2026-10-31：`Step5_DoorPassword.spec.cpp` 13 條 It 全綠（UE 73/73、Python 41/41），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit 與實作）
 
 ### STEP 6 變身
 - [ ] 人類與可變身的物品互動 → 玩家變成該物品；人類身體留在原地（AI 補充）

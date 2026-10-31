@@ -7,7 +7,7 @@
 
 ### 第 0 批 環境
 - [x] **0a Python 測試環境**：`tools/run_tests.sh` 一行跑全部 Python 測試；確認設計文件存在 → STEP 0（第 1、2、4、5 條）
-- [ ] **0b 工具可行性（人工）**：使用者安裝 UE 5.8；Epic MCP 連線並列出 Actor；Flopperam plugin 在 Linux 編譯；PixelStreaming2 範本在 Firefox 可玩；實測單一實例資源；確認 MCP 只聽 localhost → STEP 0b
+- [x] **0b 工具可行性（人工）**：使用者安裝 UE 5.8；Epic MCP 連線並列出 Actor；Flopperam plugin 在 Linux 編譯；PixelStreaming2 範本在 Firefox 可玩；實測單一實例資源；確認 MCP 只聽 localhost → STEP 0b
   - **Go/No-Go**：Epic MCP 在 Linux 不能用 → 改用 Flopperam 為主，加 `UnrealEditor-Cmd -run=pythonscript` 跑官方 Python 編輯器腳本當後備，寫進調整紀錄
   - **2026-10-30 結果：Go**（細節見調整紀錄）。AI 能驗的都驗完了；**剩人工：在 Firefox 用真的鍵盤滑鼠操控角色**，確認後人在 VERIFY 打勾、在這裡勾掉。
 - [ ] **0c UE 專案與 UE 測試環境**：repo 根目錄建 C++ ThirdPerson 專案 `EscapeGame.uproject`；`tools/run_tests.sh` 加上 headless UE 自動化測試 → STEP 0（第 3、4 條）
@@ -86,6 +86,7 @@ deploy/                      Pixel Streaming：Wilbur 設定、配對頁、實�
 
 ### 工具分工
 - **Epic UE Skills plugin + UE 5.8 內建 MCP（唯一的 MCP）**：擺放 Actor、BP 子類別、UMG、DataTable、PIE、跑測試。0b 已確認在 Linux 可用。灰盒房間也用它（`SceneTools.add_to_scene_from_asset` 放基本形狀）。
+  - 少了 Flopperam 唯一真正缺的是「一鍵蓋建築」（`create_wall`、`construct_house`、`create_staircase` 這類）；Epic 只有 `PrimitiveTools.add_cube` 等 4 種基本形狀。步驟 9 改成：灰盒尺寸寫成 repo 裡的資料檔，用 `ProgrammaticToolset` 一次批次放牆、地板、門洞，可重跑、可 diff。
 - ~~Flopperam MCP（選用）~~：**0b 放棄**，在 UE 5.8.3 編譯失敗（見調整紀錄）。
 - **gamedev skills**：只裝 router + unreal，加 level-design、game-ui-ux、game-feel、camera、puzzle。
 - 原則：
@@ -154,3 +155,6 @@ deploy/                      Pixel Streaming：Wilbur 設定、配對頁、實�
 
 - **2026-10-31 人確認**：BRIEF、VERIFY 確認；A05、X019 刻意跳過；人數上限 3 人；授權 MIT（加 `LICENSE`）。
   步驟 13 改「上限 3 人」、步驟 18 改「3 人同房」、「Pixel Streaming 容量」改寫成 3 人。Claude Code 的 Epic skills plugin 與 gamedev skills 人已安裝。
+
+- **2026-10-31 步驟 0b 完成**：人在 Firefox 實測 Pixel Streaming，鍵盤滑鼠可以操控角色 → 0b 勾掉。
+  另外列出 Epic MCP 全部 toolset，和 Flopperam 開源版的功能逐項比對：Blueprint（53 個工具，含圖的 DSL 讀寫）、Actor、材質、UMG（23 個）、DataTable、PIE、截圖、自動化測試都有；只少了蓋牆／房子／樓梯的巨集 → 已寫進「工具分工」。

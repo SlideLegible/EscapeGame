@@ -92,14 +92,14 @@
 - [x] **不可以** 電閘拉下後再推回去（任何形態碰配電箱都不會恢復）（AI 補充）（AI 代理驗證 2026-10-31：`Step7_SceneState.spec.cpp` 11 條 It 全綠（UE 99/99、Python 41/41），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit 與實作；邏輯層驗證，實際走得過去在 STEP 9、12 驗）
 
 ### STEP 8 成就
-- [ ] 觸發預設嘲諷回應第 10 次 → 解鎖 A01「被嘲笑專家」；第 9 次時還沒解鎖（AI 補充）
-- [ ] 累計變身第 20 次 → 解鎖 A02「我是誰」（AI 補充）
-- [ ] 人類身體連續離開（處於物品形態）超過 10 分鐘 → 解鎖 A03「魂不附體」；9 分 59 秒時還沒解鎖（AI 補充）
-- [ ] 拆開牛皮紙包（X008）→ 解鎖 A04（AI 補充）
-- [ ] 鑰匙圈碰過 S01、S05、S09、S19 四扇門 → 解鎖 A07；只碰過三扇 → 還沒解鎖（AI 補充）
-- [ ] 觸發 E01～E05 任一結局 → 解鎖同名的結局成就（AI 補充）
-- [ ] **不可以** 同一個成就解鎖兩次（不重複跳提示）（AI 補充）
-- [ ] **不可以** 成就寫進磁碟或任何永久儲存（AI 補充）
+- [x] 觸發預設嘲諷回應第 10 次 → 解鎖 A01「被嘲笑專家」；第 9 次時還沒解鎖（AI 補充）（AI 代理驗證 2026-10-31：`Step8_Achievements.spec.cpp` 22 條 It 全綠（UE 121/121、Python 46/46），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit；成就是每位玩家各自的，見 PLANS 待人確認；提示畫面在 STEP 10 驗）
+- [x] 累計變身第 20 次 → 解鎖 A02「我是誰」（AI 補充）（AI 代理驗證 2026-10-31：`Step8_Achievements.spec.cpp` 22 條 It 全綠（UE 121/121、Python 46/46），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit；成就是每位玩家各自的，見 PLANS 待人確認；提示畫面在 STEP 10 驗）
+- [x] 人類身體連續離開（處於物品形態）超過 10 分鐘 → 解鎖 A03「魂不附體」；9 分 59 秒時還沒解鎖（AI 補充）（AI 代理驗證 2026-10-31：`Step8_Achievements.spec.cpp` 22 條 It 全綠（UE 121/121、Python 46/46），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit；成就是每位玩家各自的，見 PLANS 待人確認；提示畫面在 STEP 10 驗）
+- [x] 拆開牛皮紙包（X008）→ 解鎖 A04（AI 補充）（AI 代理驗證 2026-10-31：`Step8_Achievements.spec.cpp` 22 條 It 全綠（UE 121/121、Python 46/46），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit；成就是每位玩家各自的，見 PLANS 待人確認；提示畫面在 STEP 10 驗）
+- [x] 鑰匙圈碰過 S01、S05、S09、S19 四扇門 → 解鎖 A07；只碰過三扇 → 還沒解鎖（AI 補充）（AI 代理驗證 2026-10-31：`Step8_Achievements.spec.cpp` 22 條 It 全綠（UE 121/121、Python 46/46），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit；成就是每位玩家各自的，見 PLANS 待人確認；提示畫面在 STEP 10 驗）
+- [x] 觸發 E01～E05 任一結局 → 解鎖同名的結局成就（AI 補充）（AI 代理驗證 2026-10-31：`Step8_Achievements.spec.cpp` 22 條 It 全綠（UE 121/121、Python 46/46），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit；成就是每位玩家各自的，見 PLANS 待人確認；提示畫面在 STEP 10 驗）
+- [x] **不可以** 同一個成就解鎖兩次（不重複跳提示）（AI 補充）（AI 代理驗證 2026-10-31：`Step8_Achievements.spec.cpp` 22 條 It 全綠（UE 121/121、Python 46/46），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit；成就是每位玩家各自的，見 PLANS 待人確認；提示畫面在 STEP 10 驗）
+- [x] **不可以** 成就寫進磁碟或任何永久儲存（AI 補充）（AI 代理驗證 2026-10-31：`Step8_Achievements.spec.cpp` 22 條 It 全綠（UE 121/121、Python 46/46），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit；成就是每位玩家各自的，見 PLANS 待人確認；提示畫面在 STEP 10 驗；另有 `tests/test_step8_no_persistence.py` 掃描 Source 沒有存檔／寫檔 API）
 
 ---
 

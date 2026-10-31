@@ -176,3 +176,6 @@ deploy/                      Pixel Streaming：Wilbur 設定、配對頁、實�
     4. 每次編輯器 log 都有 `Asset manager settings do not include a rule for assets of type GameFeatureData` 的 Error，是範本專案的固有訊息，不影響載入；先不處理。
     5. UBT 編譯時會短暫開 `UbaServer - Listening on 0.0.0.0:1345`（Unreal Build Accelerator，只有編譯期間）。MCP 仍只聽 127.0.0.1；UBA 這個埠步驟 17 部署時要一起擋（部署機不會編譯，應該不會有）。
   - `.mcp.json` 由 `ModelContextProtocol.GenerateClientConfig ClaudeCode` 產生，伺服器名稱 `unreal-mcp`、`http://127.0.0.1:8000/mcp`。
+  - **0c 修正（驗收時發現的兩個問題）**：
+    1. `run_ue_tests.py` 會卡住：UE 啟動的 `UnrealTraceServer fork` 繼承了 stdout／stderr 管道，`subprocess.run(stdout=PIPE)` 等不到 EOF（UE 本身早已結束）。修法：編譯與 UE 的輸出都改寫到 `Saved/Automation/build.log`、`ue_tests.log`，不用 PIPE，stdin 接 DEVNULL；失敗時印 log 最後 4000 字。另外查引擎原始碼（`TraceAuxiliary.cpp`）確認 `-notraceserver` 會跳過自動啟動 Trace 伺服器（也就不會聽 0.0.0.0:1985），已加進測試命令列；實測跑完沒有 UnrealTraceServer 留下。
+    2. `run_tests.sh` 最後一行不是 `OK`：stdout 非 tty 時有緩衝，UE 清單在 unittest 總結（stderr）之後才出現。修法：`python3 -I -u`（不緩衝），沒有改測試。

@@ -14,7 +14,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 UE_ROOT = Path(os.environ.get("UE_ROOT", str(Path.home() / "UnrealEngine")))
 UPROJECT = ROOT / "EscapeGame.uproject"
-REPORT_DIR = ROOT / "Saved" / "Automation" / "Report"
+LOG_DIR = ROOT / "Saved" / "Automation"
+REPORT_DIR = LOG_DIR / "Report"
 TEST_FILTER = "EscapeGame"
 MAX_PARALLEL_ACTIONS = 10  # 這台機器 RAM 只有 30 GiB
 
@@ -33,9 +34,22 @@ def test_command():
     return [
         str(editor_cmd), str(UPROJECT),
         f"-ExecCmds=Automation RunTests {TEST_FILTER};Quit",
-        "-nullrhi", "-unattended", "-nopause", "-nosplash", "-nosound",
+        "-nullrhi", "-notraceserver", "-unattended", "-nopause", "-nosplash", "-nosound",
         f"-ReportExportPath={REPORT_DIR}",
     ]
+
+
+def run_to_log(cmd, log_name):
+    """輸出寫到 log 檔，不用 PIPE：UnrealTraceServer 之類的子行程會繼承管道，導致 PIPE 永遠等不到 EOF。"""
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    log = LOG_DIR / log_name
+    with open(log, "wb") as f:
+        code = subprocess.run(cmd, cwd=ROOT, stdin=subprocess.DEVNULL, stdout=f, stderr=subprocess.STDOUT).returncode
+    return code, log
+
+
+def log_tail(log, n=4000):
+    return log.read_text(encoding="utf-8", errors="replace")[-n:]
 
 
 def read_results():
@@ -58,21 +72,21 @@ def main():
         return 2
 
     print("編譯 EscapeGameEditor ...", flush=True)
-    build = subprocess.run(build_command(), cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    if build.returncode != 0:
-        print(build.stdout[-4000:])
-        print(f"編譯失敗（結束碼 {build.returncode}）")
+    code, log = run_to_log(build_command(), "build.log")
+    if code != 0:
+        print(log_tail(log))
+        print(f"編譯失敗（結束碼 {code}），完整 log：{log}")
         return 3
 
     if REPORT_DIR.exists():
         shutil.rmtree(REPORT_DIR)
     print("執行 UE 自動化測試（headless、-nullrhi）...", flush=True)
-    run = subprocess.run(test_command(), cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    code, log = run_to_log(test_command(), "ue_tests.log")
 
     results = read_results()
     if results is None:
-        print(run.stdout[-4000:])
-        print(f"找不到測試報告 {REPORT_DIR / 'index.json'}（UnrealEditor-Cmd 結束碼 {run.returncode}）")
+        print(log_tail(log))
+        print(f"找不到測試報告 {REPORT_DIR / 'index.json'}（UnrealEditor-Cmd 結束碼 {code}），完整 log：{log}")
         return 4
 
     mine = [(p, s) for p, s in results if p.startswith("EscapeGame.")]

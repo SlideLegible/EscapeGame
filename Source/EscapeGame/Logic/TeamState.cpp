@@ -1,4 +1,4 @@
-// 步驟 3 生命值：全隊共用狀態（純邏輯）
+// 步驟 3 生命值、步驟 4 時間：全隊共用狀態（純邏輯）
 #include "Logic/TeamState.h"
 
 FTeamState::FTeamState() {}
@@ -22,6 +22,12 @@ TArray<FTeamEvent> FTeamState::ApplyHpDelta(int32 Delta)
 	}
 	return Events;
 }
+
+// 步驟 4 還沒實作（紅）：先放空殼
+TArray<FTeamEvent> FTeamState::Tick(float Dt) { return TArray<FTeamEvent>(); }
+int32 FTeamState::GetRemainingSeconds() const { return 0; }
+FString FTeamState::FormatClock(int32 Seconds) { return FString(); }
+FTeamEvent FTeamState::EndRoundWithDawn() { return FTeamEvent(); }
 
 void FTeamState::AddPlayer(const FString& PlayerId)
 {
@@ -69,7 +75,7 @@ TArray<FString> FTeamState::GetRemainingPlayers() const
 	return Out;
 }
 
-TArray<FTeamEvent> FTeamState::ApplyInteraction(const FInteractionResult& Result)
+TArray<FTeamEvent> FTeamState::ApplyInteraction(const FInteractionResult& Result, const FString& PlayerId)
 {
 	if (!Result.InteractionId.IsEmpty()) { TriggeredIds.Add(Result.InteractionId); }
 	for (const FExtraTrigger& Extra : Result.ExtraTriggers)

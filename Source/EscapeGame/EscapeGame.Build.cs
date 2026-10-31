@@ -23,6 +23,12 @@ public class EscapeGame : ModuleRules
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });
 
+		// 步驟 9：自動化測試用 UEditorLoadingAndSavingUtils::LoadMap 載入地圖（只有編輯器 target 需要）
+		if (Target.bBuildEditor)
+		{
+			PrivateDependencyModuleNames.Add("UnrealEd");
+		}
+
 		PublicIncludePaths.AddRange(new string[] {
 			"EscapeGame",
 		});

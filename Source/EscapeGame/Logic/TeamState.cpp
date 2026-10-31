@@ -34,7 +34,11 @@ EPasswordInput FTeamState::CheckPassword(const FString& Code) const
 	return Code == Password ? EPasswordInput::Correct : EPasswordInput::Wrong;
 }
 
-int32 FTeamState::RollRange(int32 Min, int32) { return Min; }  // 步驟 6 空殼
+int32 FTeamState::RollRange(int32 Min, int32 Max)
+{
+	if (Max < Min) { Swap(Min, Max); }
+	return Stream.RandRange(Min, Max);
+}
 
 void FTeamState::AddFlag(const FString& Flag)
 {

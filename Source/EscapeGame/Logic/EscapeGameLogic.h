@@ -123,7 +123,6 @@ private:
 
 	FInteractionResolver Resolver;
 	FTeamState Team;
-	FString LocationsCsv;
 	FString PasswordTargetId;  // 密碼鎖的對象（S01），從 Resolver 資料找
 	TArray<FPlayerInfo> Players;
 	TArray<FItemState> Items;

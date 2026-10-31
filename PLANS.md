@@ -20,7 +20,7 @@
 - [x] **3 生命值**：初始 5、無上限、不為負、歸零 → E05 重啟但保留成就 → STEP 3
 - [x] **4 時間**：30:00 倒數、時鐘自身互動 → E04 + A06；已逃出者不受影響 → STEP 4
 - [x] **5 大門密碼**：可注入種子的亂數、排除 1031、輸錯 1/1000 扣血、試過 1031 的旗標 → STEP 5
-- [ ] **6 變身**：身體留原地、變回人類、物品互換、物品唯一、L01／L02 進入規則、監視器形態 → STEP 6
+- [x] **6 變身**：身體留原地、變回人類、物品互換、物品唯一、L01／L02 進入規則、監視器形態 → STEP 6
 - [ ] **7 場景狀態**：電閘不可逆、教室門、辦公室門、儲物間門 → STEP 7
 - [ ] **8 成就**：A01／A02／A03 計數、A04／A06／A07、E01～E05；不重複、不寫磁碟 → STEP 8
 
@@ -59,12 +59,12 @@ Source/EscapeGame/
   Logic/                     純邏輯，只依賴 Core；不可 include Engine 的 Actor／畫面標頭
     InteractionResolver.*    （形態, 對象, 狀態快照）→ 互動結果（步驟 2，純函式）
     TeamState.*              全隊狀態：生命值、玩家名單、已觸發、成就、E05 重啟（步驟 3）；倒數與 E04（步驟 4）；密碼、旗標、E01～E03、機率扣血（步驟 5）
-    EscapeGameLogic.*        組合層（步驟 5 建立）：Resolver + TeamState，`Interact`／`SubmitPassword`／`Tick`、`FInteractOutcome`；形態、場景、成就之後加
+    EscapeGameLogic.*        組合層（步驟 5 建立）：Resolver + TeamState，`Interact`／`SubmitPassword`／`ReturnToHuman`／`Tick`、`FInteractOutcome`；形態與位置（步驟 6）；場景、成就之後加
     AchievementTracker.*     成就計數與解鎖
   Core/                      組合層：GameMode、GameState、PlayerState（複製、伺服器權威）
   Forms/                     畫面層：HumanCharacter、FormPawn 與各形態
   UI/                        畫面層：HUD、文字框、密碼鍵盤、結局、成就提示
-  Tests/                     UE 自動化測試，StepN_名稱.spec.cpp（Step2_InteractionResolver.spec.cpp、Step3_TeamState.spec.cpp、Step4_Clock.spec.cpp、Step5_DoorPassword.spec.cpp）
+  Tests/                     UE 自動化測試，StepN_名稱.spec.cpp（Step2_InteractionResolver.spec.cpp、Step3_TeamState.spec.cpp、Step4_Clock.spec.cpp、Step5_DoorPassword.spec.cpp、Step6_Transform.spec.cpp）
 Content/Data/                DT_*.csv 與匯入後的 DataTable
 Content/Maps/                主關卡
 deploy/                      Pixel Streaming：Wilbur 設定、配對頁、實例管理腳本（第 6 批）
@@ -183,6 +183,15 @@ deploy/                      Pixel Streaming：Wilbur 設定、配對頁、實�
   - 被拒絕（`Rejected`）的情形：玩家不存在、已結束、`SubmitPassword` 時不是 F00。物件 ID 不存在這一步**不**拒絕（交給 Resolver 的預設回應），步驟 6 再處理。
   - `Interact` 碰大門回傳 `NeedsPassword` 時完全不改狀態（不記已觸發、不擲骰）。
   - X022 停電後密碼一律當輸錯是步驟 7 的事，這一步沒做。
+- **步驟 6 的詮釋（待人確認，選了最保守的做法）**：
+  - **離開特殊地點（設計文件沒寫清楚）**：`item_interactions.md` §3 的「離開方式：變回人類或變成其他物品（依變身規則）」，加上 §2.2「舊物品留在原地」，照字面會讓飲料罐垃圾卡在飲料機裡、學生證永遠出不了飲料機底下，E01 路線走不通。定案：在特殊地點裡變身成任何物品 → 玩家離開地點，新物品被帶出來放在入口物件（S03／S04）的位置；舊物品（例 F01）也放在入口位置；在地點裡變回人類 → 舊物品放在入口位置。物品不會被留在特殊地點裡（只有還沒被拿走的 F02／F03 在裡面）。入口位置要先用 `RegisterObjectLocation` 註冊，沒註冊就用玩家目前位置。
+  - **在特殊地點裡能做的事**：只能碰「HomeLocationId 等於這個地點的物品」（F02 在 L01、F03 在 L02）和自己（`SELF`），其他（入口、別的地點的物品、一般場景物件）一律 `Rejected`。不在地點裡的人碰還在地點裡的物品（飲料機裡的飲料）也是 `Rejected`（從外面碰不到）。設計文件沒寫這兩條，是為了讓「看到飲料／看到學生證」只發生在進入之後。
+  - **哪個物品屬於哪個特殊地點**：DT_Forms 的 Location 欄等於 DT_Locations 的 LocationName 才算（「飲料機內部」→ F02 屬於 L01、「飲料機底下」→ F03 屬於 L02）；「走廊」「廁所儲物間內部」等不是特殊地點。出現物品（`SpawnedItemId`）第一次出現時才產生，位置是這次互動對象的位置，屬於某地點的就在該地點裡；已存在的物品不重產、不移動（飲料被帶出來之後，別人再進飲料機不會看到新的飲料）。
+  - **任何形態碰可變身物品就變成它**（§1 通用規則）：Resolver 回預設回應、對象是 F01～F12 時，視為變身；`Outcome.Result.bIsDefault` 設成 false、文字清空（沒有嘲諷文字）、`bTransformed` 為 true，並帶 `FromForm`／`ToForm`。步驟 8 要數「預設嘲諷」（A01）時看 `Result.bIsDefault`，要數「變成物品」（A02）時看 `bTransformed`（變回人類 `ReturnToHuman` 不算）。
+  - **被別人占用的物品 → `Blocked`**：不顯示文字、不改任何狀態、不算任何次數；回應和「碰任何別人正在當的物品」完全一樣。碰自己正在當的物品 → `Rejected`。對象 ID 不存在、F00、還沒出現的物品 → `Rejected`（步驟 5 時「ID 不存在交給 Resolver 預設回應」改成這樣）。`SELF` 永遠可以。
+  - **玩家位置**：玩家變成物品時，玩家位置＝物品位置；之後 `SetPlayerLocation` 會讓占用中的物品一起動，人類身體不動。放開物品時物品留在當時位置。逃出（E01～E03）或 E04 的玩家放開物品、物品留在當時位置（學生證留在大門旁）。進入特殊地點時玩家位置不變（UE 端自己決定要不要傳送到裡面）。
+  - **E05 重啟**：還沒結束的玩家變回人類、位置與身體都回到 `AddPlayer` 的出生點、離開特殊地點；所有物品回到初始狀態（只有「一開始就在」的存在、位置回到 `RegisterObjectLocation` 的位置、沒有占用、在地點外）。已逃出的玩家不動。
+  - **骰子 X020**：文字裡的 `[a～b 隨機]` 用 `FTeamState` 同一顆亂數（`RollRange`）換成整數，所以骰子也會讓之後的密碼序列不同（固定種子下仍可重現）。
 - 形態表（`item_interactions.md` §1）裡混進了 X027、X032、X035 三列 → `design_to_csv.py` 依 ID 前綴歸類即可，不需改文件。
 - ~~成就沒有 A05~~ → **刻意跳過**（2026-10-31 人確認）。
 - ~~互動沒有 X019~~ → **刻意跳過**（2026-10-31 人確認）。
@@ -280,3 +289,10 @@ deploy/                      Pixel Streaming：Wilbur 設定、配對頁、實�
   - **測試**：10,000 局用兩種做法（10,000 個種子各一局；同一個種子 `StartNewRoundForTesting` 10,000 次），都沒有 1031，並確認 1031 兩邊的數字都出得來。100,000 次輸錯用種子 20261031（第一個選的種子，沒有挑），擲中 117 次（70～130 內）、E05 重啟 23 次（= 117 / 5）、每一次都是 `Resolved` + X017。密碼不外洩：30 個種子 × 每個 S 物件 + 各種錯碼 + 正確碼，收集所有 `Messages` 與 `Result.Text`，沒有一則含當局密碼。
   - **偏離 PLANS 架構的地方**：沒有。`FInteractOutcome` 的欄位照派工單（`Events` 一個陣列、`bHpChanceHit`），「新解鎖成就、變身前後形態、進入的特殊地點」留給步驟 6、8。
   - **時間／測試**：每輪 `tools/run_tests.sh` 約 20～40 秒（含增量編譯）。紅的時候 Step5 的 13 條都失敗（空殼）、舊的 UE 測試全綠、Python 41 條裡只有 UE 那條失敗；第一次紅跑時我的測試輔助函式拿空密碼取 `Out[0]` 讓測試行程當掉（segfault），改成密碼不是四位時回傳一定錯的碼，再重跑才是乾淨的「斷言失敗」。最後 Python 41/41；UE 73/73。綠的階段第一次實作就全綠，沒有改過測試。詮釋與取捨見「待人確認」的步驟 5 一項。
+
+- **2026-10-31 步驟 6 變身**：改 `Logic/EscapeGameLogic.h/.cpp`（組合層加形態與位置）、`Logic/TeamState.h/.cpp`（加 `RollRange`），新增 `Tests/Step6_Transform.spec.cpp`（`EscapeGame.Step6`，7 條 VERIFY + 8 條 PLANS 詮釋，共 15 條 It）。`InteractionResolver` 沒動。
+  - **資料**：`Load` 現在解析 DT_Forms／DT_SceneObjects／DT_Locations：F01～F12 是物品（F00 不是），`bStartsPresent`＝Acquisition 是「一開始就在」，`HomeLocationId`＝Location 欄等於某個 LocationName，`bSeesWholeMap`＝Ability 含「整張地圖」；地點的入口與可進入形態用「Prefix 加數字」掃描（"F01 飲料罐垃圾"→F01）。載入時檢查入口是 DT_SceneObjects 裡的一個 S、可進入形態與所有出現物品在 DT_Forms，否則報錯並寫出地點／互動 ID。
+  - **狀態**：玩家 `FormId`／`Location`／`BodyLocation`／`SpawnLocation`／`LocationId`；物品 `bExists`／`Location`／`InitialLocation`／`OccupiedBy`／`LocationId`。`FInteractOutcome` 加 `bTransformed`、`FromForm`、`ToForm`、`EnteredLocationId`。介面：`RegisterObjectLocation`、`SetObjectLocation`（PLANS 架構寫 `SetItemLocation`，改名因為 S 物件也要登記位置）、`SetPlayerLocation`、`ReturnToHuman`、`GetPlayerForm`／`GetPlayerLocation`／`GetBodyLocation`／`GetPlayerLocationId`／`CanSeeWholeMap`／`GetItemLocation`／`IsItemPresent`／`GetItemOccupant`／`GetItemLocationId`。
+  - **Interact 檢查順序**照派工單：玩家 → 對象 ID（SELF／F／S，F00 不行）→ 物品已出現／被占用（別人 `Blocked`、自己 `Rejected`）→ 特殊地點規則；都通過才 Resolve。出現物品 → 進入地點 → 變身 → `Apply`（TeamState）；`Apply` 之後處理事件（結束的玩家放開物品、E05 重啟）。`Tick` 的 E04 也走同一條。
+  - **偏離 PLANS 架構**：`SetItemLocation` 改叫 `SetObjectLocation`；其餘照做。詮釋與取捨見「待人確認」的步驟 6 一項（特殊地點的離開方式是最大的一項）。
+  - **時間／測試**：寫測試約 1 輪、實作約 1 輪；整個 `tools/run_tests.sh` 約 25 秒（含增量編譯）。紅的時候 Step6 的 15 條都失敗（空殼）、舊的 UE 測試 73 條全綠（第一次紅跑因為 `FindPlayer` 的非 const 多載只有宣告沒有定義，連結失敗，先把查找函式補上再重跑）。最後 Python 41/41；UE 88/88。實作第一次就全綠，沒有改過測試。

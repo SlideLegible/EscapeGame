@@ -109,6 +109,26 @@ deploy/                      Pixel Streaming：Wilbur 設定、配對頁、實�
   - Wilbur 沒有 bind address 選項，會聽所有介面 → 步驟 17 用防火牆只開放配對頁和 player port。
   - UE 的 Trace 控制埠 1985 也聽 `0.0.0.0`：這是編輯器／遊戲行程**自己**開的（`Runtime/TraceLog/Private/Trace/Control.cpp`，Linux 版 `UnixTrace.cpp` 綁 `s_addr = 0`），寫死、沒有參數能改成只聽 127.0.0.1，`-notraceserver` 也擋不掉。用途是讓別台電腦的 Unreal Insights 遙控開始／停止效能追蹤。Shipping 版不支援完整追蹤（`Config.h` 的 static_assert），預設不會編進這個控制埠 → 部署用 Shipping 就沒有它；開發時靠步驟 17 的防火牆規則擋外部連線，步驟 16 打包後用 `ss` 確認。
 
+### 步驟 4～8 的 Logic 架構（2026-10-31 developer session 規劃，給執行的 subagent 照著做）
+全部在 `Source/EscapeGame/Logic/`，純 C++、只依賴 Core（`FRandomStream` 在 `Math/RandomStream.h`，`FVector` 在 Core）。
+- **`FTeamState`（TeamState.*）全隊、每局的狀態**：生命值、倒數、玩家名單（是否已結束、結局）、已觸發 X、旗標、全隊已解鎖成就（聯集，步驟 3 測試要用）、大門密碼與亂數。
+  - 步驟 4：`Tick(float Dt)`、`GetRemainingSeconds()`（整數秒，無條件進位，加極小容差避免 1/60 累加誤差）、`static FString FormatClock(int32 Seconds)` → `"30:00"`。時間到 0 → 一次 E04 事件（受影響＝還沒結束的玩家），之後時鐘停在 0。
+  - `ApplyInteraction(const FInteractionResult&, const FString& PlayerId = FString())`：結果帶 E04 → 同時間到；帶 E01～E03 → 只有 PlayerId 結束（步驟 5）。拿到 E04 的玩家標成「已結束」（沿用 `bEscaped`／`GetEscapeEnding` 回傳 E04），所以不會再收到 E04；全部玩家都結束 → `Tick` 不再倒數。
+  - 步驟 5：建構子接種子 `FTeamState(int32 Seed)`（保留無參數版本給舊測試）。密碼：`RandRange(0, 9998)`，≥1031 的加 1（均勻、排除 1031、不用重抽迴圈）。`CheckPassword(const FString& Code)` → `EPasswordInput`（不是 4 位數字也算 Wrong）。X017 這類 `bHasHpChance` 在 `ApplyInteraction` 用同一個亂數擲骰（`RandHelper(Den) < Num`），擲中才套 `HpChanceDelta`。取得密碼的函式只在 `#if !UE_BUILD_SHIPPING` 裡（步驟 12 測試模式用）；任何 log 都不寫密碼。
+  - **E05 重啟＝新的一局**：生命值 5、已觸發與旗標清空、倒數回 30:00、重新產生密碼；成就與成就計數、已結束的玩家保留。
+- **`FEscapeGameLogic`（EscapeGameLogic.*，步驟 5 建立）組合層，UE 端只跟它說話**：持有 Resolver、`FTeamState`、形態狀態（步驟 6）、`FAchievementTracker`（步驟 8）。
+  - `static bool Load(Interactions, Forms, SceneObjects, Responses, Locations 五份 CSV 文字, int32 Seed, FEscapeGameLogic& Out, FString& OutError)`。
+  - `FInteractOutcome Interact(const FString& PlayerId, const FString& TargetId)`、`FInteractOutcome SubmitPassword(PlayerId, Code)`、`ReturnToHuman(PlayerId)`、`Tick(float Dt)`、`AddPlayer(PlayerId, FVector Spawn)`、`SetPlayerLocation`／`SetItemLocation`、查詢函式。
+  - `FInteractOutcome`：`EKind { Rejected, Blocked, NeedsPassword, Resolved }`、要顯示的文字、`FInteractionResult`、這次的 `FTeamEvent`、新解鎖成就（依玩家）、變身前後形態、進入的特殊地點。
+  - 步驟 5：`SubmitPassword` 用 `CheckPassword` 的結果組 query（`State.Password`）再 Resolve；1031 輸錯 → 旗標 `Tried1031`。X017 文字有兩段「」：第一段是輸錯的文字，第二段是擲中扣血時**另外**顯示的文字（載入時檢查剛好兩段，否則報錯）。骰子 X020 文字裡的 `[a～b 隨機]` 用亂數換成點數。
+  - 步驟 6 形態：每位玩家有 `FormId`、目前位置、人類身體位置、所在特殊地點（`""`／`L01`／`L02`）；每個物品 F01～F12 有 `bExists`（F08～F12 開局就在，其餘由「出現物品」產生）、位置、`OccupiedBy`、所在特殊地點（DT_Forms 的 Location 等於 DT_Locations 的 LocationName 時就是那個地點）。
+    - 變身：Resolver 給 `TransformFormId`，或對象是可變身物品而 Resolver 回預設回應時（設計文件 §1 通用規則）。人類變身 → 身體留在當時位置；物品換物品 → 舊物品留在當時位置、放開。`ReturnToHuman` → 回到身體位置、離開特殊地點。
+    - 對象是別人占用中的物品 → `Blocked`（不顯示文字、不改任何狀態、不算嘲諷次數）；物品還沒出現、ID 不存在、特殊地點裡的物品而玩家不在那個地點 → `Rejected`。
+    - 特殊地點：形態在 DT_Locations 的 AllowedForms、對象是 Entrance、而且 Resolver 不是預設回應 → 玩家進入該地點。看得到整張地圖：形態的 Ability 含「整張地圖」（F10）。
+    - E05 重啟：所有還沒結束的玩家變回人類、回到出生點；物品回到初始狀態（只剩開局就在的）。
+  - 步驟 7 場景狀態：門與開門的互動 `{S19: X036, S05: X005, S09: X013}` 用小表（載入時檢查 X 存在且對象相符），`IsDoorOpen(DoorId)` 看該 X 是否已觸發。X022 已觸發＝停電：之後**任何密碼都當作輸錯**（走 X017），不讓「正確密碼的回應和輸錯不一樣」洩漏答案。
+  - 步驟 8：`FAchievementTracker`（AchievementTracker.*），**每位玩家各自**的已解鎖與計數；全隊聯集仍寫進 `FTeamState`。A01 預設嘲諷（`bIsDefault` 而且不是變身）第 10 次；A02 變成物品（不含變回人類）第 20 次；A03 連續處於物品形態 > 600 秒（物品換物品不中斷，變回人類或 E05 重啟歸零，用 `Tick` 的 dt 累計）；A04／A06／A07 來自互動資料；E01～E05 結局 → 受影響的玩家解鎖同名成就。計數、碰過的門都跨 E05 保留；同一成就只回報一次。
+
 ### 素材來源
 （步驟 15 開始填：素材名稱、來源網址、授權。）
 

@@ -22,7 +22,7 @@
 - [x] **5 大門密碼**：可注入種子的亂數、排除 1031、輸錯 1/1000 扣血、試過 1031 的旗標 → STEP 5
 - [x] **6 變身**：身體留原地、變回人類、物品互換、物品唯一、L01／L02 進入規則、監視器形態 → STEP 6
 - [x] **7 場景狀態**：電閘不可逆、教室門、辦公室門、儲物間門 → STEP 7
-- [ ] **8 成就**：A01／A02／A03 計數、A04／A06／A07、E01～E05；不重複、不寫磁碟 → STEP 8
+- [x] **8 成就**：A01／A02／A03 計數、A04／A06／A07、E01～E05；不重複、不寫磁碟 → STEP 8
 
 ### 第 3 批 場景與單人通關
 - [ ] **9 灰盒關卡**：MCP 搭 8 個區域，擺放所有 F、S 物件；自動化測試掃描關卡 → STEP 9
@@ -52,19 +52,19 @@ tools/
   run_ue_tests.py            編譯 EscapeGameEditor + headless（-nullrhi）跑 UE 自動化測試（0c）
   design_to_csv.py           設計文件 → Content/Data/DT_*.csv（步驟 1）；可用 --interactions／--script／--out 指定輸入輸出
   design_to_responses.py     設計文件 §5 → Content/Data/DT_Responses.csv（步驟 2）；--interactions／--out
-tests/                       Python 測試，test_stepN_名稱.py（test_step5_password_secrecy.py：掃 Source/ 的 log 與 DevOnly 函式）
+tests/                       Python 測試，test_stepN_名稱.py（test_step5_password_secrecy.py：掃 Source/ 的 log 與 DevOnly 函式；test_step8_no_persistence.py：掃 Source/ 不可有永久儲存 API）
 EscapeGame.uproject          （0c）UE 專案；.mcp.json 是 Claude Code 連 MCP 的設定（只指向 127.0.0.1:8000）
 Config/ Content/ThirdPerson/ Content/{LevelPrototyping,Characters,Input}/   ThirdPerson 範本與共用素材（Content 約 130 MB，*.uasset／*.umap 走 LFS）
 Source/EscapeGame/
   Logic/                     純邏輯，只依賴 Core；不可 include Engine 的 Actor／畫面標頭
     InteractionResolver.*    （形態, 對象, 狀態快照）→ 互動結果（步驟 2，純函式）
     TeamState.*              全隊狀態：生命值、玩家名單、已觸發、成就、E05 重啟（步驟 3）；倒數與 E04（步驟 4）；密碼、旗標、E01～E03、機率扣血（步驟 5）
-    EscapeGameLogic.*        組合層（步驟 5 建立）：Resolver + TeamState，`Interact`／`SubmitPassword`／`ReturnToHuman`／`Tick`、`FInteractOutcome`；形態與位置（步驟 6）；場景狀態（步驟 7：`IsDoorOpen`／`GetOpenDoors`／`IsPowerCut`）；成就之後加
-    AchievementTracker.*     成就計數與解鎖
+    EscapeGameLogic.*        組合層（步驟 5 建立）：Resolver + TeamState，`Interact`／`SubmitPassword`／`ReturnToHuman`／`Tick`、`FInteractOutcome`；形態與位置（步驟 6）；場景狀態（步驟 7：`IsDoorOpen`／`GetOpenDoors`／`IsPowerCut`）；成就（步驟 8：`GetAchievements`／`PopNewAchievements`／`FInteractOutcome::NewAchievements`）
+    AchievementTracker.*     成就計數與解鎖（步驟 8，每位玩家各自，只在記憶體）
   Core/                      組合層：GameMode、GameState、PlayerState（複製、伺服器權威）
   Forms/                     畫面層：HumanCharacter、FormPawn 與各形態
   UI/                        畫面層：HUD、文字框、密碼鍵盤、結局、成就提示
-  Tests/                     UE 自動化測試，StepN_名稱.spec.cpp（Step2_InteractionResolver.spec.cpp、Step3_TeamState.spec.cpp、Step4_Clock.spec.cpp、Step5_DoorPassword.spec.cpp、Step6_Transform.spec.cpp、Step7_SceneState.spec.cpp）
+  Tests/                     UE 自動化測試，StepN_名稱.spec.cpp（Step2_InteractionResolver.spec.cpp、Step3_TeamState.spec.cpp、Step4_Clock.spec.cpp、Step5_DoorPassword.spec.cpp、Step6_Transform.spec.cpp、Step7_SceneState.spec.cpp、Step8_Achievements.spec.cpp）
 Content/Data/                DT_*.csv 與匯入後的 DataTable
 Content/Maps/                主關卡
 deploy/                      Pixel Streaming：Wilbur 設定、配對頁、實例管理腳本（第 6 批）
@@ -198,6 +198,19 @@ deploy/                      Pixel Streaming：Wilbur 設定、配對頁、實�
   - **門表只有三扇**：`{S19: X036, S05: X005, S09: X013}`。大門（S01）不在表裡，`IsDoorOpen("S01")` 永遠 false（大門靠學生證／密碼結束該玩家的遊戲，不是共用的開門狀態）。
   - **人類再碰配電箱**：資料如此，拉下後人類再碰仍是 X022（不會變成預設回應也不會恢復）；非人類碰是 X025 扣血，與是否停電無關。
   - **學生證碰大門（停電後）**：Resolver 因為 X010 的前置條件「未觸發 X022」不成立，回預設回應；這一步只確認，沒有改 Resolver。
+- **步驟 8 的詮釋（待人確認，選了最保守的做法）**：
+  - **A03 的門檻與容差**：連續處於物品形態的秒數用 `double` 累計，`> 600.0 + 1e-3` 才解鎖。`Tick` 的 dt 是 float 的 1/60，每格比 1/60 多約 8e-9 秒，累加 36000 格（600 秒整）約多 3e-4 秒，所以容差用 1e-3（遠小於一格 0.0167 秒）：600 秒整（36000 格）還沒解鎖、再多一格才解鎖，599 秒多一點更沒有。
+  - **A03 只算 `Tick` 的時間**：沒有 `Tick` 就不會累計；已結束（逃出或 E04）的玩家不累計；人類形態不累計。變回人類（`ReturnToHuman`）與 E05 重啟歸零；物品換物品、進出特殊地點不歸零。E05 重啟歸零是我的詮釋（設計文件只說「離開超過 10 分鐘」，沒寫重啟怎麼算；重啟時玩家本來就被帶回人類身體）。
+  - **A01 只數 `Kind == Resolved` 而且 `Result.bIsDefault`**：Blocked／Rejected／NeedsPassword、碰可變身物品的預設變身（步驟 6 已改成非嘲諷）都不算；`SELF` 的預設回應、`SubmitPassword` 若得到預設回應也算（資料上不會發生）。
+  - **A02 數 `bTransformed`**：包含物品換物品、在特殊地點裡變身；`ReturnToHuman` 不算。
+  - **A04／A06／A07 給「做這個互動的玩家」**；E04 由 X021 觸發時，A06 只給做互動的玩家，E04 給所有還沒逃出的玩家（A06 與 E04 是兩個不同的成就來源）。
+  - **E01～E05 一律從 `FTeamEvent` 的受影響玩家發**：E01～E03 只有逃出的那位；E04、E05 是事件當下所有還沒逃出的玩家（已逃出的不會補發）。E05 也發（設計文件 §8），跨重啟保留。
+  - **成就、計數、鑰匙圈碰過的門全部跨 E05 保留**（BRIEF：成就同一次遊玩跨局保留）。因為已觸發集合會被 E05 清掉，所以「碰過的門」放在追蹤器（每位玩家各自），不放在 `FTeamState`；組 query 時才放進 `State.TouchedDoors`。
+  - **A07 碰門的記錄**：形態是 F11、對象在 Resolver 的門清單（`GetDoorIds()`）時，Resolve 之後把門記進該玩家的集合（Resolver 判定時已經把這次碰的門算進去，所以第四扇門那次就得到 X034）。X034 在四扇門都碰過之後，每次碰門仍會回傳（步驟 2 的詮釋），但成就只回報一次。碰門的記錄是每位玩家各自的：P1 碰三扇、P2 碰一扇不會合併。
+  - **全隊聯集**：每個新解鎖也寫進 `FTeamState::AddUnlockedAchievement`（新增的函式）；Resolver 結果裡的成就欄 `ApplyInteraction` 本來就會加。聯集只是給步驟 3 的測試與之後的 UI 看，真正「誰解鎖了什麼」以追蹤器為準。
+  - **`PopNewAchievements` 是單一佇列**：不分玩家，給 UE 端用；`FInteractOutcome::NewAchievements` 只有那次呼叫新解鎖的（`Interact`／`SubmitPassword`），`Tick` 與事件來的只在佇列裡（`Tick` 回傳型別沒改）。沒人取走的佇列會一直累積（一局最多幾十筆，沒有上限處理）。
+  - **解鎖要求玩家存在**：`UnlockAchievement` 的玩家必須是 `AddPlayer` 加過的。
+  - **不寫永久儲存**：追蹤器只有 `TMap`、`TSet`、`TArray`，沒有 static、沒有全域；`tests/test_step8_no_persistence.py` 掃整個 `Source/EscapeGame/`（含測試）不可以有 `SaveGame`／`FFileHelper::Save*`／`GConfig->Set*`／`SaveConfig`／`IFileManager`／`IPlatformFile`／`FArchive`／`CreateFileWriter`／`ofstream`／`fopen` 等（讀檔 `LoadFileToString` 不算）。這條 Python 測試在紅的 commit 就是綠的（目前程式碼本來就沒有這些 API），它是之後的防護網，不是「還沒實作」的紅。
 - 形態表（`item_interactions.md` §1）裡混進了 X027、X032、X035 三列 → `design_to_csv.py` 依 ID 前綴歸類即可，不需改文件。
 - ~~成就沒有 A05~~ → **刻意跳過**（2026-10-31 人確認）。
 - ~~互動沒有 X019~~ → **刻意跳過**（2026-10-31 人確認）。
@@ -311,3 +324,11 @@ deploy/                      Pixel Streaming：Wilbur 設定、配對頁、實�
   - **紅的時候**：header 與 cpp 先放空殼（`IsDoorOpen` 回 false 等），spec 編得過。Step7 11 條裡 10 條失敗，原因都是「還沒實作」的斷言（停電／門開沒有、停電後密碼不走 X017、載入不報錯）；第 3 條 VERIFY（非人類碰配電箱 X025 扣血）在紅的時候就通過，因為那是 Resolver 資料已有的行為（步驟 2），這條只是確認組合層沒有擋掉它。舊的 88 條全綠。
   - **偏離 PLANS 架構的地方**：沒有。
   - **時間／測試**：寫測試約 1 輪、實作約 1 輪；整個 `tools/run_tests.sh` 約 25 秒（含增量編譯）。最後 Python 41/41；UE 99/99。實作第一次就全綠，沒有改過測試。
+
+- **2026-10-31 步驟 8 成就**：新增 `Logic/AchievementTracker.h/.cpp`（`FAchievementTracker`，只用 Core），改 `Logic/EscapeGameLogic.h/.cpp`（接上追蹤器）、`Logic/TeamState.h/.cpp`（加 `AddUnlockedAchievement`），新增 `Tests/Step8_Achievements.spec.cpp`（`EscapeGame.Step8`，13 條 VERIFY 相關 + 9 條 PLANS 詮釋，共 22 條 It）與 `tests/test_step8_no_persistence.py`（5 條）。`InteractionResolver` 沒動。
+  - **追蹤器**：每位玩家一筆紀錄（已解鎖清單依解鎖順序、嘲諷次數、變身次數、連續物品形態秒數 `double`、鑰匙圈碰過的門）。`Unlock` 第一次 true 之後 false；門檻是具名常數（`TauntThreshold = 10`、`TransformThreshold = 20`、`ItemFormSecondsThreshold = 600.0`、`SecondsTolerance = 1e-3`）。
+  - **組合層**：`FAchievementUnlock { PlayerId, AchievementId }`；`FInteractOutcome::NewAchievements`；`PopNewAchievements()` 取出並清空佇列。解鎖統一走 `UnlockAchievement`（追蹤器 → 全隊聯集 → 佇列）。A01 在 `Apply`（預設嘲諷）、A02 在 `Interact` 變身之後、A03 在 `Tick`、A04／A06／A07 在 `Apply` 讀 `Result.AchievementIds` 與 `ExtraTriggers`、E01～E05 讀事件（`Interact`／`SubmitPassword`／`Tick` 三條路徑都有）。
+  - **補上 X034 永遠不會觸發的缺口**：`Interact` 組 query 時把該玩家碰過的門放進 `State.TouchedDoors`，F11 碰門後記進集合。步驟 2 的 Resolver 與測試沒動。
+  - **偏離 PLANS 架構的地方**：沒有。詮釋與取捨見「待人確認」的步驟 8 一項。
+  - **測試**：每條 VERIFY 一個 It（結局成就 E01、E02、E03、E04（時鐘）、E04（時間到）、E05 各一條，所以 VERIFY 第 6 條共 6 個 It）；A01 用「人類碰講桌 S16」（互動表沒有人類碰講桌，一定是預設嘲諷，測試裡每次都檢查 `bIsDefault`）；A02 用椅子 F12 與骰子 F08 來回、每 4 次中間變回人類；A03 跑 599 秒、600 秒整、再多一格；A07 先碰 S01 兩次、S05、S09 確認同一扇門不重複計、只有三扇不算。E03 路線走真的互動（X009 → F04 → X005 → X006 → F05 → X013 → F07 → X015）。額外：跨 E05（嘲諷 6 次 → E05 → 再 4 次；鑰匙圈碰三扇 → E05 → 只碰第四扇就 A07）、每位玩家各自、`PopNewAchievements`（Interact／Tick／事件三種來源）、`NewAchievements` 與佇列一致、A03 物品換物品不歸零／變回人類歸零／E05 歸零、Blocked／Rejected／NeedsPassword／變身不算嘲諷、追蹤器單元。不可以寫進永久儲存：C++ 端兩個實例先後建立、第一個結束後第二個沒有成就；Python 端靜態掃描與檢查器自測。
+  - **時間／測試**：寫測試約 1 輪、實作約 1 輪；整個 `tools/run_tests.sh` 約 25 秒（含增量編譯）。紅的時候 Step8 的 22 條都失敗（空殼）、舊的 99 條 UE 測試全綠，Python 5 條新測試是綠的（防護網，見待人確認）。最後 Python 46/46；UE 121/121。實作第一次就全綠，沒有改過測試。

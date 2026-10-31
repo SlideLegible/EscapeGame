@@ -1,10 +1,11 @@
-// 步驟 5 大門密碼、步驟 6 變身、步驟 7 場景狀態：組合層。Resolver 判定 → 形態／位置 → TeamState 套用 → 整理成要顯示的文字與事件。
+// 步驟 5 大門密碼、步驟 6 變身、步驟 7 場景狀態、步驟 8 成就：組合層。Resolver 判定 → 形態／位置 → TeamState 套用 → 整理成要顯示的文字與事件。
 #include "Logic/EscapeGameLogic.h"
 #include "Serialization/Csv/CsvParser.h"
 
 namespace
 {
 	const TCHAR* const HumanForm = TEXT("F00");
+	const TCHAR* const KeyRingForm = TEXT("F11");  // 一大串鑰匙圈：碰門時把門記進 A07 的集合
 	const TCHAR* const SelfTarget = TEXT("SELF");  // 與 Resolver 的「（自身）」對象 ID 相同
 	const TCHAR* const StartsPresentText = TEXT("一開始就在");  // DT_Forms 的 Acquisition
 	const TCHAR* const WholeMapAbility = TEXT("整張地圖");      // DT_Forms 的 Ability（監視器）
@@ -325,6 +326,7 @@ FInteractOutcome FEscapeGameLogic::Interact(const FString& PlayerId, const FStri
 	FInteractOutcome Outcome;  // 預設 Rejected
 	FPlayerInfo* Player = FindPlayer(PlayerId);
 	if (!Player || Team.HasEscaped(PlayerId)) { return Outcome; }
+	const int32 PendingStart = PendingAchievements.Num();  // 這次互動新解鎖的成就從這裡開始
 
 	// 對象：SELF，或 DT_Forms／DT_SceneObjects 裡的 ID（F00 不能當對象）
 	const bool bSelf = TargetId == SelfTarget;
@@ -358,12 +360,18 @@ FInteractOutcome FEscapeGameLogic::Interact(const FString& PlayerId, const FStri
 	Query.FormId = Player->FormId;
 	Query.TargetId = TargetId;
 	Query.State = Team.MakeSnapshot();  // Password 維持 None
+	Query.State.TouchedDoors = Achievements.GetTouchedDoors(PlayerId);  // 鑰匙圈碰過的門（每位玩家各自，跨 E05 保留）
 	FInteractionResult Result = Resolver.Resolve(Query);
 	if (Result.bNeedsPassword)
 	{
 		Outcome.Kind = EInteractKind::NeedsPassword;
 		Outcome.Result = Result;
 		return Outcome;
+	}
+	// 鑰匙圈（F11）碰門：記下這扇門（A07 的 X034 要四扇都碰過；Resolver 判定時已把這次碰的門算進去）
+	if (Player->FormId == KeyRingForm && Resolver.GetDoorIds().Contains(TargetId))
+	{
+		Achievements.AddTouchedDoor(PlayerId, TargetId);
 	}
 
 	const FVector TargetLocation = bSelf ? Player->Location : GetObjectLocation(TargetId, Player->Location);
@@ -430,11 +438,15 @@ FInteractOutcome FEscapeGameLogic::Interact(const FString& PlayerId, const FStri
 	{
 		Outcome.FromForm = FromForm;
 		Outcome.ToForm = ToForm;
+		// A02：累計變身（變成物品；變回人類 ReturnToHuman 不算）
+		Achievements.AddTransform(PlayerId);
+		if (Achievements.HasReachedTransformThreshold(PlayerId)) { UnlockAchievement(PlayerId, FAchievementTracker::TransformAchievementId); }
 	}
 	else
 	{
 		Outcome.EnteredLocationId = EnteredLocationId;
 	}
+	Outcome.NewAchievements = NewSince(PendingStart);
 	return Outcome;
 }
 
@@ -443,6 +455,7 @@ FInteractOutcome FEscapeGameLogic::SubmitPassword(const FString& PlayerId, const
 	FInteractOutcome Outcome;  // 預設 Rejected
 	const FPlayerInfo* Player = FindPlayer(PlayerId);
 	if (!Player || Team.HasEscaped(PlayerId) || Player->FormId != HumanForm) { return Outcome; }
+	const int32 PendingStart = PendingAchievements.Num();
 
 	FInteractionQuery Query;
 	Query.FormId = Player->FormId;
@@ -455,7 +468,9 @@ FInteractOutcome FEscapeGameLogic::SubmitPassword(const FString& PlayerId, const
 
 	// 試過 1031 又失敗 → 之後月曆多一行小字。先記旗標再套用：萬一這次輸錯剛好扣到 E05，新的一局就從沒旗標開始。
 	if (Query.State.Password == EPasswordInput::Wrong && Code == RedHerringCode) { Team.AddFlag(Tried1031Flag); }
-	return Apply(PlayerId, Result);
+	Outcome = Apply(PlayerId, Result);
+	Outcome.NewAchievements = NewSince(PendingStart);
+	return Outcome;
 }
 
 FInteractOutcome FEscapeGameLogic::Apply(const FString& PlayerId, const FInteractionResult& Result)
@@ -463,8 +478,21 @@ FInteractOutcome FEscapeGameLogic::Apply(const FString& PlayerId, const FInterac
 	FInteractOutcome Outcome;
 	Outcome.Kind = EInteractKind::Resolved;
 	Outcome.Result = Result;
+	// A01：預設嘲諷（碰可變身物品的預設變身在 Interact 已改成 bIsDefault == false，不算）
+	if (Result.bIsDefault)
+	{
+		Achievements.AddTaunt(PlayerId);
+		if (Achievements.HasReachedTauntThreshold(PlayerId)) { UnlockAchievement(PlayerId, FAchievementTracker::TauntAchievementId); }
+	}
 	Outcome.Events = Team.ApplyInteraction(Result, PlayerId, &Outcome.bHpChanceHit);
 	HandleEvents(Outcome.Events);
+	// A04／A06／A07：互動資料的成就欄與額外觸發（X034），給做這個互動的玩家
+	for (const FString& Id : Result.AchievementIds) { UnlockAchievement(PlayerId, Id); }
+	for (const FExtraTrigger& Extra : Result.ExtraTriggers)
+	{
+		for (const FString& Id : Extra.AchievementIds) { UnlockAchievement(PlayerId, Id); }
+	}
+	UnlockEndingAchievements(Outcome.Events);
 
 	if (Result.bHasHpChance)
 	{
@@ -484,17 +512,52 @@ TArray<FTeamEvent> FEscapeGameLogic::Tick(float Dt)
 {
 	TArray<FTeamEvent> Events = Team.Tick(Dt);
 	HandleEvents(Events);
+	UnlockEndingAchievements(Events);
+	// A03：每位還沒結束、處於物品形態的玩家累計秒數（double，避免 1/60 累加誤差）
+	if (Dt > 0.0f)
+	{
+		for (const FPlayerInfo& Player : Players)
+		{
+			if (Player.FormId == HumanForm || Team.HasEscaped(Player.PlayerId)) { continue; }
+			Achievements.AddItemFormSeconds(Player.PlayerId, static_cast<double>(Dt));
+			if (Achievements.HasExceededItemFormThreshold(Player.PlayerId)) { UnlockAchievement(Player.PlayerId, FAchievementTracker::SoulAchievementId); }
+		}
+	}
 	return Events;
 }
 
+// ---- 成就（步驟 8） ----
+
 TArray<FAchievementUnlock> FEscapeGameLogic::PopNewAchievements()
 {
-	return TArray<FAchievementUnlock>();
+	TArray<FAchievementUnlock> Out = MoveTemp(PendingAchievements);
+	PendingAchievements.Reset();
+	return Out;
 }
 
-bool FEscapeGameLogic::UnlockAchievement(const FString& PlayerId, const FString& AchievementId) { return false; }
-void FEscapeGameLogic::UnlockEndingAchievements(const TArray<FTeamEvent>& Events) {}
-TArray<FAchievementUnlock> FEscapeGameLogic::NewSince(int32 StartIndex) const { return TArray<FAchievementUnlock>(); }
+bool FEscapeGameLogic::UnlockAchievement(const FString& PlayerId, const FString& AchievementId)
+{
+	if (!FindPlayer(PlayerId) || !Achievements.Unlock(PlayerId, AchievementId)) { return false; }
+	Team.AddUnlockedAchievement(AchievementId);  // 全隊聯集
+	PendingAchievements.Add({ PlayerId, AchievementId });
+	return true;
+}
+
+void FEscapeGameLogic::UnlockEndingAchievements(const TArray<FTeamEvent>& Events)
+{
+	// E01～E05：每個事件的每位受影響玩家解鎖同名成就（E05 也算，跨重啟保留）
+	for (const FTeamEvent& Event : Events)
+	{
+		for (const FString& PlayerId : Event.AffectedPlayers) { UnlockAchievement(PlayerId, Event.EndingId); }
+	}
+}
+
+TArray<FAchievementUnlock> FEscapeGameLogic::NewSince(int32 StartIndex) const
+{
+	TArray<FAchievementUnlock> Out;
+	for (int32 I = FMath::Max(0, StartIndex); I < PendingAchievements.Num(); ++I) { Out.Add(PendingAchievements[I]); }
+	return Out;
+}
 
 // ---- 形態 ----
 
@@ -528,6 +591,7 @@ bool FEscapeGameLogic::ReturnToHuman(const FString& PlayerId)
 	Player->FormId = HumanForm;
 	Player->LocationId.Empty();
 	Player->Location = Player->BodyLocation;
+	Achievements.ResetItemFormSeconds(PlayerId);  // A03：連續處於物品形態的秒數歸零
 	return true;
 }
 
@@ -559,6 +623,7 @@ void FEscapeGameLogic::RestartRound()
 	for (FPlayerInfo& Player : Players)
 	{
 		if (Team.HasEscaped(Player.PlayerId)) { continue; }
+		Achievements.ResetItemFormSeconds(Player.PlayerId);  // 成就與其他計數、碰過的門跨 E05 保留，只有連續秒數歸零
 		Player.FormId = HumanForm;
 		Player.LocationId.Empty();
 		Player.Location = Player.SpawnLocation;

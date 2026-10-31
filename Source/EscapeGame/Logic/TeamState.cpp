@@ -214,6 +214,7 @@ TArray<FTeamEvent> FTeamState::ApplyInteraction(const FInteractionResult& Result
 
 void FTeamState::AddUnlockedAchievement(const FString& AchievementId)
 {
+	if (!AchievementId.IsEmpty()) { UnlockedAchievements.Add(AchievementId); }
 }
 
 FInteractionState FTeamState::MakeSnapshot() const

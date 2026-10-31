@@ -106,11 +106,11 @@
 ## 第 3 批 場景與單人通關
 
 ### STEP 9 關卡
-- [ ] 開啟主關卡 → 有密碼學教室、走廊、辦公室、廁所、儲物間、警衛室、飲料機內部、飲料機底下 8 個區域（AI 補充）
-- [ ] 自動化測試掃描主關卡 → F01～F12 每個可變身物品、S01～S20 每個場景物件都剛好放了 1 個（馬桶可以多個），而且放在設計文件寫的區域（AI 補充）
-- [ ] 開局玩家出生在密碼學教室（AI 補充）
-- [ ] **不可以** 教室門撞開前，人類能走出教室（AI 補充）
-- [ ] **不可以** 沒開辦公室門、儲物間門之前能走進去（AI 補充）
+- [x] 開啟主關卡 → 有密碼學教室、走廊、辦公室、廁所、儲物間、警衛室、飲料機內部、飲料機底下 8 個區域（AI 補充）（AI 代理驗證 2026-10-31：`Step9_Level.spec.cpp` 8 條 It 與 `tests/test_step9_layout.py` 全綠（UE 132/132、Python 56/56），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；地圖由 `tools/mcp_build_graybox.py` 經 MCP（只聽 127.0.0.1）從 `Level_Layout.csv` 蓋出；看過紅（3d62bd0）到綠（4fb07e0）之間沒有改測試）
+- [x] 自動化測試掃描主關卡 → F01～F12 每個可變身物品、S01～S20 每個場景物件都剛好放了 1 個（馬桶可以多個），而且放在設計文件寫的區域（AI 補充）（AI 代理驗證 2026-10-31：`Step9_Level.spec.cpp` 8 條 It 與 `tests/test_step9_layout.py` 全綠（UE 132/132、Python 56/56），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；地圖由 `tools/mcp_build_graybox.py` 經 MCP（只聽 127.0.0.1）從 `Level_Layout.csv` 蓋出；看過紅（3d62bd0）到綠（4fb07e0）之間沒有改測試）
+- [x] 開局玩家出生在密碼學教室（AI 補充）（AI 代理驗證 2026-10-31：`Step9_Level.spec.cpp` 8 條 It 與 `tests/test_step9_layout.py` 全綠（UE 132/132、Python 56/56），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；地圖由 `tools/mcp_build_graybox.py` 經 MCP（只聽 127.0.0.1）從 `Level_Layout.csv` 蓋出；看過紅（3d62bd0）到綠（4fb07e0）之間沒有改測試；PlayerStart 在教室，實際 PIE 出生在 STEP 12 再確認）
+- [x] **不可以** 教室門撞開前，人類能走出教室（AI 補充）（AI 代理驗證 2026-10-31：`Step9_Level.spec.cpp` 8 條 It 與 `tests/test_step9_layout.py` 全綠（UE 132/132、Python 56/56），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；地圖由 `tools/mcp_build_graybox.py` 經 MCP（只聽 127.0.0.1）從 `Level_Layout.csv` 蓋出；看過紅（3d62bd0）到綠（4fb07e0）之間沒有改測試）
+- [x] **不可以** 沒開辦公室門、儲物間門之前能走進去（AI 補充）（AI 代理驗證 2026-10-31：`Step9_Level.spec.cpp` 8 條 It 與 `tests/test_step9_layout.py` 全綠（UE 132/132、Python 56/56），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；地圖由 `tools/mcp_build_graybox.py` 經 MCP（只聽 127.0.0.1）從 `Level_Layout.csv` 蓋出；看過紅（3d62bd0）到綠（4fb07e0）之間沒有改測試）
 
 ### STEP 10 介面
 - [ ] 畫面上常駐顯示生命值、剩餘時間（mm:ss）、目前形態名稱，都是繁體中文、沒有方塊字（AI 補充）

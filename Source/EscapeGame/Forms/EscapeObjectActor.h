@@ -1,5 +1,4 @@
 // 步驟 9 灰盒關卡：關卡裡的場景物件與可變身物品（灰盒方塊）。
-// 現在是空殼，只讓 Step9_Level.spec.cpp 編得過；SetDoorOpen 的實作在 9b。
 #pragma once
 
 #include "CoreMinimal.h"

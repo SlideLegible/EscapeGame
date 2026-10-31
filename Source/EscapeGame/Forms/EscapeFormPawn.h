@@ -1,5 +1,4 @@
 // 步驟 9 灰盒關卡：玩家的人類身體與可變身物品的 Pawn（移動與鏡頭是步驟 11）。
-// 現在是空殼，只讓 Step9_Level.spec.cpp 編得過。
 #pragma once
 
 #include "CoreMinimal.h"

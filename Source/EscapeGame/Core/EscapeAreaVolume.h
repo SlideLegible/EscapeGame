@@ -1,5 +1,4 @@
 // 步驟 9 灰盒關卡：區域盒子（Classroom、Corridor… 8 個區域各一個）。
-// 現在是空殼，只讓 Step9_Level.spec.cpp 編得過；ContainsPoint 的實作在 9b。
 #pragma once
 
 #include "CoreMinimal.h"

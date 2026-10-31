@@ -516,6 +516,23 @@ void FEscapeGameLogic::RestartRound()
 	}
 }
 
+// ---- 場景狀態（步驟 7） ----
+
+bool FEscapeGameLogic::IsDoorOpen(const FString& DoorId) const
+{
+	return false;
+}
+
+TArray<FString> FEscapeGameLogic::GetOpenDoors() const
+{
+	return TArray<FString>();
+}
+
+bool FEscapeGameLogic::IsPowerCut() const
+{
+	return false;
+}
+
 // ---- 查詢 ----
 
 FString FEscapeGameLogic::GetPlayerForm(const FString& PlayerId) const

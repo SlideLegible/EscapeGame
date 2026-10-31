@@ -1,5 +1,5 @@
-// 步驟 5 大門密碼、步驟 6 變身：組合層。UE 端只跟它說話。純邏輯，只依賴 Core。
-// 場景狀態（7）、成就計數（8）還沒做。
+// 步驟 5 大門密碼、步驟 6 變身、步驟 7 場景狀態：組合層。UE 端只跟它說話。純邏輯，只依賴 Core。
+// 成就計數（8）還沒做。
 #pragma once
 
 #include "CoreMinimal.h"
@@ -71,6 +71,14 @@ public:
 	FString GetItemOccupant(const FString& ItemId) const;
 	/** 物品所在的特殊地點："" 或 L01／L02 */
 	FString GetItemLocationId(const FString& ItemId) const;
+
+	// 場景狀態（步驟 7）：全隊共用，來源是 Team 的已觸發 X；E05 重啟（新的一局）才會清掉。
+	/** 該門的開門互動（S19: X036、S05: X005、S09: X013）已觸發。不在門表的 ID（含 S01 大門）一律 false。 */
+	bool IsDoorOpen(const FString& DoorId) const;
+	/** 目前已開的門，依門表順序（給 UE 端同步） */
+	TArray<FString> GetOpenDoors() const;
+	/** 總電閘（X022）已拉下：不可逆，只有 E05 重啟才恢復。停電後 SubmitPassword 一律當輸錯。 */
+	bool IsPowerCut() const;
 
 	const FTeamState& GetTeam() const { return Team; }
 	const FInteractionResolver& GetResolver() const { return Resolver; }

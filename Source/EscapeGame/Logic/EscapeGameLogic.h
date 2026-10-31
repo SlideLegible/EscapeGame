@@ -47,7 +47,7 @@ public:
 	void SetPlayerLocation(const FString& PlayerId, const FVector& Location);
 
 	FInteractOutcome Interact(const FString& PlayerId, const FString& TargetId);
-	/** 在大門輸入四位數密碼。玩家不是人類形態（F00）→ Rejected */
+	/** 在大門輸入四位數密碼。玩家不是人類形態（F00）→ Rejected。停電（IsPowerCut）後不管輸入什麼都當作輸錯。 */
 	FInteractOutcome SubmitPassword(const FString& PlayerId, const FString& Code);
 
 	/** 變回人類：回到人類身體的位置，離開特殊地點，放開物品（留在原地；在特殊地點裡就放在入口）。

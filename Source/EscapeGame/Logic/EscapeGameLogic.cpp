@@ -1,4 +1,4 @@
-// 步驟 5 大門密碼、步驟 6 變身：組合層。Resolver 判定 → 形態／位置 → TeamState 套用 → 整理成要顯示的文字與事件。
+// 步驟 5 大門密碼、步驟 6 變身、步驟 7 場景狀態：組合層。Resolver 判定 → 形態／位置 → TeamState 套用 → 整理成要顯示的文字與事件。
 #include "Logic/EscapeGameLogic.h"
 #include "Serialization/Csv/CsvParser.h"
 
@@ -11,6 +11,22 @@ namespace
 	const TCHAR* const RandomMarker = TEXT("隨機");
 	const TCHAR* const Tried1031Flag = TEXT("Tried1031");  // 與 Resolver 解析「曾在大門輸入 1031 且失敗」產生的旗標同名
 	const TCHAR* const RedHerringCode = TEXT("1031");
+
+	/** 步驟 7 門表：門（DT_SceneObjects 的 S）→ 打開它的互動（DT_Interactions 的 X）。順序就是 GetOpenDoors 的順序。
+	 *  大門（S01）不在表裡：它靠學生證（X010）或密碼（X016）結束一個玩家的遊戲，不是「開了就全隊都能通過」的門。 */
+	struct FDoorEntry
+	{
+		const TCHAR* DoorId;
+		const TCHAR* InteractionId;
+	};
+	const FDoorEntry DoorTable[] = {
+		{ TEXT("S19"), TEXT("X036") },  // 教室門：椅子撞開
+		{ TEXT("S05"), TEXT("X005") },  // 辦公室門：辦公室鑰匙
+		{ TEXT("S09"), TEXT("X013") },  // 儲物間門：不知道用來做甚麼的鑰匙
+	};
+	/** 總電閘：X022 已觸發＝停電（對象是配電箱 S15）。不可逆，只有 E05 重啟（新的一局）才恢復。 */
+	const TCHAR* const PowerCutInteractionId = TEXT("X022");
+	const TCHAR* const PowerBoxId = TEXT("S15");
 
 	using FTable = TArray<TMap<FString, FString>>;
 
@@ -140,6 +156,30 @@ bool FEscapeGameLogic::Load(const FString& InteractionsCsv, const FString& Forms
 	{
 		OutError = TEXT("DT_Interactions：找不到密碼鎖的列（X016／X017）");
 		return false;
+	}
+
+	// 步驟 7：門表與電閘的互動必須存在，而且對象就是那扇門（那個配電箱）
+	{
+		const auto CheckRow = [&](const TCHAR* InteractionId, const TCHAR* ExpectedTarget) -> bool
+		{
+			const FInteractionRow* Found = NewLogic.Resolver.GetRows().FindByPredicate([&](const FInteractionRow& R) { return R.Id == InteractionId; });
+			if (!Found)
+			{
+				OutError = FString::Printf(TEXT("%s：DT_Interactions 找不到這一列（場景狀態要用它來判斷 %s）"), InteractionId, ExpectedTarget);
+				return false;
+			}
+			if (Found->TargetKind != EInteractionTargetKind::Id || Found->TargetId != ExpectedTarget)
+			{
+				OutError = FString::Printf(TEXT("%s：對象應該是 %s，實際：「%s」"), InteractionId, ExpectedTarget, *Found->RawTarget);
+				return false;
+			}
+			return true;
+		};
+		for (const FDoorEntry& Door : DoorTable)
+		{
+			if (!CheckRow(Door.InteractionId, Door.DoorId)) { return false; }
+		}
+		if (!CheckRow(PowerCutInteractionId, PowerBoxId)) { return false; }
 	}
 
 	// 步驟 6：形態（DT_Forms）、場景物件（DT_SceneObjects）、特殊地點（DT_Locations）
@@ -408,7 +448,8 @@ FInteractOutcome FEscapeGameLogic::SubmitPassword(const FString& PlayerId, const
 	Query.FormId = Player->FormId;
 	Query.TargetId = PasswordTargetId;
 	Query.State = Team.MakeSnapshot();
-	Query.State.Password = Team.CheckPassword(Code);
+	// 停電後不管輸入什麼都當作輸錯：如果正確密碼在停電後得到和輸錯不同的回應，就等於洩漏「這組是對的」。
+	Query.State.Password = IsPowerCut() ? EPasswordInput::Wrong : Team.CheckPassword(Code);
 	const FInteractionResult Result = Resolver.Resolve(Query);
 	if (Result.bNeedsPassword) { return Outcome; }  // 資料裡沒有對應的密碼結果列：不應發生
 
@@ -520,17 +561,26 @@ void FEscapeGameLogic::RestartRound()
 
 bool FEscapeGameLogic::IsDoorOpen(const FString& DoorId) const
 {
+	for (const FDoorEntry& Door : DoorTable)
+	{
+		if (DoorId == Door.DoorId) { return Team.GetTriggeredIds().Contains(FString(Door.InteractionId)); }
+	}
 	return false;
 }
 
 TArray<FString> FEscapeGameLogic::GetOpenDoors() const
 {
-	return TArray<FString>();
+	TArray<FString> Open;
+	for (const FDoorEntry& Door : DoorTable)
+	{
+		if (Team.GetTriggeredIds().Contains(FString(Door.InteractionId))) { Open.Add(Door.DoorId); }
+	}
+	return Open;
 }
 
 bool FEscapeGameLogic::IsPowerCut() const
 {
-	return false;
+	return Team.GetTriggeredIds().Contains(FString(PowerCutInteractionId));
 }
 
 // ---- 查詢 ----

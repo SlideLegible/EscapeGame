@@ -21,7 +21,7 @@
 - [x] **4 時間**：30:00 倒數、時鐘自身互動 → E04 + A06；已逃出者不受影響 → STEP 4
 - [x] **5 大門密碼**：可注入種子的亂數、排除 1031、輸錯 1/1000 扣血、試過 1031 的旗標 → STEP 5
 - [x] **6 變身**：身體留原地、變回人類、物品互換、物品唯一、L01／L02 進入規則、監視器形態 → STEP 6
-- [ ] **7 場景狀態**：電閘不可逆、教室門、辦公室門、儲物間門 → STEP 7
+- [x] **7 場景狀態**：電閘不可逆、教室門、辦公室門、儲物間門 → STEP 7
 - [ ] **8 成就**：A01／A02／A03 計數、A04／A06／A07、E01～E05；不重複、不寫磁碟 → STEP 8
 
 ### 第 3 批 場景與單人通關
@@ -59,12 +59,12 @@ Source/EscapeGame/
   Logic/                     純邏輯，只依賴 Core；不可 include Engine 的 Actor／畫面標頭
     InteractionResolver.*    （形態, 對象, 狀態快照）→ 互動結果（步驟 2，純函式）
     TeamState.*              全隊狀態：生命值、玩家名單、已觸發、成就、E05 重啟（步驟 3）；倒數與 E04（步驟 4）；密碼、旗標、E01～E03、機率扣血（步驟 5）
-    EscapeGameLogic.*        組合層（步驟 5 建立）：Resolver + TeamState，`Interact`／`SubmitPassword`／`ReturnToHuman`／`Tick`、`FInteractOutcome`；形態與位置（步驟 6）；場景、成就之後加
+    EscapeGameLogic.*        組合層（步驟 5 建立）：Resolver + TeamState，`Interact`／`SubmitPassword`／`ReturnToHuman`／`Tick`、`FInteractOutcome`；形態與位置（步驟 6）；場景狀態（步驟 7：`IsDoorOpen`／`GetOpenDoors`／`IsPowerCut`）；成就之後加
     AchievementTracker.*     成就計數與解鎖
   Core/                      組合層：GameMode、GameState、PlayerState（複製、伺服器權威）
   Forms/                     畫面層：HumanCharacter、FormPawn 與各形態
   UI/                        畫面層：HUD、文字框、密碼鍵盤、結局、成就提示
-  Tests/                     UE 自動化測試，StepN_名稱.spec.cpp（Step2_InteractionResolver.spec.cpp、Step3_TeamState.spec.cpp、Step4_Clock.spec.cpp、Step5_DoorPassword.spec.cpp、Step6_Transform.spec.cpp）
+  Tests/                     UE 自動化測試，StepN_名稱.spec.cpp（Step2_InteractionResolver.spec.cpp、Step3_TeamState.spec.cpp、Step4_Clock.spec.cpp、Step5_DoorPassword.spec.cpp、Step6_Transform.spec.cpp、Step7_SceneState.spec.cpp）
 Content/Data/                DT_*.csv 與匯入後的 DataTable
 Content/Maps/                主關卡
 deploy/                      Pixel Streaming：Wilbur 設定、配對頁、實例管理腳本（第 6 批）
@@ -192,6 +192,12 @@ deploy/                      Pixel Streaming：Wilbur 設定、配對頁、實�
   - **玩家位置**：玩家變成物品時，玩家位置＝物品位置；之後 `SetPlayerLocation` 會讓占用中的物品一起動，人類身體不動。放開物品時物品留在當時位置。逃出（E01～E03）或 E04 的玩家放開物品、物品留在當時位置（學生證留在大門旁）。進入特殊地點時玩家位置不變（UE 端自己決定要不要傳送到裡面）。
   - **E05 重啟**：還沒結束的玩家變回人類、位置與身體都回到 `AddPlayer` 的出生點、離開特殊地點；所有物品回到初始狀態（只有「一開始就在」的存在、位置回到 `RegisterObjectLocation` 的位置、沒有占用、在地點外）。已逃出的玩家不動。
   - **骰子 X020**：文字裡的 `[a～b 隨機]` 用 `FTeamState` 同一顆亂數（`RollRange`）換成整數，所以骰子也會讓之後的密碼序列不同（固定種子下仍可重現）。
+- **步驟 7 的詮釋（待人確認，選了最保守的做法）**：
+  - **停電後密碼一律當輸錯**：`SubmitPassword` 在 X022 已觸發後，不管輸入什麼都把 `State.Password` 設成 `Wrong`（走 X017，照常擲 1/1000，輸 1031 仍記 `Tried1031`）。理由：若正確密碼在停電後得到和輸錯不同的回應（例如預設嘲諷），等於洩漏「這組是對的」，違反設計文件「不得出現任何指向密碼的線索」。測試用同一個種子兩局，一局輸正確密碼、一局輸錯，Messages、事件、生命值逐項相同。代價：停電後玩家永遠看不到「門禁機沒電了」之類的提示——設計文件沒有這種文字，要加的話請人決定怎麼不洩漏。
+  - **E05 重啟＝新的一局，門重新鎖上、電恢復**：門與電都只看「已觸發的 X」，E05 重啟會清掉已觸發集合，所以教室門、辦公室門、儲物間門重新鎖上，電閘可以再拉。這不違反「不可逆」（限制指的是同一局裡不能推回去）；若人認為電閘跨 E05 也要保持，需要另外加規則。
+  - **門表只有三扇**：`{S19: X036, S05: X005, S09: X013}`。大門（S01）不在表裡，`IsDoorOpen("S01")` 永遠 false（大門靠學生證／密碼結束該玩家的遊戲，不是共用的開門狀態）。
+  - **人類再碰配電箱**：資料如此，拉下後人類再碰仍是 X022（不會變成預設回應也不會恢復）；非人類碰是 X025 扣血，與是否停電無關。
+  - **學生證碰大門（停電後）**：Resolver 因為 X010 的前置條件「未觸發 X022」不成立，回預設回應；這一步只確認，沒有改 Resolver。
 - 形態表（`item_interactions.md` §1）裡混進了 X027、X032、X035 三列 → `design_to_csv.py` 依 ID 前綴歸類即可，不需改文件。
 - ~~成就沒有 A05~~ → **刻意跳過**（2026-10-31 人確認）。
 - ~~互動沒有 X019~~ → **刻意跳過**（2026-10-31 人確認）。
@@ -296,3 +302,12 @@ deploy/                      Pixel Streaming：Wilbur 設定、配對頁、實�
   - **Interact 檢查順序**照派工單：玩家 → 對象 ID（SELF／F／S，F00 不行）→ 物品已出現／被占用（別人 `Blocked`、自己 `Rejected`）→ 特殊地點規則；都通過才 Resolve。出現物品 → 進入地點 → 變身 → `Apply`（TeamState）；`Apply` 之後處理事件（結束的玩家放開物品、E05 重啟）。`Tick` 的 E04 也走同一條。
   - **偏離 PLANS 架構**：`SetItemLocation` 改叫 `SetObjectLocation`；其餘照做。詮釋與取捨見「待人確認」的步驟 6 一項（特殊地點的離開方式是最大的一項）。
   - **時間／測試**：寫測試約 1 輪、實作約 1 輪；整個 `tools/run_tests.sh` 約 25 秒（含增量編譯）。紅的時候 Step6 的 15 條都失敗（空殼）、舊的 UE 測試 73 條全綠（第一次紅跑因為 `FindPlayer` 的非 const 多載只有宣告沒有定義，連結失敗，先把查找函式補上再重跑）。最後 Python 41/41；UE 88/88。實作第一次就全綠，沒有改過測試。
+
+- **2026-10-31 步驟 7 場景狀態**：改 `Logic/EscapeGameLogic.h/.cpp`，新增 `Tests/Step7_SceneState.spec.cpp`（`EscapeGame.Step7`，6 條 VERIFY + 5 條 PLANS 詮釋，共 11 條 It）。`TeamState`、`InteractionResolver` 沒動。
+  - **做法**：場景狀態不另外存，全部由 `FTeamState` 的已觸發 X 推出來，所以全隊共用、E05 重啟自動清掉。`IsDoorOpen(DoorId)`＝門表裡該門的 X 已觸發（`{S19: X036, S05: X005, S09: X013}`，cpp 裡的小常數表）；`GetOpenDoors()` 依門表順序回傳；`IsPowerCut()`＝X022 已觸發（X022／S15 也是常數）。不在門表的 ID（含 S01）一律 false。
+  - **載入檢查**：`Load` 檢查門表三列與 X022 都存在、`TargetKind` 是單一 ID 而且等於那扇門（S15），否則回傳 false 並寫出互動 ID 與實際的對象文字。
+  - **停電後密碼**：`SubmitPassword` 在 `IsPowerCut()` 時把 `Password` 設成 `Wrong`（見待人確認）。學生證碰大門不用改：Resolver 已因 X010 的「未觸發 X022」給預設回應。
+  - **測試**：每條 VERIFY 一個 It；測試用 `BecomeForm` 輔助函式走真的互動路線變成 F00～F12 每一種形態（F05 要先 X005／X006、F06 要先 X005／X008、F07 要先 F05 開儲物間門 X013），「不可以推回去」13 種形態各跑一局。「停電後正確密碼和輸錯一樣」用同一個種子的兩局對照，並連續 200 次。E05 測試用椅子連碰配電箱 5 次（X025 每次 -1）扣到 0。載入檢查測試用把 CSV 的對象換掉來弄壞資料（X036／X005／X013／X022 各一次）再加刪掉 X022 那一列。
+  - **紅的時候**：header 與 cpp 先放空殼（`IsDoorOpen` 回 false 等），spec 編得過。Step7 11 條裡 10 條失敗，原因都是「還沒實作」的斷言（停電／門開沒有、停電後密碼不走 X017、載入不報錯）；第 3 條 VERIFY（非人類碰配電箱 X025 扣血）在紅的時候就通過，因為那是 Resolver 資料已有的行為（步驟 2），這條只是確認組合層沒有擋掉它。舊的 88 條全綠。
+  - **偏離 PLANS 架構的地方**：沒有。
+  - **時間／測試**：寫測試約 1 輪、實作約 1 輪；整個 `tools/run_tests.sh` 約 25 秒（含增量編譯）。最後 Python 41/41；UE 99/99。實作第一次就全綠，沒有改過測試。

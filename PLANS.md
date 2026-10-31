@@ -25,7 +25,7 @@
 - [x] **8 成就**：A01／A02／A03 計數、A04／A06／A07、E01～E05；不重複、不寫磁碟 → STEP 8
 
 ### 第 3 批 場景與單人通關
-- [ ] **9 灰盒關卡**：MCP 搭 8 個區域，擺放所有 F、S 物件；自動化測試掃描關卡 → STEP 9
+- [x] **9 灰盒關卡**：MCP 搭 8 個區域，擺放所有 F、S 物件；自動化測試掃描關卡 → STEP 9
 - [ ] **10 介面**：HUD（生命值、mm:ss、形態）、彈出文字框、四位數鍵盤、結局畫面、成就提示、Noto Sans TC → STEP 10
 - [ ] **11 操控**：Enhanced Input（WASD、滑鼠、E、Q）；各形態移動模式（Hop／Roll／Static）與鏡頭臂長度 → STEP 11
 - [ ] **12 單人全路線**：Functional Test 跑 E01、E03 路線；開發版測試模式讀密碼 → STEP 12
@@ -52,6 +52,7 @@ tools/
   run_ue_tests.py            編譯 EscapeGameEditor + headless（-nullrhi）跑 UE 自動化測試（0c）
   design_to_csv.py           設計文件 → Content/Data/DT_*.csv（步驟 1）；可用 --interactions／--script／--out 指定輸入輸出
   design_to_responses.py     設計文件 §5 → Content/Data/DT_Responses.csv（步驟 2）；--interactions／--out
+  mcp_build_graybox.py       （步驟 9）讀 Level_Layout.csv，經 MCP（127.0.0.1:8000）在開著的編輯器裡重蓋並存檔 /Game/Maps/Lvl_Academy；--print-script 只印腳本
 tests/                       Python 測試，test_stepN_名稱.py（test_step5_password_secrecy.py：掃 Source/ 的 log 與 DevOnly 函式；test_step8_no_persistence.py：掃 Source/ 不可有永久儲存 API）
 EscapeGame.uproject          （0c）UE 專案；.mcp.json 是 Claude Code 連 MCP 的設定（只指向 127.0.0.1:8000）
 Config/ Content/ThirdPerson/ Content/{LevelPrototyping,Characters,Input}/   ThirdPerson 範本與共用素材（Content 約 130 MB，*.uasset／*.umap 走 LFS）
@@ -62,11 +63,14 @@ Source/EscapeGame/
     EscapeGameLogic.*        組合層（步驟 5 建立）：Resolver + TeamState，`Interact`／`SubmitPassword`／`ReturnToHuman`／`Tick`、`FInteractOutcome`；形態與位置（步驟 6）；場景狀態（步驟 7：`IsDoorOpen`／`GetOpenDoors`／`IsPowerCut`）；成就（步驟 8：`GetAchievements`／`PopNewAchievements`／`FInteractOutcome::NewAchievements`）
     AchievementTracker.*     成就計數與解鎖（步驟 8，每位玩家各自，只在記憶體）
   Core/                      組合層：GameMode、GameState、PlayerState（複製、伺服器權威）
+    EscapeAreaVolume.*       （步驟 9）區域盒子：AreaId、Box（Root，只 Overlap）、ContainsPoint
   Forms/                     畫面層：HumanCharacter、FormPawn 與各形態
+    EscapeObjectActor.*      （步驟 9）場景物件／可變身物品的灰盒方塊：ObjectId、bIsDoor、SetDoorOpen／IsDoorOpen
+    EscapeFormPawn.*         （步驟 9）人類身體／物品的 Pawn 空殼：FormId、Mesh（移動與鏡頭是步驟 11）
   UI/                        畫面層：HUD、文字框、密碼鍵盤、結局、成就提示
   Tests/                     UE 自動化測試，StepN_名稱.spec.cpp（Step2_InteractionResolver.spec.cpp、Step3_TeamState.spec.cpp、Step4_Clock.spec.cpp、Step5_DoorPassword.spec.cpp、Step6_Transform.spec.cpp、Step7_SceneState.spec.cpp、Step8_Achievements.spec.cpp）
-Content/Data/                DT_*.csv 與匯入後的 DataTable
-Content/Maps/                主關卡
+Content/Data/                DT_*.csv 與匯入後的 DataTable；Level_Layout.csv（步驟 9，自己的資料：關卡尺寸與物件位置）
+Content/Maps/                主關卡 Lvl_Academy.umap（步驟 9，由 tools/mcp_build_graybox.py 產生，LFS）
 deploy/                      Pixel Streaming：Wilbur 設定、配對頁、實例管理腳本（第 6 批）
 ```
 
@@ -226,6 +230,12 @@ deploy/                      Pixel Streaming：Wilbur 設定、配對頁、實�
   - **`PopNewAchievements` 是單一佇列**：不分玩家，給 UE 端用；`FInteractOutcome::NewAchievements` 只有那次呼叫新解鎖的（`Interact`／`SubmitPassword`），`Tick` 與事件來的只在佇列裡（`Tick` 回傳型別沒改）。沒人取走的佇列會一直累積（一局最多幾十筆，沒有上限處理）。
   - **解鎖要求玩家存在**：`UnlockAchievement` 的玩家必須是 `AddPlayer` 加過的。
   - **不寫永久儲存**：追蹤器只有 `TMap`、`TSet`、`TArray`，沒有 static、沒有全域；`tests/test_step8_no_persistence.py` 掃整個 `Source/EscapeGame/`（含測試）不可以有 `SaveGame`／`FFileHelper::Save*`／`GConfig->Set*`／`SaveConfig`／`IFileManager`／`IPlatformFile`／`FArchive`／`CreateFileWriter`／`ofstream`／`fopen` 等（讀檔 `LoadFileToString` 不算）。這條 Python 測試在紅的 commit 就是綠的（目前程式碼本來就沒有這些 API），它是之後的防護網，不是「還沒實作」的紅。
+- **步驟 9 的詮釋與配置（待人確認，選了最保守的做法）**：
+  - **哪些門口開著**：警衛室（走廊北牆 X 300～500）與廁所（走廊北牆 X 1300～1500）是沒有門的開口，進得去；只有教室（S19）、辦公室（S05）、儲物間（S09）三扇會擋人。設計文件沒寫警衛室、廁所有沒有門，照約定的建議配置開著。F10 監視器、F11 鑰匙圈、S15 配電箱在警衛室，所以開了教室門就拿得到。
+  - **L01／L02 放哪**：地圖外東邊 X 5000～5400（L01 在 Y 0～400，L02 在 Y 600～1000），各自一個封閉小房間（地板＋四面牆＋天花板），沒有門也沒有路；地板之間隔著空地，步行到不了。進入方式是步驟 6 的特殊地點邏輯，UE 端怎麼傳送進去留給步驟 10～12。天花板用 `Floor` 列表示（`Ceiling_L01`、`Ceiling_L02`），因為 `Wall` 列規定 SZ ≥ 400。
+  - **門擋在哪一側**：門方塊是兼 S 物件的擋路盒子，中心點必須在設計文件指定的區域盒裡（S19 在 Classroom、S05 在 Corridor、S09 在 Restroom，因為 DT_SceneObjects 的位置欄就是這樣寫），所以 S19 往教室內凸出 40 cm、S05 往走廊內凸出 60 cm、S09 往廁所內凸出 40 cm；開啟時隱藏且沒有碰撞，門洞寬 200 cm。
+  - **物件都是方塊**：F／S 全部是 `AEscapeObjectActor`（BlockAll 方塊，大小是估的），沒有 `AEscapeFormPawn`（F00 人類身體在步驟 11 才放，spec 查詢本來就忽略它）。F01～F07 目前一開始就放在關卡裡，「還沒出現、隱藏、沒有碰撞」的規則（PLANS 架構）是步驟 10 組合層同步場景時做，不在這一步。
+  - **配置是我估的**：尺寸不是設計文件給的；人想改就改 `Level_Layout.csv`、重跑 `tools/mcp_build_graybox.py`。
 - 形態表（`item_interactions.md` §1）裡混進了 X027、X032、X035 三列 → `design_to_csv.py` 依 ID 前綴歸類即可，不需改文件。
 - ~~成就沒有 A05~~ → **刻意跳過**（2026-10-31 人確認）。
 - ~~互動沒有 X019~~ → **刻意跳過**（2026-10-31 人確認）。
@@ -351,3 +361,14 @@ deploy/                      Pixel Streaming：Wilbur 設定、配對頁、實�
   - **誰發現的**：另一個唯讀檢查 session。`Interact` 的特殊地點檢查看的是物品的 `HomeLocationId`（原本屬於哪個地點），不是 `LocationId`（目前在哪）。情境一：P1 把飲料 F02 帶出 L01、在別處變回人類（F02 留在外面），P2 再進 L01 碰 F02 仍通過檢查，得到 X026 變身，F02 還被瞬移回 S03 入口。情境二：P1 用學生證 F03 逃出（F03 留在大門旁），P2 進 L02 能隔空把大門旁的學生證拿走。
   - **做法**：照 TDD。新增 `Source/EscapeGame/Tests/Step6_TransformFix.spec.cpp`（`EscapeGame.Step6Fix`，3 條 It：兩個情境的 Rejected 並斷言物品位置／LocationId／占用者、玩家形態與地點與位置、生命值、已觸發集合都不變；一條正向對照：飲料還在 L01 裡時從 L01 碰得到、是 X004 變身）；既有的 Step6 spec 沒動。紅的時候只有兩個情境失敗。修正只改一行：`Interact` 特殊地點檢查改成 `TargetItem->LocationId == Player->LocationId`。規則本意不變：在特殊地點裡只能碰「目前在該地點裡的物品」和 `SELF`；「待人確認」步驟 6 那項的說法已同步改成「目前在該地點裡的物品」。
   - **測試**：Python 46/46；UE 124/124（原本 121 + 新增 3）。
+
+- **2026-11-01 步驟 9 灰盒關卡**：9a 紅 commit `3d62bd0`（測試與空殼）、9b 實作到全綠。
+  - **C++ 類別**：`Core/EscapeAreaVolume`（Box 是 Root，單位方塊 extent 50，`SetCollisionEnabled(QueryOnly)` + 所有通道 Overlap；`ContainsPoint` 把點轉到盒子本地座標（`InverseTransformPositionNoScale`）再和 `GetScaledBoxExtent()` 比，所以 Actor 縮放與旋轉都算進去）。`Forms/EscapeObjectActor`（Mesh 是 Root，`ConstructorHelpers` 載入 `/Engine/BasicShapes/Cube`，`BlockAll`；`SetDoorOpen(true)` = `SetActorHiddenInGame(true)` + `NoCollision`，`false` = 顯示 + `QueryAndPhysics`）。`Forms/EscapeFormPawn`（Mesh Root，同樣預設 Cube、`Pawn` 碰撞）。尺寸都用 Actor 縮放：`Scale = SX／SY／SZ ÷ 100`，所以 CSV 的尺寸直接對應。
+  - **Level_Layout.csv（83 列）**：Area 8、Floor 10（含 2 個 L01／L02 天花板）、Wall 30、Door 3、Object 31（F01～F12、S01～S20 去掉三扇門、S11 三個）、Spawn 1。地板頂面 Z=0（地板方塊 Z=-10、厚 20，連牆下一起鋪，門洞底下也有地板），區域盒 Z 中心 200、SZ 400，牆厚 20、高 400。平面（X, Y，單位 cm）：Corridor 0～3000 × 0～400（東西向長廊）；Classroom 0～1000 × -1000～-20；Office 1020～1720 × -800～-20；GuardRoom 0～800 × 420～1020；Restroom 1000～1800 × 420～1220；Storage 1000～1400 × 1240～1640（廁所北側）；L01 5000～5400 × 0～400；L02 5000～5400 × 600～1000。門洞：S19 在走廊南牆 X 400～600、S05 X 1280～1480、S09 在廁所／儲物間之間的牆 X 1100～1300；警衛室與廁所的開口在走廊北牆 X 300～500、X 1300～1500。出生點 (500, -600, 98)。
+  - **蓋地圖用到的 MCP 工具與參數格式**（都經 `call_tool`，`toolset_name` 前綴 `editor_toolset.toolsets.`；腳本裡用 `execute_tool(前綴 + "scene.SceneTools.xxx", json.dumps(參數))`，回傳 dict，值在 `["returnValue"]`）：`programmatic.ProgrammaticToolset.execute_tool_script(script)`（回傳的 `returnValue` 是 JSON 字串）；`asset.AssetTools.exists(path)`、`duplicate(path, new_path)`、`save_assets(asset_paths=[...])`；`scene.SceneTools.load_level(level_path)`、`get_current_level()`、`find_actors(name, tag, collision_channels, actor_type?)`（`name`、`tag`、`collision_channels` 都要給，空字串／空陣列即可；`actor_type={"refPath":"/Script/Engine.PlayerStart"}`）、`get_folders()`、`get_actors_in_folder(folder_path, recursive)`、`remove_from_scene(actor)`、`add_to_scene_from_asset(asset_path="/Engine/BasicShapes/Cube", name, xform)`、`add_to_scene_from_class(actor_type={"refPath":"/Script/EscapeGame.EscapeObjectActor"}, name, xform)`、`set_actor_folder(actor, folder_path)`；`actor.ActorTools.set_label(actor, label)`、`set_actor_transform(actor, xform, worldspace)`、`get_label`；`object.ObjectTools.set_properties(instance, values=<JSON 字串>)`（屬性名稱就是 C++ 的名稱：`AreaId`、`ObjectId`、`bIsDoor`）、`get_properties(instance, properties=[...])`。Actor 參數是 `{"refPath": "..."}`（工具回傳的就是這個格式，直接傳回去）；`xform = {"location":{x,y,z}, "rotation":{pitch,yaw,roll}, "scale":{x,y,z}}`。
+  - **`tools/mcp_build_graybox.py`**（標準函式庫，`python3 -I` 可跑，只能連 `127.0.0.1`，其他主機直接結束）：自己實作 MCP 的 `initialize` → `notifications/initialized` → `tools/call`，把 CSV 變成 `ROWS` 接在腳本字串前面，整段送 `execute_tool_script`。流程：地圖不存在 → 複製 `/Engine/Maps/Templates/Template_Default` 並先存檔；`load_level`；刪掉資料夾 `Graybox` 底下所有 Actor 與範本的 `Floor`；照 CSV 放（Area → `Area_<Id>`、Floor／Wall → CSV 的 Id、Object／Door → Id、S11 → `S11_1`～`S11_3`；資料夾 `Graybox/{Areas,Floors,Walls,Doors,Objects/<區域>,Spawn}`）；Spawn 列用範本原有的 PlayerStart（沒有才新增、多的刪掉）；`save_assets`。重跑驗證：第二次 `removed: 83`、`placed` 與第一次相同、PlayerStart 仍然 1 個。腳本印出 JSON 報告，`saved` 與 `player_starts == 1` 才回傳 0。`--print-script` 只印要送的腳本。
+  - **偏離 PLANS 架構的地方（原因都是 MCP 的實際行為）**：(1) 「已存在就先刪」做不到：`AssetTools.delete` 回傳 true、記憶體裡的 World 被 Force Delete，但磁碟上的 `.umap` 還在、`exists` 仍是 true（連試兩次）。改成「已存在就載入，清掉 `Graybox` 資料夾再重蓋」，結果一樣。(2) `duplicate` 出來的地圖只在記憶體裡、是 dirty，馬上 `load_level` 會報 `the level has unsaved changes`；要先 `save_assets` 再載入。(3) 範本自己的 PlayerStart 直接拿來用，不另外刪除再新增（`PlayerStart` 剛好一個）。(4) 沒有用到 `ActorTools.set_actor_transform` 以外的搬動工具；`add_to_scene_*` 的 `xform` 直接帶縮放。
+  - **遇到的問題**：(1) 第一次跑時 `get_actors_in_folder("Graybox")` 對不存在的資料夾會丟錯 → 先查 `get_folders()`（為這個多一個存檔點 commit）。(2) 探索時用複製出來的 `Lvl_Probe` 試過一次存檔，確認 `.umap` 單檔約 190 KB、沒有產生 `__ExternalActors__`（Actor 存在地圖裡，符合「不是 World Partition」）；探索用的 `Lvl_Probe.umap` 已手動刪掉，沒有進 repo。(3) 載入引擎範本地圖 `load_level("/Engine/Maps/Templates/Template_Default")` 可行，但最後沒用到。
+  - **MCP**：實際跑了 3 次 `mcp_build_graybox.py`（第 1 次因 Graybox 資料夾不存在失敗，沒有放任何 Actor；第 2 次蓋成功；第 3 次重跑驗證相同）＋ 約 10 次探索用的小呼叫（`describe_toolset`、複製／載入／放 Actor／`set_properties` 試用）。headless 開編輯器（`-nullrhi`），約 15 秒後 `127.0.0.1:8000` 可連；`ss -ltn` 只看到 `127.0.0.1:8000`（另有 `0.0.0.0:1985` 是 UE Trace 控制埠，已知，編輯器關掉後約 20 秒消失；不是 MCP）。編輯器 RSS 約 3.1 GB。每次 MCP 任務前都先 commit（`970efb2`、`3380df8`、`a3478c5` 三個存檔點）。一次完整重蓋約 2.6 秒。
+  - **`DefaultEngine.ini`**：`GameDefaultMap`、`EditorStartupMap` 改成 `/Game/Maps/Lvl_Academy.Lvl_Academy`；`GlobalDefaultGameMode` 仍是 `BP_ThirdPersonGameMode`。
+  - **時間／測試**：實作＋MCP 約 40 分鐘。整個 `tools/run_tests.sh` 約 22 秒（含增量編譯與 UE 測試）。最後 Python 56/56（新增 10 條）；UE 132/132（新增 8 條：VERIFY 5 + PLANS 詮釋 3）。紅的時候 `Lvl_Academy` 不存在，spec 8 條都因「找不到地圖」失敗；實作第一次就全綠，沒有改過測試與 spec。

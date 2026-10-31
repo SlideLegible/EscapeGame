@@ -16,7 +16,7 @@
 - [x] **1 設計文件轉 CSV**：`tools/design_to_csv.py` 依 ID 前綴分類，輸出 `Content/Data/DT_*.csv`；格式錯誤時指出 ID 與行號 → STEP 1
 
 ### 第 2 批 核心邏輯（`Source/EscapeGame/Logic/`，UE 自動化測試，固定種子、固定 dt）
-- [ ] **2 互動判定**：Resolver 優先序（X033 鑰匙圈碰門 → 精確 → 其他／非人類形態 → 任一形態 → 預設嘲諷）；CSV 每列 X 一個 test case → STEP 2
+- [x] **2 互動判定**：Resolver 優先序（X033 鑰匙圈碰門 → 精確 → 其他／非人類形態 → 任一形態 → 預設嘲諷）；CSV 每列 X 一個 test case → STEP 2
 - [ ] **3 生命值**：初始 5、無上限、不為負、歸零 → E05 重啟但保留成就 → STEP 3
 - [ ] **4 時間**：30:00 倒數、時鐘自身互動 → E04 + A06；已逃出者不受影響 → STEP 4
 - [ ] **5 大門密碼**：可注入種子的亂數、排除 1031、輸錯 1/1000 扣血、試過 1031 的旗標 → STEP 5
@@ -51,18 +51,19 @@ tools/
   run_tests.sh               一行跑全部測試（Python；UE 測試由 test_step0c_ue_project.py 呼叫 run_ue_tests.py）
   run_ue_tests.py            編譯 EscapeGameEditor + headless（-nullrhi）跑 UE 自動化測試（0c）
   design_to_csv.py           設計文件 → Content/Data/DT_*.csv（步驟 1）；可用 --interactions／--script／--out 指定輸入輸出
+  design_to_responses.py     設計文件 §5 → Content/Data/DT_Responses.csv（步驟 2）；--interactions／--out
 tests/                       Python 測試，test_stepN_名稱.py
 EscapeGame.uproject          （0c）UE 專案；.mcp.json 是 Claude Code 連 MCP 的設定（只指向 127.0.0.1:8000）
 Config/ Content/ThirdPerson/ Content/{LevelPrototyping,Characters,Input}/   ThirdPerson 範本與共用素材（Content 約 130 MB，*.uasset／*.umap 走 LFS）
 Source/EscapeGame/
   Logic/                     純邏輯，只依賴 Core；不可 include Engine 的 Actor／畫面標頭
-    InteractionResolver.*    （形態, 對象, 旗標）→ 互動結果
+    InteractionResolver.*    （形態, 對象, 狀態快照）→ 互動結果（步驟 2，純函式）
     TeamState.*              生命值、旗標、倒數、密碼、結局判定
     AchievementTracker.*     成就計數與解鎖
   Core/                      組合層：GameMode、GameState、PlayerState（複製、伺服器權威）
   Forms/                     畫面層：HumanCharacter、FormPawn 與各形態
   UI/                        畫面層：HUD、文字框、密碼鍵盤、結局、成就提示
-  Tests/                     UE 自動化測試，StepN_名稱.spec.cpp
+  Tests/                     UE 自動化測試，StepN_名稱.spec.cpp（Step2_InteractionResolver.spec.cpp）
 Content/Data/                DT_*.csv 與匯入後的 DataTable
 Content/Maps/                主關卡
 deploy/                      Pixel Streaming：Wilbur 設定、配對頁、實例管理腳本（第 6 批）
@@ -131,6 +132,15 @@ deploy/                      Pixel Streaming：Wilbur 設定、配對頁、實�
    - 沒有發現超出 BRIEF 的功能。
 
 ### 待人確認的設計問題（不改設計文件）
+- **步驟 2 的詮釋（2026-10-31 已口頭同意，待正式確認）**：
+  - 同一層有多列都成立時，條件數多的勝出（X035「已試過 1031」勝過 X032）；同數量取設計文件較前的列。
+  - 「其他任一形態」排除「對該對象已有精確列」的形態，不管那一列的前置條件有沒有成立（X014 與 F05、X037 與 F12）。
+  - X016 要密碼 `Correct`、X017 要 `Wrong`：設計文件沒有機器可讀欄位，Resolver 用 ID 小表對應，其他「（密碼鎖）」列載入時報錯。建議之後在設計文件加欄位。
+  - 密碼結果 `None` 時人類碰大門回傳「需要輸入密碼」（`bNeedsPassword`），不回傳預設回應。
+  - X034 不是獨立命中：F11 碰門，把這扇門算進去後四扇門都碰過時，結果是 X033，`ExtraTriggers` 多一筆 X034（帶 A07）。之後每次碰門都會再回傳，去重是步驟 8 的事。
+  - X020、X021 的「（自身）」對象 ID 是 `SELF`；預設回應碰上 `SELF` 時 `[對象]` 用玩家目前形態的名稱。
+  - 成就欄「A06、E04」：A 開頭放 `AchievementIds`，E 開頭放 `EndingId`（一列最多一個結局）。
+  - VERIFY 第 3 條「椅子以外的形態」不含 F11（F11 碰教室門依第 2 條得到 X033）；第 5 條 X007 需要 X005 已觸發才成立，測試這樣設定。
 - 形態表（`item_interactions.md` §1）裡混進了 X027、X032、X035 三列 → `design_to_csv.py` 依 ID 前綴歸類即可，不需改文件。
 - ~~成就沒有 A05~~ → **刻意跳過**（2026-10-31 人確認）。
 - ~~互動沒有 X019~~ → **刻意跳過**（2026-10-31 人確認）。
@@ -194,3 +204,13 @@ deploy/                      Pixel Streaming：Wilbur 設定、配對頁、實�
   - **錯誤處理**：欄位數不對、ID 重複、表頭和預期不同、我們的表裡第一欄不是 ID → 結束碼 1，stderr 寫「檔名:行號: ID …」。全部在記憶體解析成功後才寫暫存檔再一起替換，出錯不動既有 CSV、也不建立新檔。
   - **給步驟 2 的建議**：所有欄位目前都是字串（含 HpChange 如「-1」、「每次輸錯有 1/1000 機率 -1」）；結構化（機率、前置條件、形態 ID 與對象 ID 拆開）要在步驟 2 的 Resolver 或另一層做，或之後再請人決定是否在設計文件加機器可讀欄位。步驟 2 若要「預設嘲諷」文字、成就名稱、結局，需要另外的 CSV（DT_Achievements／DT_Endings），到時再加進腳本。
   - **遇到的問題**：形態表混入的 X 列欄數和形態表表頭不同，所以不能用「同一個表的表頭」檢查欄數。
+
+- **2026-10-31 步驟 2 互動判定**：`Source/EscapeGame/Logic/InteractionResolver.h/.cpp`（只用 Core：`FCsvParser`、FString、TArray、TSet、TMap，沒有 USTRUCT）。
+  - **預設回應的資料來源**：新增 `tools/design_to_responses.py` → `Content/Data/DT_Responses.csv`（`Name,Text`，一列 `Default`，`[對象]` 保留）。原本要擴充 `design_to_csv.py`，但步驟 1 的測試斷言輸出資料夾恰好 4 個檔，改它要動步驟 1 的測試，人決定改用獨立腳本；`design_to_csv.py` 與步驟 1 測試沒動。
+  - **資料結構**：`FInteractionRow`（CSV 原始文字加解析後欄位：形態規則 Exact／AnyForm／OtherForm／NonHuman、對象種類 Id／Self／AnyDoor／AllDoorsTouched、條件清單、密碼需求、結果欄位）、`FInteractionQuery`（形態、對象、`FInteractionState`：已觸發 X、旗標、已碰過的門、密碼輸入結果）、`FInteractionResult`（互動 ID、`bIsDefault`、`bNeedsPassword`、文字、HpDelta、機率扣血 numerator／denominator／delta、物品、變身、成就、結局、`ExtraTriggers`）。`FInteractionResolver::Load(四份 CSV 文字, …)` 失敗回傳 false 並寫錯誤；`Resolve` 是 const 純函式；`GetDisplayName` 查 ID → 名稱。
+  - **優先序實作**：(1) 資料裡 `AnyDoor` 的列（X033）：形態符合、對象在門清單、條件成立；門清單與形態都從 CSV 解析，沒寫死 → (2) 精確 → (3) 其他任一形態／非人類形態 → (4) 任一形態 → (5) 預設回應。每層只看前置條件成立的列。
+  - **前置條件文法**：`條件 := 子句 { "，且" 子句 }`；`子句 := [已觸發過｜未觸發｜尚未觸發] Xnnn｜Xnnn 碰過全部的門｜曾在大門輸入 dddd 且失敗（旗標 Tried<dddd>）`。對象欄括號：（第一次）＝這一列自己未觸發；（第二次以後）＝同對象「第一次」列已觸發；（已試過 dddd）＝旗標；（密碼鎖）＝密碼小表。引用不存在的 X／形態／對象、無法解析的文字，載入時一律報錯並指出互動 ID。
+  - **測試**：spec 每列 X 一個 `It`（36）、VERIFY 第 2～7 條各一個、再加「需要輸入密碼」「無法解析的前置條件載入報錯」，共 44 條；X034 的測試檢查 `ExtraTriggers`。測試端自己從原始 CSV 文字解讀形態與狀態（不用 Resolver 的解析結果）。「任一形態」等規則挑形態：依形態表順序取第一個「該列接受、沒有更高層的列接受、不是鑰匙圈（碰門時）」的形態。Python：`test_step2_default_response.py`（5 條）、`test_step2_logic_isolation.py`（3 條，白名單寫在測試裡，`FCsvParser` 在 `Serialization/Csv/CsvParser.h`）。
+  - **時間**：整個 `tools/run_tests.sh` 約 21 秒（UE 46/46，含增量編譯）。
+  - **沒有遇到需要改測試的情況**；第一次實作就全綠。
+

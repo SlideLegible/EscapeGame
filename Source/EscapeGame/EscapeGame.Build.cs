@@ -8,6 +8,10 @@ public class EscapeGame : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
+		// 步驟 10：不用 unity build。Logic/*.cpp 各自的匿名 namespace 有同名常數（SelfTarget、HumanForm、RedHerringCode…），
+		// 新增檔案會改變 adaptive unity 的分組，讓它們被併進同一個編譯單元而撞名。
+		bUseUnity = false;
+
 		PublicDependencyModuleNames.AddRange(new string[] {
 			"Core",
 			"CoreUObject",
@@ -18,7 +22,8 @@ public class EscapeGame : ModuleRules
 			"StateTreeModule",
 			"GameplayStateTreeModule",
 			"UMG",
-			"Slate"
+			"Slate",
+			"SlateCore"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });

@@ -17,7 +17,7 @@
 
 ### 第 2 批 核心邏輯（`Source/EscapeGame/Logic/`，UE 自動化測試，固定種子、固定 dt）
 - [x] **2 互動判定**：Resolver 優先序（X033 鑰匙圈碰門 → 精確 → 其他／非人類形態 → 任一形態 → 預設嘲諷）；CSV 每列 X 一個 test case → STEP 2
-- [ ] **3 生命值**：初始 5、無上限、不為負、歸零 → E05 重啟但保留成就 → STEP 3
+- [x] **3 生命值**：初始 5、無上限、不為負、歸零 → E05 重啟但保留成就 → STEP 3
 - [ ] **4 時間**：30:00 倒數、時鐘自身互動 → E04 + A06；已逃出者不受影響 → STEP 4
 - [ ] **5 大門密碼**：可注入種子的亂數、排除 1031、輸錯 1/1000 扣血、試過 1031 的旗標 → STEP 5
 - [ ] **6 變身**：身體留原地、變回人類、物品互換、物品唯一、L01／L02 進入規則、監視器形態 → STEP 6
@@ -58,12 +58,12 @@ Config/ Content/ThirdPerson/ Content/{LevelPrototyping,Characters,Input}/   Thir
 Source/EscapeGame/
   Logic/                     純邏輯，只依賴 Core；不可 include Engine 的 Actor／畫面標頭
     InteractionResolver.*    （形態, 對象, 狀態快照）→ 互動結果（步驟 2，純函式）
-    TeamState.*              生命值、旗標、倒數、密碼、結局判定
+    TeamState.*              全隊狀態：生命值、玩家名單、已觸發、成就、E05 重啟（步驟 3）；倒數、密碼、旗標之後加
     AchievementTracker.*     成就計數與解鎖
   Core/                      組合層：GameMode、GameState、PlayerState（複製、伺服器權威）
   Forms/                     畫面層：HumanCharacter、FormPawn 與各形態
   UI/                        畫面層：HUD、文字框、密碼鍵盤、結局、成就提示
-  Tests/                     UE 自動化測試，StepN_名稱.spec.cpp（Step2_InteractionResolver.spec.cpp）
+  Tests/                     UE 自動化測試，StepN_名稱.spec.cpp（Step2_InteractionResolver.spec.cpp、Step3_TeamState.spec.cpp）
 Content/Data/                DT_*.csv 與匯入後的 DataTable
 Content/Maps/                主關卡
 deploy/                      Pixel Streaming：Wilbur 設定、配對頁、實例管理腳本（第 6 批）
@@ -141,6 +141,12 @@ deploy/                      Pixel Streaming：Wilbur 設定、配對頁、實�
   - X020、X021 的「（自身）」對象 ID 是 `SELF`；預設回應碰上 `SELF` 時 `[對象]` 用玩家目前形態的名稱。
   - 成就欄「A06、E04」：A 開頭放 `AchievementIds`，E 開頭放 `EndingId`（一列最多一個結局）。
   - VERIFY 第 3 條「椅子以外的形態」不含 F11（F11 碰教室門依第 2 條得到 X033）；第 5 條 X007 需要 X005 已觸發才成立，測試這樣設定。
+- **步驟 3 的詮釋（待人確認）**：
+  - E05 本身要不要算進結局成就（「上課睡覺的代價」）？目前 `TeamState` 只回傳事件，**不**把 E05 加進成就集合，留給步驟 8 決定。
+  - E05 重啟時，本次互動的 X 也會跟著「已觸發」一起清掉（例：扣到 0 的那個 X027 重啟後不算已觸發）。
+  - `ExtraTriggers`（X034）的互動 ID 與成就也記進已觸發／成就集合。
+  - 結局欄 `EndingId`（E01～E04）這一步不處理，步驟 4、8 做。
+  - 已逃出的玩家不算重啟的「受影響玩家」，也不會被重啟帶回遊戲。
 - 形態表（`item_interactions.md` §1）裡混進了 X027、X032、X035 三列 → `design_to_csv.py` 依 ID 前綴歸類即可，不需改文件。
 - ~~成就沒有 A05~~ → **刻意跳過**（2026-10-31 人確認）。
 - ~~互動沒有 X019~~ → **刻意跳過**（2026-10-31 人確認）。
@@ -214,3 +220,10 @@ deploy/                      Pixel Streaming：Wilbur 設定、配對頁、實�
   - **時間**：整個 `tools/run_tests.sh` 約 21 秒（UE 46/46，含增量編譯）。
   - **沒有遇到需要改測試的情況**；第一次實作就全綠。
 
+- **2026-10-31 步驟 3 生命值**：`Logic/TeamState.h/.cpp`，純 C++（`FTeamState`），只 include `CoreMinimal.h` 與 `Logic/InteractionResolver.h`，沒有改 Resolver。
+  - **資料**：`Hp`（開局 5、無上限、最低 0）、`RestartCount`、玩家名單（ID、是否逃出、結局 ID，依加入順序）、`TriggeredIds`（已觸發 X）、`UnlockedAchievements`。
+  - **介面**：`ApplyHpDelta(int32)`、`ApplyInteraction(FInteractionResult)`（記已觸發含 ExtraTriggers → 加成就 → 套 HpDelta，回傳 `TArray<FTeamEvent>`）、`AddPlayer`／`MarkEscaped`／`HasEscaped`／`GetEscapeEnding`／`GetRemainingPlayers`、`MakeSnapshot()`（目前只帶 `TriggeredIds`）。`FTeamEvent` = `EndingId` + `AffectedPlayers`。
+  - **E05 重啟**：生命值從 >0 變成 0 時回傳 E05（受影響＝當下還沒逃出的玩家），然後 **清掉**：已觸發集合（生命值回 5）；**保留**：已解鎖成就、玩家名單與已逃出狀態及其結局；`RestartCount` +1。1 扣 2 只到 0、只觸發一次。
+  - `bHasHpChance`（X017）不擲骰，步驟 5 處理。
+  - X004／X026／X027 的測試走真流程：CSV → Resolver → `MakeSnapshot()` 組 query → `ApplyInteraction` 回 TeamState。
+  - **時間**：一次完整 `tools/run_tests.sh`（含增量編譯與 UE 53 條）約 20 秒（Python 35 條）。測試當時沒有別的 UnrealEditor 行程，可用記憶體約 12 GB。

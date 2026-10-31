@@ -21,7 +21,10 @@
   - Python 測試：`tests/test_stepN_名稱.py`，只用內建 `unittest`，用 `python3 -I` 執行。
   - UE 自動化測試（步驟 0c 之後）：`Source/EscapeGame/Tests/StepN_名稱.spec.cpp`，headless（`-nullrhi`）。
   - 測試檔第一行註解寫對到哪裡，例：`# 步驟 1 設計文件轉 CSV → VERIFY STEP 1`；測試名稱用 VERIFY 的句子。
-- 本機開起來：（步驟 0c 之後補上 UE 編輯器啟動指令。）
+- 本機開起來：
+  - 編譯（編輯器要先關掉）：`~/UnrealEngine/Engine/Build/BatchFiles/Linux/Build.sh EscapeGameEditor Linux Development -project=$PWD/EscapeGame.uproject -MaxParallelActions=10`
+  - 開編輯器並啟動 MCP（只聽 `127.0.0.1:8000`）：`~/UnrealEngine/Engine/Binaries/Linux/UnrealEditor $PWD/EscapeGame.uproject -ExecCmds="ModelContextProtocol.StartServer"`
+  - 只跑 UE 自動化測試：`python3 -I tools/run_ue_tests.py`（會先增量編譯；引擎不在 `~/UnrealEngine` 時設 `UE_ROOT`）。
 - 哪些檔案可以碰什麼：
   - `Source/EscapeGame/Logic/`：純邏輯，只能依賴 UE 的 `Core`，不可以 include Actor、Engine 畫面、UMG 的標頭。亂數用注入種子的 `FRandomStream`，時間用傳入的 dt。
   - `Source/EscapeGame/Core/`：組合層，可以用 GameFramework（GameMode／GameState／PlayerState）與網路複製。

@@ -10,7 +10,7 @@
 - [x] **0b 工具可行性（人工）**：使用者安裝 UE 5.8；Epic MCP 連線並列出 Actor；Flopperam plugin 在 Linux 編譯；PixelStreaming2 範本在 Firefox 可玩；實測單一實例資源；確認 MCP 只聽 localhost → STEP 0b
   - **Go/No-Go**：Epic MCP 在 Linux 不能用 → 改用 Flopperam 為主，加 `UnrealEditor-Cmd -run=pythonscript` 跑官方 Python 編輯器腳本當後備，寫進調整紀錄
   - **2026-10-30 結果：Go**（細節見調整紀錄）。AI 能驗的都驗完了；**剩人工：在 Firefox 用真的鍵盤滑鼠操控角色**，確認後人在 VERIFY 打勾、在這裡勾掉。
-- [ ] **0c UE 專案與 UE 測試環境**：repo 根目錄建 C++ ThirdPerson 專案 `EscapeGame.uproject`；`tools/run_tests.sh` 加上 headless UE 自動化測試 → STEP 0（第 3、4 條）
+- [x] **0c UE 專案與 UE 測試環境**：repo 根目錄建 C++ ThirdPerson 專案 `EscapeGame.uproject`；`tools/run_tests.sh` 加上 headless UE 自動化測試 → STEP 0（第 3、4 條）
 
 ### 第 1 批 資料管線
 - [ ] **1 設計文件轉 CSV**：`tools/design_to_csv.py` 依 ID 前綴分類，輸出 `Content/Data/DT_*.csv`；格式錯誤時指出 ID 與行號 → STEP 1
@@ -48,10 +48,12 @@
 BRIEF.md VERIFY.md PLANS.md PLANS.v1.md AGENTS.md CLAUDE.md dev_rule.md README.md
 docs/design/                 設計文件（素材，不修改）
 tools/
-  run_tests.sh               一行跑全部測試（Python；0c 之後加 UE）
+  run_tests.sh               一行跑全部測試（Python；UE 測試由 test_step0c_ue_project.py 呼叫 run_ue_tests.py）
+  run_ue_tests.py            編譯 EscapeGameEditor + headless（-nullrhi）跑 UE 自動化測試（0c）
   design_to_csv.py           設計文件 → Content/Data/DT_*.csv（步驟 1）
 tests/                       Python 測試，test_stepN_名稱.py
-EscapeGame.uproject          （0c）
+EscapeGame.uproject          （0c）UE 專案；.mcp.json 是 Claude Code 連 MCP 的設定（只指向 127.0.0.1:8000）
+Config/ Content/ThirdPerson/ Content/{LevelPrototyping,Characters,Input}/   ThirdPerson 範本與共用素材（Content 約 130 MB，*.uasset／*.umap 走 LFS）
 Source/EscapeGame/
   Logic/                     純邏輯，只依賴 Core；不可 include Engine 的 Actor／畫面標頭
     InteractionResolver.*    （形態, 對象, 旗標）→ 互動結果
@@ -158,3 +160,19 @@ deploy/                      Pixel Streaming：Wilbur 設定、配對頁、實�
 
 - **2026-10-31 步驟 0b 完成**：人在 Firefox 實測 Pixel Streaming，鍵盤滑鼠可以操控角色 → 0b 勾掉。
   另外列出 Epic MCP 全部 toolset，和 Flopperam 開源版的功能逐項比對：Blueprint（53 個工具，含圖的 DSL 讀寫）、Actor、材質、UMG（23 個）、DataTable、PIE、截圖、自動化測試都有；只少了蓋牆／房子／樓梯的巨集 → 已寫進「工具分工」。
+
+- **2026-10-31 步驟 0c UE 專案與 UE 測試環境**：
+  - **怎麼建專案**：照 `Templates/TP_ThirdPerson/Config/TemplateDefs.ini` 手動做出編輯器「新增專案」會做的事（一次性，沒有留腳本）：複製範本、跳過 FoldersToIgnore／FilesToIgnore；cpp／h／ini／cs 裡 `TP_ThirdPerson` 改 `EscapeGame`（大小寫都處理），資料夾與檔名跟著改；三個 SharedContentPacks（LevelPrototyping、Characters、Input）從 `Templates/TemplateResources/High/*/Content` 複製到 `Content/<MountName>/`（`CopyAdditionalFilesToFolder` 的規則）；`DefaultGame.ini` 換新的 ProjectID、ProjectName。
+    - **拿掉三個 Variant**：`Source/EscapeGame/Variant_{Combat,Platforming,SideScrolling}`、`Content/Variant_*`、`Content/__ExternalActors__/Variant_*`、`Content/__ExternalObjects__/Variant_*`，以及 Build.cs 的 Variant include 路徑。
+    - `.uproject` 保留範本的 ModelingToolsEditorMode、StateTree、GameplayStateTree，加 `ModelContextProtocol`、`AllToolsets`（都 `TargetAllowList: ["Editor"]`）。PixelStreaming2 留到步驟 17。預設地圖仍是 `Lvl_ThirdPerson`。
+    - **redirect**：`GameProjectUtils` 只加 `+ActiveClassRedirects`（類別名）。藍圖父類別存的是 `/Script/TP_ThirdPerson.TP_ThirdPersonCharacter` 這種路徑，所以我改用 `[CoreRedirects]` 加 `PackageRedirects`（`/Script/TP_ThirdPerson` → `/Script/EscapeGame`）和三條 `ClassRedirects`（Character、GameMode、PlayerController）。用 `-run=pythonscript` 實際載入三個 BP_ThirdPerson* 藍圖，確認父類別解析成 `EscapeGameCharacter`／`EscapeGameGameMode`／`EscapeGamePlayerController`；載入 `Lvl_ThirdPerson` 沒有「找不到父類別」或載入失敗的錯誤。
+    - 範本留下的 `Content/ThirdPerson/Blueprints/BP_ThirdPerson*` 名稱還沒改（藍圖改名會動 uasset，之後做步驟 9、11 時再決定）。
+  - **UE 測試怎麼接進 `run_tests.sh`**：沒有改 `run_tests.sh`。由 `tests/test_step0c_ue_project.py` 的一個測試呼叫 `tools/run_ue_tests.py`（增量編譯 → `UnrealEditor-Cmd ... -ExecCmds="Automation RunTests EscapeGame;Quit" -nullrhi -unattended -nopause -nosplash -nosound -ReportExportPath=Saved/Automation/Report` → 讀 `index.json` → 印出每條 `EscapeGame.` 測試與「n/n 全部通過」）。原因：`test_step0_env.py` 會巢狀再跑一次 `run_tests.sh`，逾時只有 120 秒、而且要求最後一行是 `OK`；所以這個測試在 `ESCAPEGAME_NESTED_TEST_RUN` 有值時 skip，UE 只在最外層跑一次。UE 沒裝時測試**失敗**（不是 skip）。
+  - **時間**：首次編譯（引擎是預編譯版，只編專案模組 + 測試）約 26 秒（`-MaxParallelActions=10`，log 有「Executing up to 10 actions based on MaxProcessorCount override」，確認有效）；之後增量編譯幾秒。一次 UE 測試（含增量編譯與開關編輯器）約 13～17 秒；整個 `tools/run_tests.sh` 約 16 秒。`-run=pythonscript` 載入藍圖的 commandlet 尖峰 RAM 約 2.2 GB。
+  - **遇到的問題**：
+    1. 自己的 spec 測試名稱含「.」（`UE 5.8`、`EscapeGame.`），UE 會當成路徑分隔，名稱被截斷；`GetTestName()` 只回傳最後一段。在寫程式前另開一個 commit 修正名稱與改用 `GetBeautifiedTestName()`，斷言內容沒有放寬。**之後的 spec 名稱不要含「.」。**
+    2. 非 Automation 的 `-ExecCmds="...;Quit"`：`;` 不會分隔（要用逗號），而且 `UnrealEditor-Cmd` 收到 `Quit` 後在這台機器上會卡住不結束（不是 Automation 路徑）。`run_ue_tests.py` 用 Automation 自己的 `;Quit`，會正常結束；其他用法要加 `timeout` 並用 `kill` 收尾。
+    3. 從引擎複製來的檔案是唯讀，改名取代前要 `chmod -R u+w`。
+    4. 每次編輯器 log 都有 `Asset manager settings do not include a rule for assets of type GameFeatureData` 的 Error，是範本專案的固有訊息，不影響載入；先不處理。
+    5. UBT 編譯時會短暫開 `UbaServer - Listening on 0.0.0.0:1345`（Unreal Build Accelerator，只有編譯期間）。MCP 仍只聽 127.0.0.1；UBA 這個埠步驟 17 部署時要一起擋（部署機不會編譯，應該不會有）。
+  - `.mcp.json` 由 `ModelContextProtocol.GenerateClientConfig ClaudeCode` 產生，伺服器名稱 `unreal-mcp`、`http://127.0.0.1:8000/mcp`。

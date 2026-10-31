@@ -11,14 +11,14 @@
 ## 第 0 批 環境
 
 ### STEP 0 測試環境
-- [ ] 在 repo 根目錄執行 `tools/run_tests.sh` → 跑完全部 Python 測試，最後一行顯示 `OK`，結束碼 0（AI 補充）
-- [ ] 兩份設計文件 `docs/design/escape_room_script.md`、`docs/design/item_interactions.md` 都在 → 測試確認檔案存在且不是空的（AI 補充）
-- [ ] 裝好 UE 5.8 後，`tools/run_tests.sh` 也跑 UE 自動化測試（headless、`-nullrhi`）→ 列出 `EscapeGame.` 開頭的測試，全部通過（AI 補充）
+- [x] 在 repo 根目錄執行 `tools/run_tests.sh` → 跑完全部 Python 測試，最後一行顯示 `OK`，結束碼 0（AI 補充）
+- [x] 兩份設計文件 `docs/design/escape_room_script.md`、`docs/design/item_interactions.md` 都在 → 測試確認檔案存在且不是空的（AI 補充）
+- [x] 裝好 UE 5.8 後，`tools/run_tests.sh` 也跑 UE 自動化測試（headless、`-nullrhi`）→ 列出 `EscapeGame.` 開頭的測試，全部通過（AI 補充）
 - [ ] **不可以** 跑測試時需要網路、螢幕或 GPU（AI 補充）
 - [ ] **不可以** 需要另外安裝 Python 套件才能跑測試（只用內建 `unittest`）（AI 補充）
 
 ### STEP 0b 工具可行性（人工驗證）
-- [ ] 開編輯器、在 Claude Code 執行 `/mcp` → 看到 `unreal-mcp` 已連線；請 Claude 列出目前關卡的 Actor → 列出的名稱和編輯器 Outliner 一致（AI 補充）
+- [x] 開編輯器、在 Claude Code 執行 `/mcp` → 看到 `unreal-mcp` 已連線；請 Claude 列出目前關卡的 Actor → 列出的名稱和編輯器 Outliner 一致（AI 補充）
 - [x] 用 PixelStreaming2 範本開一個實例，用 Firefox 打開 signalling 網址 → 1 秒內看到畫面，鍵盤滑鼠可以操控角色（AI 補充）
 - [x] 實測單一 720p 實例 → 記下 VRAM、RAM、CPU 用量到 PLANS.md 調整紀錄（AI 補充）
 - [x] **不可以** MCP 伺服器監聽 `127.0.0.1` 以外的位址（`ss -ltnp` 確認）（AI 補充）
@@ -28,13 +28,13 @@
 ## 第 1 批 資料管線
 
 ### STEP 1 設計文件轉成資料表
-- [ ] 執行 `python3 -I tools/design_to_csv.py` → 在 `Content/Data/` 產生 `DT_Forms.csv`、`DT_SceneObjects.csv`、`DT_Locations.csv`、`DT_Interactions.csv`（AI 補充）
-- [ ] 設計文件中出現的 13 個形態（F00～F12）、20 個場景物件（S01～S20）、2 個特殊地點（L01、L02）、36 個互動（X001～X037，沒有 X019）→ 每個 ID 在對應的 CSV 裡剛好出現 1 次（AI 補充）
-- [ ] 形態表裡混進的 X027、X032、X035 → 出現在 `DT_Interactions.csv`，**不在** `DT_Forms.csv`（AI 補充）
-- [ ] 文字欄位裡的中文、全形標點、`🎂` → 原樣保留，CSV 用 UTF-8（AI 補充）
-- [ ] 把設計文件的某一列改壞（欄位數不對）→ 腳本以非 0 結束碼結束，錯誤訊息寫出是哪一個 ID、哪一行（AI 補充）
-- [ ] **不可以** 遺漏或重複任何 ID（AI 補充）
-- [ ] **不可以** 修改 `docs/design/` 底下的檔案（AI 補充）
+- [x] 執行 `python3 -I tools/design_to_csv.py` → 在 `Content/Data/` 產生 `DT_Forms.csv`、`DT_SceneObjects.csv`、`DT_Locations.csv`、`DT_Interactions.csv`（AI 補充）
+- [x] 設計文件中出現的 13 個形態（F00～F12）、20 個場景物件（S01～S20）、2 個特殊地點（L01、L02）、36 個互動（X001～X037，沒有 X019）→ 每個 ID 在對應的 CSV 裡剛好出現 1 次（AI 補充）
+- [x] 形態表裡混進的 X027、X032、X035 → 出現在 `DT_Interactions.csv`，**不在** `DT_Forms.csv`（AI 補充）
+- [x] 文字欄位裡的中文、全形標點、`🎂` → 原樣保留，CSV 用 UTF-8（AI 補充）
+- [x] 把設計文件的某一列改壞（欄位數不對）→ 腳本以非 0 結束碼結束，錯誤訊息寫出是哪一個 ID、哪一行（AI 補充）
+- [x] **不可以** 遺漏或重複任何 ID（AI 補充）
+- [x] **不可以** 修改 `docs/design/` 底下的檔案（AI 補充）
 
 ---
 

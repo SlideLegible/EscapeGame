@@ -107,7 +107,7 @@ deploy/                      Pixel Streaming：Wilbur 設定、配對頁、實�
 - Pixel Streaming：PixelStreaming2 + Wilbur；實例 `-RenderOffscreen -ResX=1280 -ResY=720 -PixelStreamingConnectionURL=ws://127.0.0.1:8888`；多人用 Listen Server（開房者的實例當 host）；公網要 coturn，先在 LAN 展示。
   - Wilbur 用 `get_ps_servers.sh` 抓（目前是 `UE5.7-0.1.2`），**不用它的 `start.sh`**（會呼叫 sudo、apt）；改成 `npm install --ignore-scripts -w …` 只裝需要的 workspace，再 `npm run build:all:cjs`。
   - Wilbur 沒有 bind address 選項，會聽所有介面 → 步驟 17 用防火牆只開放配對頁和 player port。
-  - UE 的 Trace 控制埠 1985 也聽 `0.0.0.0` → 步驟 17 一併擋掉，Shipping 版確認有沒有開。
+  - UE 的 Trace 控制埠 1985 也聽 `0.0.0.0`：這是編輯器／遊戲行程**自己**開的（`Runtime/TraceLog/Private/Trace/Control.cpp`，Linux 版 `UnixTrace.cpp` 綁 `s_addr = 0`），寫死、沒有參數能改成只聽 127.0.0.1，`-notraceserver` 也擋不掉。用途是讓別台電腦的 Unreal Insights 遙控開始／停止效能追蹤。Shipping 版不支援完整追蹤（`Config.h` 的 static_assert），預設不會編進這個控制埠 → 部署用 Shipping 就沒有它；開發時靠步驟 17 的防火牆規則擋外部連線，步驟 16 打包後用 `ss` 確認。
 
 ### 素材來源
 （步驟 15 開始填：素材名稱、來源網址、授權。）
@@ -187,7 +187,7 @@ deploy/                      Pixel Streaming：Wilbur 設定、配對頁、實�
     5. UBT 編譯時會短暫開 `UbaServer - Listening on 0.0.0.0:1345`（Unreal Build Accelerator，只有編譯期間）。MCP 仍只聽 127.0.0.1；UBA 這個埠步驟 17 部署時要一起擋（部署機不會編譯，應該不會有）。
   - `.mcp.json` 由 `ModelContextProtocol.GenerateClientConfig ClaudeCode` 產生，伺服器名稱 `unreal-mcp`、`http://127.0.0.1:8000/mcp`。
   - **0c 修正（驗收時發現的兩個問題）**：
-    1. `run_ue_tests.py` 會卡住：UE 啟動的 `UnrealTraceServer fork` 繼承了 stdout／stderr 管道，`subprocess.run(stdout=PIPE)` 等不到 EOF（UE 本身早已結束）。修法：編譯與 UE 的輸出都改寫到 `Saved/Automation/build.log`、`ue_tests.log`，不用 PIPE，stdin 接 DEVNULL；失敗時印 log 最後 4000 字。另外查引擎原始碼（`TraceAuxiliary.cpp`）確認 `-notraceserver` 會跳過自動啟動 Trace 伺服器（也就不會聽 0.0.0.0:1985），已加進測試命令列；實測跑完沒有 UnrealTraceServer 留下。
+    1. `run_ue_tests.py` 會卡住：UE 啟動的 `UnrealTraceServer fork` 繼承了 stdout／stderr 管道，`subprocess.run(stdout=PIPE)` 等不到 EOF（UE 本身早已結束）。修法：編譯與 UE 的輸出都改寫到 `Saved/Automation/build.log`、`ue_tests.log`，不用 PIPE，stdin 接 DEVNULL；失敗時印 log 最後 4000 字。另外查引擎原始碼（`TraceAuxiliary.cpp`）確認 `-notraceserver` 會跳過自動啟動 Trace 伺服器，已加進測試命令列；實測跑完沒有 UnrealTraceServer 留下。（2026-10-31 更正：1985 不是 Trace 伺服器開的，`-notraceserver` 擋不掉它，見「做法」。）
     2. `run_tests.sh` 最後一行不是 `OK`：stdout 非 tty 時有緩衝，UE 清單在 unittest 總結（stderr）之後才出現。修法：`python3 -I -u`（不緩衝），沒有改測試。
 
 - **2026-10-31 人接受 5d60e51**（0c 修改 spec 測試名稱）；之後 UE spec 的 Describe/It 名稱不可以含「.」。

@@ -1,7 +1,25 @@
-// 步驟 3 生命值、步驟 4 時間：全隊共用狀態（純邏輯）
+// 步驟 3 生命值、步驟 4 時間、步驟 5 大門密碼：全隊共用狀態（純邏輯）
 #include "Logic/TeamState.h"
 
 FTeamState::FTeamState() {}
+
+FTeamState::FTeamState(int32 Seed) {}
+
+EPasswordInput FTeamState::CheckPassword(const FString& Code) const { return EPasswordInput::Wrong; }
+
+void FTeamState::AddFlag(const FString& Flag) {}
+
+bool FTeamState::HasFlag(const FString& Flag) const { return false; }
+
+void FTeamState::StartNewRound() {}
+
+void FTeamState::GeneratePassword() {}
+
+#if !UE_BUILD_SHIPPING
+FString FTeamState::GetPasswordForDevOnly() const { return FString(); }
+
+void FTeamState::StartNewRoundForTesting() {}
+#endif
 
 TArray<FTeamEvent> FTeamState::ApplyHpDelta(int32 Delta)
 {
@@ -115,7 +133,7 @@ TArray<FString> FTeamState::GetRemainingPlayers() const
 	return Out;
 }
 
-TArray<FTeamEvent> FTeamState::ApplyInteraction(const FInteractionResult& Result, const FString& PlayerId)
+TArray<FTeamEvent> FTeamState::ApplyInteraction(const FInteractionResult& Result, const FString& PlayerId, bool* OutChanceHit)
 {
 	if (!Result.InteractionId.IsEmpty()) { TriggeredIds.Add(Result.InteractionId); }
 	for (const FExtraTrigger& Extra : Result.ExtraTriggers)

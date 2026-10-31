@@ -212,6 +212,10 @@ TArray<FTeamEvent> FTeamState::ApplyInteraction(const FInteractionResult& Result
 	return Events;
 }
 
+void FTeamState::AddUnlockedAchievement(const FString& AchievementId)
+{
+}
+
 FInteractionState FTeamState::MakeSnapshot() const
 {
 	FInteractionState S;

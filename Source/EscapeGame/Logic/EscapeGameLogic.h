@@ -1,8 +1,9 @@
 // 步驟 5 大門密碼、步驟 6 變身、步驟 7 場景狀態：組合層。UE 端只跟它說話。純邏輯，只依賴 Core。
-// 成就計數（8）還沒做。
+// 步驟 8 成就：每位玩家各自的 FAchievementTracker，新解鎖的成就收進佇列（PopNewAchievements）。
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Logic/AchievementTracker.h"
 #include "Logic/InteractionResolver.h"
 #include "Logic/TeamState.h"
 
@@ -12,6 +13,13 @@ enum class EInteractKind : uint8
 	Blocked,        // 被擋下（步驟 6：物品被別人占用）
 	NeedsPassword,  // 要輸入密碼，狀態沒改
 	Resolved,       // 互動成立，狀態已更新
+};
+
+/** 某位玩家剛解鎖的一個成就（UE 端用它跳提示） */
+struct FAchievementUnlock
+{
+	FString PlayerId;
+	FString AchievementId;
 };
 
 struct FInteractOutcome
@@ -27,6 +35,8 @@ struct FInteractOutcome
 	FString FromForm;           // 變身前的形態（例 F00）
 	FString ToForm;             // 變身後的形態
 	FString EnteredLocationId;  // 這次互動進入的特殊地點（L01／L02），沒有進入則為空
+	// 步驟 8：這次互動新解鎖的成就（已經解鎖過的不會再出現）
+	TArray<FAchievementUnlock> NewAchievements;
 };
 
 class FEscapeGameLogic
@@ -54,7 +64,13 @@ public:
 	 *  已是人類、玩家不存在、已結束 → false。 */
 	bool ReturnToHuman(const FString& PlayerId);
 
+	/** 倒數 Dt 秒，也累計每位玩家連續處於物品形態的秒數（A03） */
 	TArray<FTeamEvent> Tick(float Dt);
+
+	// 成就（步驟 8）：每位玩家各自；全隊聯集在 GetTeam().GetUnlockedAchievements()。只在記憶體。
+	const FAchievementTracker& GetAchievements() const { return Achievements; }
+	/** 取出自上次取出之後所有新解鎖的成就（Interact、SubmitPassword、Tick、E04／E05 事件來的都算），並清空佇列 */
+	TArray<FAchievementUnlock> PopNewAchievements();
 
 	// 形態與位置的查詢（玩家不存在回傳空字串／零向量／false）
 	FString GetPlayerForm(const FString& PlayerId) const;
@@ -128,9 +144,17 @@ private:
 	void HandleEvents(const TArray<FTeamEvent>& Events);
 	void RestartRound();
 	FInteractOutcome Apply(const FString& PlayerId, const FInteractionResult& Result);
+	/** 解鎖成就：第一次才回傳 true，並寫進全隊聯集與佇列 */
+	bool UnlockAchievement(const FString& PlayerId, const FString& AchievementId);
+	/** 每個事件的每位受影響玩家解鎖同名的結局成就（E01～E05） */
+	void UnlockEndingAchievements(const TArray<FTeamEvent>& Events);
+	/** 佇列從 StartIndex 起的新解鎖 */
+	TArray<FAchievementUnlock> NewSince(int32 StartIndex) const;
 
 	FInteractionResolver Resolver;
 	FTeamState Team;
+	FAchievementTracker Achievements;
+	TArray<FAchievementUnlock> PendingAchievements;  // 還沒被 PopNewAchievements 取走的
 	FString PasswordTargetId;  // 密碼鎖的對象（S01），從 Resolver 資料找
 	TArray<FPlayerInfo> Players;
 	TArray<FItemState> Items;

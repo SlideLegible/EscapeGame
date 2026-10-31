@@ -1,5 +1,5 @@
 // 步驟 3 生命值、步驟 4 時間、步驟 5 大門密碼（步驟 6 加骰子）：全隊共用狀態，純邏輯，只依賴 Core。
-// 變身（6）、場景狀態（7）、成就計數（8）、網路複製（13）都還沒做。
+// 網路複製（13）還沒做。成就計數在 AchievementTracker（步驟 8），這裡只留全隊聯集。
 #pragma once
 
 #include "CoreMinimal.h"
@@ -79,6 +79,8 @@ public:
 
 	const TSet<FString>& GetTriggeredIds() const { return TriggeredIds; }
 	const TSet<FString>& GetUnlockedAchievements() const { return UnlockedAchievements; }
+	/** 步驟 8：把某位玩家剛解鎖的成就也記進全隊聯集（跨 E05 保留） */
+	void AddUnlockedAchievement(const FString& AchievementId);
 
 	/** 給 Resolver 用的狀態快照（已觸發的 X、旗標） */
 	FInteractionState MakeSnapshot() const;

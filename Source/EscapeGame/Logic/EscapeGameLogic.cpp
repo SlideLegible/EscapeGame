@@ -487,6 +487,15 @@ TArray<FTeamEvent> FEscapeGameLogic::Tick(float Dt)
 	return Events;
 }
 
+TArray<FAchievementUnlock> FEscapeGameLogic::PopNewAchievements()
+{
+	return TArray<FAchievementUnlock>();
+}
+
+bool FEscapeGameLogic::UnlockAchievement(const FString& PlayerId, const FString& AchievementId) { return false; }
+void FEscapeGameLogic::UnlockEndingAchievements(const TArray<FTeamEvent>& Events) {}
+TArray<FAchievementUnlock> FEscapeGameLogic::NewSince(int32 StartIndex) const { return TArray<FAchievementUnlock>(); }
+
 // ---- 形態 ----
 
 void FEscapeGameLogic::ReleasePlayerForm(FPlayerInfo& Player)

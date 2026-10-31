@@ -346,10 +346,10 @@ FInteractOutcome FEscapeGameLogic::Interact(const FString& PlayerId, const FStri
 			return Outcome;
 		}
 	}
-	// 特殊地點：裡面只能碰這個地點的東西和自己；外面碰不到還在地點裡的東西
+	// 特殊地點：裡面只能碰「目前就在這個地點裡」的物品和自己（被帶出去的不算）；外面碰不到還在地點裡的東西
 	if (!Player->LocationId.IsEmpty())
 	{
-		if (!bSelf && !(TargetItem && TargetItem->HomeLocationId == Player->LocationId)) { return Outcome; }
+		if (!bSelf && !(TargetItem && TargetItem->LocationId == Player->LocationId)) { return Outcome; }
 	}
 	else if (TargetItem && !TargetItem->HomeLocationId.IsEmpty() && TargetItem->LocationId == TargetItem->HomeLocationId)
 	{

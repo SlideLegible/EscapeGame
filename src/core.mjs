@@ -22,11 +22,16 @@ const OBJECT_AREAS = {
 
 const ITEM_HOMES = {
   F01: 'Corridor', F02: 'L01', F03: 'L02', F04: 'Corridor', F05: 'Office', F06: 'Office',
-  F07: 'Storage', F08: 'Classroom', F09: 'Classroom', F11: 'GuardRoom', F12: 'Classroom',
+  F07: 'Restroom', F08: 'Classroom', F09: 'Classroom', F11: 'GuardRoom', F12: 'Classroom',
 };
 
 const INITIAL_ITEMS = ['F08', 'F09', 'F11', 'F12'];
 const DOORS = ['S01', 'S05', 'S09', 'S19'];
+// What a locked door that leads out of a room says, whether it is touched or walked into.
+const LOCKED_DOOR_TEXT = {
+  S19: '門被鎖住了，也許可以找個夠重的東西把它撞開',
+  S05: '上鎖的門，門牌上寫著「辦公室」',
+};
 const KEYS = ['F04', 'F05', 'F11'];
 
 const ACHIEVEMENTS = {
@@ -173,8 +178,6 @@ export class Game {
       (from === 'Office' && area === 'Corridor') ||
       (from === 'Corridor' && ['Restroom', 'GuardRoom'].includes(area)) ||
       (['Restroom', 'GuardRoom'].includes(from) && area === 'Corridor') ||
-      (from === 'Restroom' && area === 'Storage' && this.isDoorOpen('S09')) ||
-      (from === 'Storage' && area === 'Restroom') ||
       (['L01', 'L02'].includes(from) && area === 'Corridor');
     if (!allowed) return false;
     player.area = area;
@@ -271,7 +274,7 @@ export class Game {
     const form = player.form;
     if (targetId === 'S19') {
       if (!this.isDoorOpen('S19') && form === 'F12') { this.state.doors.add('S19'); return this.#resolve(playerId, 'X036', '「砰！」你用盡全力撞了上去，教室門被撞開了'); }
-      if (!this.isDoorOpen('S19')) return this.#resolve(playerId, 'X037', '門被鎖住了，也許可以找個夠重的東西把它撞開');
+      if (!this.isDoorOpen('S19')) return this.#resolve(playerId, 'X037', LOCKED_DOOR_TEXT.S19);
     }
     if (targetId === 'S14' && form === 'F00') return this.#resolve(playerId, 'X018', '黑板上寫著一串奇怪的字：WKH SDVVZRUG LV QRW KHUH');
     if (targetId === 'S16' && form === 'F08') return this.#resolve(playerId, 'X029', '你從講桌滾下去，摔得頭暈眼花', { damage: 1 });
@@ -287,6 +290,7 @@ export class Game {
       return this.#resolve(playerId, 'X009', '花盆砸到了你的腳，土裡掉出一支鑰匙', { damage: 1, spawned: 'F04' });
     }
     if (targetId === 'S05' && form === 'F04' && !this.isDoorOpen('S05')) { this.state.doors.add('S05'); return this.#resolve(playerId, 'X005', '打開辦公室門'); }
+    if (targetId === 'S05' && !this.isDoorOpen('S05')) return this.#resolve(playerId, 'X041', LOCKED_DOOR_TEXT.S05);
     if (targetId === 'S06' && form === 'F00' && !this.item('F05').exists) return this.#spawn(playerId, 'X006', 'F05', '打開抽屜，裡面有一支不知道用來做什麼的鑰匙');
     if (targetId === 'S07' && form === 'F00') return this.#resolve(playerId, 'X007', '電腦需要密碼才能登入，打不開');
     if (targetId === 'S08' && form === 'F00' && !this.item('F06').exists) { this.unlock(playerId, 'A04'); return this.#spawn(playerId, 'X008', 'F06', '拆開牛皮紙包，裡面竟然是期中考考卷'); }
@@ -357,4 +361,4 @@ export class Game {
   }
 }
 
-export { FORMS, OBJECTS, OBJECT_AREAS, DEFAULT_TEXT, ACHIEVEMENTS };
+export { FORMS, OBJECTS, OBJECT_AREAS, DEFAULT_TEXT, ACHIEVEMENTS, LOCKED_DOOR_TEXT };

@@ -15,7 +15,7 @@ const ROOM = {
 
 export const OBJECT_POSITIONS = {
   S01: [0, -14], S02: [-6, -10], S03: [-14, -10], S04: [-14, -10.7], S05: [11, -15],
-  S06: [13, -20], S07: [9, -21], S08: [13, -24], S09: [-16, -21], S10: [4, -10],
+  S06: [13, -20], S07: [12.5, -20], S08: [13, -24], S09: [-16, -21], S10: [4, -10],
   S11: [-12, -19], S12: [-8, -23], S13: [-9, -17], S14: [-7.65, 0], S15: [27.68, -22],
   S16: [-6.32, 0], S17: [-3, -10], S18: [9, -24], S19: [-5.55, -5.45], S20: [-5.65, 0.35],
   S21: [22.5, -22],
@@ -63,7 +63,7 @@ const ROOM_MODELS = [
   { room: 'Corridor', file: 'objects/s10.glb', fitMax: 1.1, x: 4, z: -10, replaces: ['S10'] },
   { room: 'Corridor', file: 'objects/s17.glb', fitMax: 2.4, y: 0.85, x: -3, z: -10, replaces: ['S17'] },
   { room: 'Office', file: 'objects/s06.glb', fitMax: 1.6, x: 13, z: -20, replaces: ['S06'] },
-  { room: 'Office', file: 'objects/s07.glb', fitMax: 1.1, x: 9, z: -21, replaces: ['S07'] },
+  { room: 'Office', file: 'objects/s07.glb', rotateY: -Math.PI / 2, fitMax: 0.7, y: 0.785, x: 12.5, z: -20, replaces: ['S07'] }, // on the S06 desk top
   { room: 'GuardRoom', file: 'objects/s15.glb', rotateY: -Math.PI / 2, fitMax: 1.2, y: 0.9, z: -22, alignMaxX: 27.89, replaces: ['S15'] },
   { room: 'Office', file: 'objects/s18.glb', fitMax: 1.8, y: 0.5, x: 9, z: -24, replaces: ['S18'] },
 ];

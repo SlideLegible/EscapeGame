@@ -13,6 +13,12 @@ test('the page loads only local Three.js and game modules', async () => {
   assert.doesNotMatch(`${html}\n${main}`, /https?:\/\//);
 });
 
+test('the bundled Three.js entry module resolves its required core file locally', async () => {
+  const module = await readFile(new URL('../vendor/three.module.js', import.meta.url), 'utf8');
+  await readFile(new URL('../vendor/three.core.js', import.meta.url), 'utf8');
+  assert.match(module, /from '\.\/three\.core\.js'/);
+});
+
 test('the static page exposes the required game HUD and controls', async () => {
   const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
   for (const id of ['game', 'health', 'timer', 'form-name', 'prompt', 'dialog', 'keypad', 'ending', 'achievements', 'start']) {

@@ -75,3 +75,15 @@ test('leaving each special location puts the player on the side of the machine i
   assert.ok(dropPoint(38, -9)[1] > mz);
   assert.ok(dropPoint(38, -21)[1] < mz);
 });
+
+test('walking from the restroom into the storage room never steps outside every room', () => {
+  for (let x = -15.5; x >= -16.5; x -= 0.05) {
+    assert.ok(['Restroom', 'Storage'].includes(areaAt(x, -21)), `x=${x.toFixed(2)}`);
+  }
+});
+
+test('the storage door sits on the wall between the restroom and the storage room', () => {
+  const [x, z] = OBJECT_POSITIONS.S09;
+  assert.equal(areaAt(x + 0.1, z), 'Restroom');
+  assert.equal(areaAt(x - 0.1, z), 'Storage');
+});

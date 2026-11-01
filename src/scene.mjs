@@ -7,7 +7,7 @@ const ROOM = {
   Corridor: { label: '走廊', x: 0, z: -11, w: 50, d: 8, color: 0x756b58 },
   Office: { label: '辦公室', x: 11, z: -21, w: 10, d: 10, color: 0x766c58 },
   Restroom: { label: '廁所', x: -11, z: -21, w: 10, d: 10, color: 0x626b66 },
-  Storage: { label: '儲物間', x: -22, z: -21, w: 9, d: 10, color: 0x5b5244 },
+  Storage: { label: '儲物間', x: -21.5, z: -21, w: 11, d: 10, color: 0x5b5244 },
   GuardRoom: { label: '警衛室', x: 23, z: -21, w: 10, d: 10, color: 0x696553 },
   L01: { label: '飲料機內部', x: 38, z: -9, w: 9, d: 8, color: 0x515f58 },
   L02: { label: '飲料機底下', x: 38, z: -21, w: 9, d: 8, color: 0x50564e },
@@ -15,7 +15,7 @@ const ROOM = {
 
 export const OBJECT_POSITIONS = {
   S01: [0, -14], S02: [-6, -10], S03: [-14, -10], S04: [-14, -10.7], S05: [11, -15],
-  S06: [13, -20], S07: [9, -21], S08: [13, -24], S09: [-15, -21], S10: [4, -10],
+  S06: [13, -20], S07: [9, -21], S08: [13, -24], S09: [-16, -21], S10: [4, -10],
   S11: [-12, -19], S12: [-8, -23], S13: [-9, -17], S14: [-7.65, 0], S15: [25, -22],
   S16: [-6.2, 0], S17: [-3, -10], S18: [9, -24], S19: [-5.55, -5.45], S20: [-5.65, 0.35],
   S21: [22.5, -22],
@@ -40,7 +40,7 @@ export function areaAt(x, z) {
   if (Math.abs(x) <= 7.75 && z >= -5.75 && z <= 5.75) return 'Classroom';
   if (x >= 6 && x <= 16 && z >= -26 && z <= -15.8) return 'Office';
   if (x >= -16 && x <= -6 && z >= -26 && z <= -15.8) return 'Restroom';
-  if (x >= -27 && x <= -16.2 && z >= -26 && z <= -16) return 'Storage';
+  if (x >= -27 && x <= -16 && z >= -26 && z <= -16) return 'Storage';
   if (x >= 18 && x <= 28 && z >= -26 && z <= -15.8) return 'GuardRoom';
   if (x >= -25 && x <= 25 && z >= -16.2 && z <= -5.75) return 'Corridor';
   if (x >= 33 && x <= 43 && z >= -14 && z <= -5) return 'L01';
@@ -198,14 +198,13 @@ export class AcademyScene {
         wall((right + room.x + 1.3) / 2, top, room.w / 2 - 1.3, 0.22);
       } else if (id === 'Restroom') {
         wall(room.x, bottom, room.w, 0.22);
-        wall(left, room.z + 3.25, 0.22, room.d / 2 - 3.25);
-        wall(left, room.z - 3.25, 0.22, room.d / 2 - 3.25);
+        wall(left, (top + room.z + 1.1) / 2, 0.22, top - room.z - 1.1);
+        wall(left, (bottom + room.z - 1.1) / 2, 0.22, room.z - 1.1 - bottom);
         wall(right, room.z, 0.22, room.d);
         wall((left + room.x - 1.3) / 2, top, room.w / 2 - 1.3, 0.22);
         wall((right + room.x + 1.3) / 2, top, room.w / 2 - 1.3, 0.22);
       } else if (id === 'Storage') {
         wall(room.x, top, room.w, 0.22); wall(left, room.z, 0.22, room.d); wall(room.x, bottom, room.w, 0.22);
-        wall(right, room.z - 1.5, 0.22, room.d - 3);
       } else if (id === 'L01' || id === 'L02') {
         wall(room.x, top, room.w, 0.22); wall(room.x, bottom, room.w, 0.22);
         wall(left, room.z, 0.22, room.d); wall(right, room.z, 0.22, room.d);
@@ -447,6 +446,7 @@ export class AcademyScene {
       const group = this.#objectShape(id);
       const [x, z] = OBJECT_POSITIONS[id];
       group.position.set(x, 0, z);
+      if (id === 'S09') group.rotation.y = Math.PI / 2;
       group.userData.targetId = id;
       group.userData.interactionOnly = MODEL_TARGETS.has(id);
       group.name = `${id} ${label}`;
@@ -777,7 +777,7 @@ export class AcademyScene {
       return x >= 21.7 && x <= 24.3;
     }
     if ((from === 'Restroom' && to === 'Storage') || (from === 'Storage' && to === 'Restroom')) {
-      return this.game.isDoorOpen('S09') && z >= -22.3 && z <= -19.7;
+      return this.game.isDoorOpen('S09') && z >= -21.9 && z <= -20.1;
     }
     return true;
   }

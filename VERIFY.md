@@ -113,12 +113,12 @@
 - [x] **不可以** 沒開辦公室門、儲物間門之前能走進去（AI 補充）（AI 代理驗證 2026-10-31：`Step9_Level.spec.cpp` 8 條 It 與 `tests/test_step9_layout.py` 全綠（UE 132/132、Python 56/56），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；地圖由 `tools/mcp_build_graybox.py` 經 MCP（只聽 127.0.0.1）從 `Level_Layout.csv` 蓋出；看過紅（3d62bd0）到綠（4fb07e0）之間沒有改測試）
 
 ### STEP 10 介面
-- [ ] 畫面上常駐顯示生命值、剩餘時間（mm:ss）、目前形態名稱，都是繁體中文、沒有方塊字（AI 補充）
-- [ ] 互動時 → 彈出文字框顯示事件文字，按任意鍵或 3 秒後關閉（AI 補充）
-- [ ] 人類碰大門 → 出現四位數密碼鍵盤，可以輸入 0～9、刪除、確認（AI 補充）
-- [ ] 觸發結局 → 顯示對應的結局畫面與結局劇情文字（AI 補充）
-- [ ] 解鎖成就 → 右上角跳出成就名稱，2～4 秒後消失（AI 補充）
-- [ ] **不可以** 任何文字超出文字框或被截斷（AI 補充）
+- [x] 畫面上常駐顯示生命值、剩餘時間（mm:ss）、目前形態名稱，都是繁體中文、沒有方塊字（AI 補充）（AI 代理驗證 2026-10-31：`Step10_UI.spec.cpp` 21 條 It 與 `tests/test_step10_ui_data.py` 全綠（UE 153/153、Python 74/74），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；驗的是 presenter 與 widget 結構（-nullrhi），實際畫面需要人試玩看一次；字型涵蓋用 cmap 檢查所有 CSV 文字，🎂 走彩色 emoji 字型）
+- [x] 互動時 → 彈出文字框顯示事件文字，按任意鍵或 3 秒後關閉（AI 補充）（AI 代理驗證 2026-10-31：`Step10_UI.spec.cpp` 21 條 It 與 `tests/test_step10_ui_data.py` 全綠（UE 153/153、Python 74/74），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；驗的是 presenter 與 widget 結構（-nullrhi），實際畫面需要人試玩看一次）
+- [x] 人類碰大門 → 出現四位數密碼鍵盤，可以輸入 0～9、刪除、確認（AI 補充）（AI 代理驗證 2026-10-31：`Step10_UI.spec.cpp` 21 條 It 與 `tests/test_step10_ui_data.py` 全綠（UE 153/153、Python 74/74），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；驗的是 presenter 與 widget 結構（-nullrhi），實際畫面需要人試玩看一次）
+- [x] 觸發結局 → 顯示對應的結局畫面與結局劇情文字（AI 補充）（AI 代理驗證 2026-10-31：`Step10_UI.spec.cpp` 21 條 It 與 `tests/test_step10_ui_data.py` 全綠（UE 153/153、Python 74/74），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；驗的是 presenter 與 widget 結構（-nullrhi），實際畫面需要人試玩看一次）
+- [x] 解鎖成就 → 右上角跳出成就名稱，2～4 秒後消失（AI 補充）（AI 代理驗證 2026-10-31：`Step10_UI.spec.cpp` 21 條 It 與 `tests/test_step10_ui_data.py` 全綠（UE 153/153、Python 74/74），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；驗的是 presenter 與 widget 結構（-nullrhi），實際畫面需要人試玩看一次）
+- [x] **不可以** 任何文字超出文字框或被截斷（AI 補充）（AI 代理驗證 2026-10-31：`Step10_UI.spec.cpp` 21 條 It 與 `tests/test_step10_ui_data.py` 全綠（UE 153/153、Python 74/74），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；驗的是 presenter 與 widget 結構（-nullrhi），實際畫面需要人試玩看一次）
 
 ### STEP 11 操控
 - [ ] 人類形態：WASD 移動、滑鼠轉鏡頭、E 互動、Q 變回人類（AI 補充）

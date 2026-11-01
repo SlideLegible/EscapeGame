@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { areaAt, areaCameraRect, ITEM_POSITIONS, dropPoint, entryPoint, nearestCandidate, OcclusionGrid, rayRectLimit, roomClipRect, DOORWAYS, CORRIDOR_HALF_LENGTH, SPECIAL_EXITS, OBJECT_POSITIONS, LECTERN_SIZE } from '../src/scene.mjs';
+import { advancePlayerFacing, areaAt, areaCameraRect, bodyPathIntersectsGrid, bodyPathStepHeight, ITEM_POSITIONS, dropPoint, entryPoint, nearestCandidate, OcclusionGrid, rayRectLimit, removeRootTranslationTrack, roomClipRect, DOORWAYS, CORRIDOR_HALF_LENGTH, SPECIAL_EXITS, OBJECT_POSITIONS, LECTERN_SIZE } from '../src/scene.mjs';
 
 test('walkable room areas touch across the classroom, corridor, office, restroom, and storage thresholds', () => {
   assert.equal(areaAt(7, -6.2), 'Corridor');
@@ -271,4 +271,50 @@ test('every corridor entrance and arrival point is in the main hall, not in the 
     assert.ok(Math.abs(corridor.spawn[0]) + 0.22 < CORRIDOR_HALF_LENGTH);
     assert.ok(Math.max(...corridor.span.map(Math.abs)) < CORRIDOR_HALF_LENGTH);
   }
+});
+
+test('human movement checks the full body path against room geometry', () => {
+  const grid = new OcclusionGrid({ minX: 0, minY: 0, minZ: 0, maxX: 10, maxY: 3, maxZ: 10 });
+  grid.addTriangle(6, 0, 0, 6, 3, 0, 6, 0, 10);
+  grid.addTriangle(6, 3, 0, 6, 3, 10, 6, 0, 10);
+  assert.equal(bodyPathIntersectsGrid(grid, 4.5, 5, 6.5, 5), true);
+  assert.equal(bodyPathIntersectsGrid(grid, 4.5, 8, 5.5, 8), false);
+});
+
+test('human movement can step over a low obstacle but not a wall', () => {
+  const low = new OcclusionGrid({ minX: 0, minY: 0, minZ: 0, maxX: 10, maxY: 3, maxZ: 10 });
+  low.addTriangle(6, 0, 0, 6, 0.15, 0, 6, 0, 10);
+  low.addTriangle(6, 0.15, 0, 6, 0.15, 10, 6, 0, 10);
+  const stepHeight = bodyPathStepHeight(low, 4.5, 5, 6.5, 5);
+  assert.ok(stepHeight > 0 && stepHeight <= 0.25);
+  assert.equal(bodyPathIntersectsGrid(low, 4.5, 5, 6.5, 5, 0.3, 1.3, stepHeight), false);
+
+  const wall = new OcclusionGrid({ minX: 0, minY: 0, minZ: 0, maxX: 10, maxY: 3, maxZ: 10 });
+  wall.addTriangle(6, 0, 0, 6, 1, 0, 6, 0, 10);
+  wall.addTriangle(6, 1, 0, 6, 1, 10, 6, 0, 10);
+  assert.equal(bodyPathStepHeight(wall, 4.5, 5, 6.5, 5), null);
+});
+
+test('human quarter and half turns both pivot in place before movement resumes', () => {
+  for (const target of [Math.PI / 2, Math.PI]) {
+    let yaw = 0;
+    let turn = advancePlayerFacing(yaw, target, 0.1);
+    assert.equal(turn.turning, true);
+    while (turn.turning) {
+      yaw = turn.yaw;
+      turn = advancePlayerFacing(yaw, target, 0.1);
+    }
+    assert.ok(Math.abs(turn.yaw - target) < 1e-9);
+    assert.equal(turn.turning, false);
+  }
+});
+
+test('human walk animation drops root translation while keeping skeletal tracks', () => {
+  const root = { uuid: 'hips-node' };
+  const position = { name: 'hips-node.position' };
+  const rotation = { name: 'hips-node.quaternion' };
+  const clip = { tracks: [position, rotation] };
+  assert.equal(removeRootTranslationTrack(clip, root), true);
+  assert.deepEqual(clip.tracks, [rotation]);
+  assert.equal(removeRootTranslationTrack(clip, root), false);
 });

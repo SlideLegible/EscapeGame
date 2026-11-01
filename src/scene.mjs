@@ -1269,7 +1269,7 @@ export class AcademyScene {
       this.camera.lookAt(this.mapTarget);
       return;
     }
-    const distance = this.game.player().form === 'F12' ? 8.5 : this.game.player().form === 'F08' ? 6.2 : this.game.player().form === 'F00' ? 4.8 : 7.2;
+    const distance = this.game.player().form === 'F12' ? 8.5 : this.game.player().form === 'F08' ? 6.2 : this.game.player().form === 'F00' ? 3.8 : 7.2;
     // The camera orbits on a sphere around the player: pitch is its elevation angle and only the mouse changes it.
     const targetY = (this.game.player().form === 'F00' ? 1.05 : 0.78) + this.jumpHeight * 0.35;
     const pitch = this.game.player().form === 'F00' ? 0.45 : this.pitch;

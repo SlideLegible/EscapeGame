@@ -44,6 +44,19 @@ const ITEM_MODELS = {
   F12: { fit: 1.4 },
 };
 
+// Room models from Sketchfab (downloaded to assets/models/rooms/, see ATTRIBUTION.sketchfab.txt). `fitFootprint` scales to the room's
+// floor minus a margin; `scale` is used as-is (the desk and closet files are in centimetres); `fitMax` sets the largest dimension.
+// `x`/`z` default to the room centre and `y` to the floor. `replaces` hides the procedural shape of that interaction target.
+const ROOM_MODELS = [
+  { room: 'Corridor', file: 'rooms/corridor.glb', rotateY: Math.PI / 2, fitFootprint: true },
+  { room: 'Restroom', file: 'rooms/restroom.glb', fitFootprint: true },
+  { room: 'Office', file: 'rooms/computer_desk.glb', scale: 0.01, x: 11, z: -21.5 },
+  { room: 'Office', file: 'rooms/bulletin_board.glb', rotateY: Math.PI / 2, x: 6.25, y: 1.2, z: -21 },
+  { room: 'GuardRoom', file: 'rooms/guard_room.glb', fitFootprint: true },
+  { room: 'Storage', file: 'rooms/janitor_closet.glb', scale: 0.01, x: -21.5, z: -24.5 },
+  { room: 'GuardRoom', file: 'items/f10.glb', fitMax: 1.0, x: 22.5, z: -22, replaces: 'S21' },
+];
+
 // Footprint (x, z) of the teacher's lectern in the bundled classroom, parallel to the blackboard.
 export const LECTERN_SIZE = [0.9, 1.48];
 
@@ -54,18 +67,96 @@ const CLASSROOM_EXIT_DOOR_PARTS = ['PUERTA_1_StingrayPBS9_0', 'PUERTA_3_Stingray
 const MODEL_TARGETS = new Set(['S04', 'S14', 'S16', 'S19', 'S20']);
 
 const ROOM_NAMES = Object.fromEntries(Object.entries(ROOM).map(([id, room]) => [id, room.label]));
+// Orbit camera collision: how far into the ray the player's own body is ignored, how far to stay off a wall, and the closest it may get.
+const CAMERA_BODY_CLEARANCE = 0.6, CAMERA_WALL_CLEARANCE = 0.3, CAMERA_MIN_DISTANCE = 0.45;
 const palette = { wall: 0xb3a789, trim: 0x51483b, wood: 0x8d704a, light: 0xe8d8b6, dark: 0x292720, lime: 0xc4ef80 };
 
+// Walkable rectangles per area, checked in order (the first match wins where they overlap).
+const AREA_RECTS = [
+  ['Classroom', -7.75, 7.75, -5.75, 5.75],
+  ['Office', 6, 16, -26, -15.8],
+  ['Restroom', -16, -6, -26, -15.8],
+  ['Storage', -27, -16, -26, -16],
+  ['GuardRoom', 18, 28, -26, -15.8],
+  ['Corridor', -25, 25, -16.2, -5.75],
+  ['L01', 33, 43, -14, -5],
+  ['L02', 33, 43, -25, -16],
+];
+
 export function areaAt(x, z) {
-  if (Math.abs(x) <= 7.75 && z >= -5.75 && z <= 5.75) return 'Classroom';
-  if (x >= 6 && x <= 16 && z >= -26 && z <= -15.8) return 'Office';
-  if (x >= -16 && x <= -6 && z >= -26 && z <= -15.8) return 'Restroom';
-  if (x >= -27 && x <= -16 && z >= -26 && z <= -16) return 'Storage';
-  if (x >= 18 && x <= 28 && z >= -26 && z <= -15.8) return 'GuardRoom';
-  if (x >= -25 && x <= 25 && z >= -16.2 && z <= -5.75) return 'Corridor';
-  if (x >= 33 && x <= 43 && z >= -14 && z <= -5) return 'L01';
-  if (x >= 33 && x <= 43 && z >= -25 && z <= -16) return 'L02';
+  for (const [id, minX, maxX, minZ, maxZ] of AREA_RECTS) {
+    if (x >= minX && x <= maxX && z >= minZ && z <= maxZ) return id;
+  }
   return null;
+}
+
+// The floor rectangle the orbit camera may occupy while the player is in `area`: the walkable rectangle cut down to
+// the room's real floor, pulled in by `margin` so the camera stays clear of the walls.
+export function areaCameraRect(area, margin = 0.3) {
+  const rect = AREA_RECTS.find(([id]) => id === area);
+  const room = ROOM[area];
+  if (!rect || !room) return null;
+  return {
+    minX: Math.max(rect[1], room.x - room.w / 2) + margin, maxX: Math.min(rect[2], room.x + room.w / 2) - margin,
+    minZ: Math.max(rect[3], room.z - room.d / 2) + margin, maxZ: Math.min(rect[4], room.z + room.d / 2) - margin,
+  };
+}
+
+// Largest t in [0, 1] for which (ox + t*dx, oz + t*dz) is still inside `rect`. An origin outside the rect is not limited.
+export function rayRectLimit(ox, oz, dx, dz, rect) {
+  if (ox < rect.minX || ox > rect.maxX || oz < rect.minZ || oz > rect.maxZ) return 1;
+  let t = 1;
+  if (dx > 1e-9) t = Math.min(t, (rect.maxX - ox) / dx); else if (dx < -1e-9) t = Math.min(t, (rect.minX - ox) / dx);
+  if (dz > 1e-9) t = Math.min(t, (rect.maxZ - oz) / dz); else if (dz < -1e-9) t = Math.min(t, (rect.minZ - oz) / dz);
+  return Math.max(0, t);
+}
+
+// Coarse voxel copy of the room geometry (walls, furniture) that the orbit camera must not sink into.
+// Floors and ceilings are skipped (the camera always sits above the first and the player never sees the second).
+export class OcclusionGrid {
+  constructor({ minX, minY, minZ, maxX, maxY, maxZ }, cell = 0.2) {
+    this.cell = cell;
+    this.minX = minX; this.minY = minY; this.minZ = minZ;
+    this.nx = Math.ceil((maxX - minX) / cell); this.ny = Math.ceil((maxY - minY) / cell); this.nz = Math.ceil((maxZ - minZ) / cell);
+    this.cells = new Uint8Array(this.nx * this.ny * this.nz);
+  }
+
+  #mark(x, y, z) {
+    const i = Math.floor((x - this.minX) / this.cell), j = Math.floor((y - this.minY) / this.cell), k = Math.floor((z - this.minZ) / this.cell);
+    if (i < 0 || j < 0 || k < 0 || i >= this.nx || j >= this.ny || k >= this.nz) return;
+    this.cells[(j * this.nz + k) * this.nx + i] = 1;
+  }
+
+  isBlocked(x, y, z) {
+    const i = Math.floor((x - this.minX) / this.cell), j = Math.floor((y - this.minY) / this.cell), k = Math.floor((z - this.minZ) / this.cell);
+    if (i < 0 || j < 0 || k < 0 || i >= this.nx || j >= this.ny || k >= this.nz) return false;
+    return this.cells[(j * this.nz + k) * this.nx + i] === 1;
+  }
+
+  addTriangle(ax, ay, az, bx, by, bz, cx, cy, cz) {
+    const ux = bx - ax, uy = by - ay, uz = bz - az, vx = cx - ax, vy = cy - ay, vz = cz - az;
+    const nxv = uy * vz - uz * vy, nyv = uz * vx - ux * vz, nzv = ux * vy - uy * vx;
+    const nLen = Math.hypot(nxv, nyv, nzv);
+    if (nLen < 1e-12 || Math.abs(nyv) / nLen > 0.85) return;
+    const longest = Math.max(Math.hypot(ux, uy, uz), Math.hypot(vx, vy, vz), Math.hypot(cx - bx, cy - by, cz - bz));
+    const n = Math.max(1, Math.ceil(longest / (this.cell * 0.6)));
+    for (let i = 0; i <= n; i++) for (let j = 0; j <= n - i; j++) {
+      const p = i / n, q = j / n;
+      this.#mark(ax + ux * p + vx * q, ay + uy * p + vy * q, az + uz * p + vz * q);
+    }
+  }
+
+  // Fraction of the way from (ox, oy, oz) to (ex, ey, ez) at which the first blocked voxel is met, or 1 if the path is clear.
+  // The first `from` fraction of the path is ignored (the player's own body).
+  firstHit(ox, oy, oz, ex, ey, ez, from = 0) {
+    const length = Math.hypot(ex - ox, ey - oy, ez - oz);
+    if (!(length > 1e-9) || !Number.isFinite(length)) return 1;
+    const step = this.cell * 0.5 / length;
+    for (let t = from; t < 1; t += step) {
+      if (this.isBlocked(ox + (ex - ox) * t, oy + (ey - oy) * t, oz + (ez - oz) * t)) return t;
+    }
+    return 1;
+  }
 }
 
 export const SPECIAL_EXITS = {
@@ -149,6 +240,7 @@ export class AcademyScene {
     this.cameraDesired = new THREE.Vector3();
     this.mapTarget = new THREE.Vector3(7, 0, -11);
     this.lastCameraUpdate = 0;
+    this.occlusion = null;
     this.#buildLights();
     this.#buildRooms();
     this.#buildObjects();
@@ -158,12 +250,14 @@ export class AcademyScene {
     this.playerWalkAction = null;
     this.playerModelLoad = this.#loadPlayerModel();
     this.classroomLoad = this.#loadClassroomModel();
+    this.roomModelsLoad = this.#loadRoomModels();
     this.itemTemplates = new Map();
     this.itemModelsLoad = this.#loadItemModels();
     this.#onResize = () => this.resize();
     window.addEventListener('resize', this.#onResize);
     this.resize();
     this.refresh();
+    Promise.all([this.classroomLoad, this.roomModelsLoad, this.itemModelsLoad]).then(() => this.#buildOcclusion());
   }
 
   #buildLights() {
@@ -310,6 +404,38 @@ export class AcademyScene {
     } catch (error) {
       console.error('教室模型載入失敗，使用簡化場景。', error);
     }
+  }
+
+  async #loadRoomModels() {
+    await Promise.all(ROOM_MODELS.map(async (config) => {
+      try {
+        const model = await loadGlb(new URL(`../assets/models/${config.file}`, import.meta.url));
+        this.#placeRoomModel(model, config);
+        model.name = config.file;
+        (this.roomGroups.get(config.room) ?? this.scene).add(model);
+        if (config.replaces) {
+          for (const child of this.targetGroups.get(config.replaces).children) child.visible = false;
+        }
+      } catch (error) {
+        console.error(`${config.file} 房間模型載入失敗，使用簡化場景。`, error);
+      }
+    }));
+    this.refresh();
+  }
+
+  #placeRoomModel(model, { room, rotateY = 0, scale = 1, fitFootprint, fitMax, x, y = 0, z }) {
+    const area = ROOM[room];
+    model.rotation.y = rotateY;
+    model.updateMatrixWorld(true);
+    const size = new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3());
+    let factor = scale;
+    if (fitFootprint) factor = Math.min((area.w - 0.6) / size.x, (area.d - 0.6) / size.z);
+    if (fitMax) factor = fitMax / Math.max(size.x, size.y, size.z);
+    model.scale.setScalar(factor);
+    model.updateMatrixWorld(true);
+    const bounds = new THREE.Box3().setFromObject(model);
+    const center = bounds.getCenter(new THREE.Vector3());
+    model.position.set((x ?? area.x) - center.x, y - bounds.min.y, (z ?? area.z) - center.z);
   }
 
   async #loadItemModels() {
@@ -1144,13 +1270,56 @@ export class AcademyScene {
       return;
     }
     const distance = this.game.player().form === 'F12' ? 8.5 : this.game.player().form === 'F08' ? 6.2 : this.game.player().form === 'F00' ? 6.5 : 7.2;
-    const height = (this.game.player().form === 'F09' ? 3.4 : 3.8) + this.pitch * 1.5;
-    const dx = Math.sin(this.yaw) * distance;
-    const dz = Math.cos(this.yaw) * distance;
-    this.cameraDesired.set(this.playerPosition.x - dx, height, this.playerPosition.z + dz);
+    // The camera orbits on a sphere around the player: pitch is its elevation angle and only the mouse changes it.
+    const targetY = 0.78 + this.jumpHeight * 0.35;
+    const reach = distance * Math.cos(this.pitch);
+    const height = Math.max(0.5, targetY + distance * Math.sin(this.pitch) - (this.game.player().form === 'F09' ? 0.4 : 0));
+    this.cameraDesired.set(this.playerPosition.x - Math.sin(this.yaw) * reach, height, this.playerPosition.z + Math.cos(this.yaw) * reach);
     this.camera.position.lerp(this.cameraDesired, smooth);
-    this.cameraTarget.set(this.playerPosition.x, 0.78 + this.jumpHeight * 0.35, this.playerPosition.z);
+    this.#pullCameraIn(this.playerPosition.x, targetY, this.playerPosition.z);
+    this.cameraTarget.set(this.playerPosition.x, targetY, this.playerPosition.z);
     this.camera.lookAt(this.cameraTarget);
+  }
+
+  // Slides the camera along its line to the player until it is clear of the room walls and of any model in the way,
+  // so the view angle never changes when something is in the way, only the distance.
+  #pullCameraIn(px, py, pz) {
+    const cam = this.camera.position;
+    const dx = cam.x - px, dy = cam.y - py, dz = cam.z - pz;
+    const length = Math.hypot(dx, dy, dz);
+    if (length < 1e-6) return;
+    let t = 1;
+    const rect = areaCameraRect(this.game.player().area);
+    if (rect) t = Math.min(t, rayRectLimit(px, pz, dx, dz, rect));
+    if (this.occlusion) t = Math.min(t, this.occlusion.firstHit(px, py, pz, cam.x, cam.y, cam.z, Math.min(1, CAMERA_BODY_CLEARANCE / length)) - CAMERA_WALL_CLEARANCE / length);
+    t = Math.max(t, Math.min(1, CAMERA_MIN_DISTANCE / length));
+    cam.set(px + dx * t, py + dy * t, pz + dz * t);
+  }
+
+  // Builds the camera occlusion grid from every static, visible mesh once the room models have loaded.
+  #buildOcclusion() {
+    const grid = new OcclusionGrid({ minX: -30, minY: 0, minZ: -28, maxX: 46, maxY: 3, maxZ: 8 });
+    const skip = new Set([this.playerGroup, this.humanGroup, ...this.itemGroups.values(), ...this.exitGroups.values(),
+      ...['S05', 'S09', 'S19'].map((id) => this.targetGroups.get(id)), ...this.classroomExitDoors]);
+    const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+    this.scene.updateMatrixWorld(true);
+    const walk = (node) => {
+      if (!node.visible || skip.has(node) || node.isSprite || node.isLight || node.isSkinnedMesh) return;
+      const position = node.isMesh && node.geometry.attributes.position;
+      if (position) {
+        const index = node.geometry.index;
+        const count = index ? index.count : position.count;
+        for (let i = 0; i + 2 < count; i += 3) {
+          a.fromBufferAttribute(position, index ? index.getX(i) : i).applyMatrix4(node.matrixWorld);
+          b.fromBufferAttribute(position, index ? index.getX(i + 1) : i + 1).applyMatrix4(node.matrixWorld);
+          c.fromBufferAttribute(position, index ? index.getX(i + 2) : i + 2).applyMatrix4(node.matrixWorld);
+          grid.addTriangle(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
+        }
+      }
+      for (const child of node.children) walk(child);
+    };
+    walk(this.scene);
+    this.occlusion = grid;
   }
 
   render() {

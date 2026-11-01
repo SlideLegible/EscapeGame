@@ -126,7 +126,6 @@ export class Game {
       item.area = player.area === 'L01' || player.area === 'L02' ? 'Corridor' : player.area;
       player.form = 'F00';
     }
-    if ((player.area === 'L01' || player.area === 'L02') && this.item('F01').area === player.area) this.item('F01').area = 'Corridor';
     player.area = player.humanArea;
     player.nonHumanSeconds = 0;
     return { transformed: true, form: 'F00' };
@@ -246,7 +245,9 @@ export class Game {
     if (targetId === 'S20') return this.#resolve(playerId, 'X030', '抽屜鎖得死死的，好像在說：「別白費力氣了，你永遠打不開我。」');
     if (targetId === 'S02' && form === 'F00') return this.#spawn(playerId, 'X001', 'F01', '從垃圾桶裡翻出一個飲料罐垃圾');
     if (targetId === 'S03' && form === 'F01') return this.#enterSpecial(playerId, 'X002', 'L01', 'F02', '鑽進飲料機裡，發現一罐飲料');
+    if (targetId === 'S03' && form === 'F02') return this.#enterSpecial(playerId, 'X038', 'L01', 'F02', '你滾回了飲料機裡');
     if (targetId === 'S04' && form === 'F01') return this.#enterSpecial(playerId, 'X003', 'L02', 'F03', '滾進飲料機底下，發現一張學生證');
+    if (targetId === 'S04' && form === 'F03') return this.#enterSpecial(playerId, 'X039', 'L02', 'F03', '你滑回了飲料機底下');
     if (targetId === 'S01' && form === 'F03' && !this.state.powerCut) return this.#resolve(playerId, 'X010', '刷學生證，大門打開了', { ending: 'E01' });
     if (targetId === 'S10' && form === 'F00') {
       this.#spawn(playerId, 'X009', 'F04', '花盆砸到了你的腳，土裡掉出一支鑰匙');

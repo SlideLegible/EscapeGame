@@ -79,6 +79,7 @@ test('the drink machine and its underside are special locations for the can form
   assert.equal(game.interact('local', 'S03').location, 'L01');
   assert.equal(game.interact('local', 'F02').interactionId, 'X004');
   assert.equal(game.state.health, 6);
+  game.transform('local', 'F01');
   game.returnToHuman('local');
   game.moveToArea('local', 'Corridor');
   game.transform('local', 'F01');
@@ -254,7 +255,7 @@ test('all object IDs and form IDs from the design table are represented', () => 
   for (let i = 0; i <= 12; i++) assert.ok(game.formName(`F${String(i).padStart(2, '0')}`));
 });
 
-test('switching forms inside the drink machine leaves the can inside, and leaving brings it back to the corridor', () => {
+test('switching forms inside the drink machine leaves the can inside, even after the player leaves', () => {
   const game = new Game();
   obtainCan(game);
   game.interact('local', 'S03');
@@ -263,8 +264,59 @@ test('switching forms inside the drink machine leaves the can inside, and leavin
   assert.equal(game.transform('local', 'F01').transformed, true);
   game.transform('local', 'F02');
   game.returnToHuman('local');
-  assert.equal(game.item('F01').area, 'Corridor');
+  assert.equal(game.item('F01').area, 'L01');
   assert.equal(game.item('F02').area, 'Corridor');
+});
+
+test('the drink can go back into the drink machine and become the can left inside', () => {
+  const game = new Game();
+  obtainCan(game);
+  game.interact('local', 'S03');
+  game.transform('local', 'F02');
+  game.moveToArea('local', 'Corridor');
+  const result = game.interact('local', 'S03');
+  assert.equal(result.interactionId, 'X038');
+  assert.equal(result.location, 'L01');
+  assert.equal(game.player().area, 'L01');
+  assert.equal(game.transform('local', 'F01').transformed, true);
+  assert.equal(game.interact('local', 'S04').rejected, true);
+});
+
+test('the student ID can slide back under the drink machine and become the can left there', () => {
+  const game = new Game();
+  obtainCan(game);
+  game.interact('local', 'S04');
+  game.transform('local', 'F03');
+  assert.equal(game.moveToArea('local', 'Corridor'), true);
+  assert.equal(game.item('F01').area, 'L02');
+  const result = game.interact('local', 'S04');
+  assert.equal(result.interactionId, 'X039');
+  assert.equal(result.location, 'L02');
+  assert.equal(game.transform('local', 'F01').transformed, true);
+  game.transform('local', 'F03');
+  game.returnToHuman('local');
+  assert.equal(game.item('F01').area, 'L02');
+  assert.equal(game.item('F03').area, 'Corridor');
+});
+
+test('the student ID cannot get into the drink machine itself', () => {
+  const game = new Game();
+  obtainCan(game);
+  game.interact('local', 'S04');
+  game.transform('local', 'F03');
+  game.moveToArea('local', 'Corridor');
+  assert.match(game.interact('local', 'S03').text, /飲料機紋絲不動/);
+  assert.equal(game.player().area, 'Corridor');
+});
+
+test('the drink cannot squeeze under the drink machine', () => {
+  const game = new Game();
+  obtainCan(game);
+  game.interact('local', 'S03');
+  game.transform('local', 'F02');
+  game.moveToArea('local', 'Corridor');
+  assert.match(game.interact('local', 'S04').text, /飲料機底下紋絲不動/);
+  assert.equal(game.player().area, 'Corridor');
 });
 
 test('leaving the machine underside as the can leaves an untouched student ID inside', () => {
@@ -274,4 +326,16 @@ test('leaving the machine underside as the can leaves an untouched student ID in
   game.returnToHuman('local');
   assert.equal(game.item('F01').area, 'Corridor');
   assert.equal(game.item('F03').area, 'L02');
+});
+
+test('an item form can walk out of the drink machine into the corridor while the can stays inside', () => {
+  const game = new Game();
+  obtainCan(game);
+  game.interact('local', 'S03');
+  game.transform('local', 'F02');
+  assert.equal(game.moveToArea('local', 'Corridor'), true);
+  assert.equal(game.player().area, 'Corridor');
+  assert.equal(game.player().form, 'F02');
+  assert.equal(game.item('F01').area, 'L01');
+  assert.equal(game.interact('local', 'S01').interactionId, null);
 });

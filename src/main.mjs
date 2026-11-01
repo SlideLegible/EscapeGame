@@ -113,6 +113,12 @@ function performInteraction(targetId) {
     openKeypad();
     return;
   }
+  if (targetId === 'EXIT') {
+    const result = scene.exitSpecialLocation();
+    showMessage(result.text);
+    updateHud();
+    return;
+  }
   const previousForm = game.player().form;
   const result = targetId === 'SELF' ? game.interact('local', 'SELF') : game.interact('local', targetId);
   sync(previousForm, result);

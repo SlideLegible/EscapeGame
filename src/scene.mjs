@@ -47,6 +47,11 @@ export function areaAt(x, z) {
   return null;
 }
 
+export const SPECIAL_EXITS = {
+  L01: { at: [34.1, -11.8], to: [-14, -6.9], text: '你從飲料機的出貨口鑽了出來' },
+  L02: { at: [34.1, -23.8], to: [-18, -6.9], text: '你從飲料機底下滾了出來' },
+};
+
 export function entryPoint(area) {
   return area === 'L01' ? [35.5, -9] : [35.5, -21];
 }
@@ -85,6 +90,7 @@ export class AcademyScene {
     this.targetMeshes = [];
     this.targetGroups = new Map();
     this.itemGroups = new Map();
+    this.exitGroups = new Map();
     this.roomGroups = new Map();
     this.playerGroup = null;
     this.classroomExitDoors = [];
@@ -96,6 +102,7 @@ export class AcademyScene {
     this.#buildLights();
     this.#buildRooms();
     this.#buildObjects();
+    this.#buildExits();
     this.#buildPlayer();
     this.classroomLoad = this.#loadClassroomModel();
     this.#onResize = () => this.resize();
@@ -475,6 +482,35 @@ export class AcademyScene {
     }
   }
 
+  #buildExits() {
+    for (const [area, exit] of Object.entries(SPECIAL_EXITS)) {
+      const group = new THREE.Group();
+      const [x, z] = exit.at;
+      group.position.set(x, 0, z);
+      group.name = `${area} 出口`;
+      group.userData.targetId = 'EXIT';
+      this.#box(group, -0.5, 0.55, 0, 0.08, 1.1, 1.3, this.#material(0x0b1214), false);
+      this.#box(group, -0.45, 1.13, 0, 0.12, 0.08, 1.46, this.#material(palette.lime, 0.4), false);
+      for (const side of [-1, 1]) this.#box(group, -0.45, 0.55, side * 0.69, 0.12, 1.1, 0.08, this.#material(palette.lime, 0.4), false);
+      const ring = new THREE.Mesh(new THREE.RingGeometry(0.45, 0.58, 32), new THREE.MeshBasicMaterial({ color: palette.lime, transparent: true, opacity: 0.55 }));
+      ring.rotation.x = -Math.PI / 2; ring.position.y = 0.02; group.add(ring);
+      this.scene.add(group);
+      this.exitGroups.set(area, group);
+      this.targetMeshes.push(group);
+    }
+  }
+
+  exitSpecialLocation() {
+    const area = this.game.player().area;
+    const exit = SPECIAL_EXITS[area];
+    if (!exit || !this.game.moveToArea('local', 'Corridor')) return { rejected: true, text: '' };
+    const [x, z] = exit.to;
+    this.playerPosition.set(x, 0, z);
+    this.playerGroup.position.copy(this.playerPosition);
+    this.refresh();
+    return { text: exit.text, location: 'Corridor' };
+  }
+
   #formShape(id) {
     const group = new THREE.Group();
     const mat = (color, metalness = 0.04) => new THREE.MeshStandardMaterial({ color, roughness: 0.78, metalness });
@@ -657,6 +693,11 @@ export class AcademyScene {
   nearestTarget(maxDistance = 3.7) {
     let best = null;
     let bestDistance = maxDistance;
+    const exit = this.exitGroups.get(this.game.player().area);
+    if (exit) {
+      const distance = Math.hypot(exit.position.x - this.playerPosition.x, exit.position.z - this.playerPosition.z);
+      if (distance < bestDistance) { bestDistance = distance; best = { id: 'EXIT', name: '離開這裡', distance }; }
+    }
     for (const [id, group] of this.targetGroups) {
       if (!group.visible) continue;
       if (OBJECT_AREAS[id] !== this.game.player().area) continue;

@@ -1,4 +1,4 @@
-// Design interaction IDs X001–X037 → VERIFY STEP 1–3
+// Design interaction IDs X001–X039 → VERIFY STEP 1–3
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../src/core.mjs';
@@ -58,6 +58,7 @@ test('corridor rows cover trash, both machine locations, drink, student card, fl
   game.transform('local', 'F01');
   assert.equal(game.interact('local', 'S03').interactionId, 'X002');
   assert.equal(game.interact('local', 'F02').interactionId, 'X004');
+  game.transform('local', 'F01');
   game.returnToHuman('local');
   game.moveToArea('local', 'Corridor');
   game.transform('local', 'F01');

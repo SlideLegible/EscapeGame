@@ -404,3 +404,10 @@ test('an item form can walk out of the drink machine into the corridor while the
   assert.equal(game.item('F01').area, 'L01');
   assert.equal(game.interact('local', 'S01').interactionId, null);
 });
+
+test('both keys share a name that does not hint which door they open', () => {
+  const game = new Game();
+  assert.equal(game.formName('F04'), '不知道用來做什麼的鑰匙');
+  assert.equal(game.formName('F05'), game.formName('F04'));
+  for (const id of ['F04', 'F05']) assert.doesNotMatch(game.formName(id), /辦公室|儲物間/);
+});

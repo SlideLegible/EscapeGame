@@ -1,6 +1,6 @@
 const FORMS = {
-  F00: '人類', F01: '飲料罐垃圾', F02: '飲料', F03: '學生證', F04: '辦公室鑰匙',
-  F05: '不知道用來做甚麼的鑰匙', F06: '期中考考卷', F07: '長竿子', F08: '骰子',
+  F00: '人類', F01: '飲料罐垃圾', F02: '飲料', F03: '學生證', F04: '不知道用來做什麼的鑰匙',
+  F05: '不知道用來做什麼的鑰匙', F06: '期中考考卷', F07: '長竿子', F08: '骰子',
   F09: '時鐘', F11: '一大串鑰匙圈', F12: '椅子',
 };
 
@@ -261,7 +261,7 @@ export class Game {
       return this.#resolve(playerId, 'X009', '花盆砸到了你的腳，土裡掉出一支鑰匙', { damage: 1, spawned: 'F04' });
     }
     if (targetId === 'S05' && form === 'F04') { this.state.doors.add('S05'); return this.#resolve(playerId, 'X005', '打開辦公室門'); }
-    if (targetId === 'S06' && form === 'F00') return this.#spawn(playerId, 'X006', 'F05', '打開抽屜，裡面有一支不知道用來做甚麼的鑰匙');
+    if (targetId === 'S06' && form === 'F00') return this.#spawn(playerId, 'X006', 'F05', '打開抽屜，裡面有一支不知道用來做什麼的鑰匙');
     if (targetId === 'S07' && form === 'F00') return this.#resolve(playerId, 'X007', '電腦需要密碼才能登入，打不開');
     if (targetId === 'S08' && form === 'F00') { this.unlock(playerId, 'A04'); return this.#spawn(playerId, 'X008', 'F06', '拆開牛皮紙包，裡面竟然是期中考考卷'); }
     if (targetId === 'S18' && form === 'F00') return this.#resolve(playerId, this.#tried1031 ? 'X035' : 'X032', this.#tried1031 ? '10 月 31 日被紅筆圈了起來，旁邊多了一行小字：老師生日🎂' : '10 月 31 日被紅筆圈了起來');

@@ -159,6 +159,36 @@ export class OcclusionGrid {
   }
 }
 
+export function bodyPathIntersectsGrid(grid, fromX, fromZ, toX, toZ, radius = 0.3, height = 1.3) {
+  const cell = grid?.cell ?? 0.2;
+  const verticalSteps = Math.max(1, Math.ceil(height / cell));
+  const pathLength = Math.hypot(toX - fromX, toZ - fromZ);
+  const pathSteps = Math.max(1, Math.ceil(pathLength / (cell * 0.4)));
+  for (let step = 1; step <= pathSteps; step++) {
+    const fraction = step / pathSteps;
+    const x = fromX + (toX - fromX) * fraction;
+    const z = fromZ + (toZ - fromZ) * fraction;
+    for (let level = 0; level <= verticalSteps; level++) {
+      const y = Math.max(0.1, Math.min(height, level * height / verticalSteps));
+      if (grid.isBlocked(x, y, z)) return true;
+      for (let around = 0; around < 8; around++) {
+        const angle = around * Math.PI / 4;
+        if (grid.isBlocked(x + Math.cos(angle) * radius, y, z + Math.sin(angle) * radius)) return true;
+      }
+    }
+  }
+  return false;
+}
+
+export function advancePlayerFacing(currentYaw, targetYaw, maxTurn) {
+  let delta = (targetYaw - currentYaw + Math.PI) % (Math.PI * 2);
+  if (delta < 0) delta += Math.PI * 2;
+  delta -= Math.PI;
+  if (Math.abs(Math.abs(delta) - Math.PI) < 1e-6) delta = -Math.PI;
+  if (Math.abs(delta) <= maxTurn) return { yaw: targetYaw, turning: false };
+  return { yaw: currentYaw + Math.sign(delta) * maxTurn, turning: true };
+}
+
 export const SPECIAL_EXITS = {
   L01: { at: [34.1, -11.8], to: [-14, -6.9], text: '你從飲料機的出貨口鑽了出來' },
   L02: { at: [34.1, -23.8], to: [-14, -12.2], text: '你從飲料機底下滾了出來' },
@@ -1183,22 +1213,13 @@ export class AcademyScene {
       const moveX = fx * forward + rx * right;
       const moveZ = fz * forward + rz * right;
       const targetYaw = Math.atan2(moveX, moveZ);
-      let turnDelta = (targetYaw - this.playerFacingYaw + Math.PI) % (Math.PI * 2);
-      if (turnDelta < 0) turnDelta += Math.PI * 2;
-      turnDelta -= Math.PI;
-      if (Math.abs(Math.abs(turnDelta) - Math.PI) < 1e-6) turnDelta = -Math.PI;
-      if (this.game.player().form === 'F00' && !this.turningInPlace && Math.abs(turnDelta) >= Math.PI * 0.75) {
-        this.turningInPlace = true;
-      }
       if (this.game.player().form === 'F00') {
-        const turnStep = Math.sign(turnDelta) * Math.min(Math.abs(turnDelta), 7 * dt);
-        if (this.turningInPlace && Math.abs(turnDelta) <= Math.abs(turnStep) + 1e-6) {
-          this.playerFacingYaw = targetYaw;
-          this.turningInPlace = false;
-        } else {
-          this.playerFacingYaw += turnStep;
-        }
+        const turn = advancePlayerFacing(this.playerFacingYaw, targetYaw, 7 * dt);
+        this.playerFacingYaw = turn.yaw;
+        this.turningInPlace = turn.turning;
         this.playerGroup.rotation.y = this.playerFacingYaw;
+      } else {
+        this.turningInPlace = false;
       }
     } else {
       this.turningInPlace = false;
@@ -1244,10 +1265,13 @@ export class AcademyScene {
     const oldX = this.playerPosition.x, oldZ = this.playerPosition.z;
     let nx = oldX + (fx * forward + rx * right) * speed * dt;
     let nz = oldZ + (fz * forward + rz * right) * speed * dt;
-    const radius = this.game.player().form === 'F12' ? 0.38 : this.game.player().form === 'F00' ? 0.22 : 0.3;
-    if (this.#blockedAt(nx, nz, radius)) {
-      if (!this.#blockedAt(nx, oldZ, radius)) nz = oldZ;
-      else if (!this.#blockedAt(oldX, nz, radius)) nx = oldX;
+    const human = this.game.player().form === 'F00';
+    const radius = this.game.player().form === 'F12' ? 0.38 : 0.3;
+    const blocked = (x, z) => this.#blockedAt(x, z, radius)
+      || human && this.occlusion && bodyPathIntersectsGrid(this.occlusion, oldX, oldZ, x, z, radius, 1.3);
+    if (blocked(nx, nz)) {
+      if (!blocked(nx, oldZ)) nz = oldZ;
+      else if (!blocked(oldX, nz)) nx = oldX;
       else return;
     }
     const area = areaAt(nx, nz);

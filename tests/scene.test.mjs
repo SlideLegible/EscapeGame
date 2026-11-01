@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { areaAt, areaCameraRect, dropPoint, entryPoint, nearestCandidate, OcclusionGrid, rayRectLimit, SPECIAL_EXITS, OBJECT_POSITIONS, LECTERN_SIZE } from '../src/scene.mjs';
+import { advancePlayerFacing, areaAt, areaCameraRect, bodyPathIntersectsGrid, dropPoint, entryPoint, nearestCandidate, OcclusionGrid, rayRectLimit, SPECIAL_EXITS, OBJECT_POSITIONS, LECTERN_SIZE } from '../src/scene.mjs';
 
 test('walkable room areas touch across the classroom, corridor, office, restroom, and storage thresholds', () => {
   assert.equal(areaAt(7, -6.2), 'Corridor');
@@ -171,4 +171,26 @@ test('occlusion grid stops the camera ray at walls but ignores floors and ceilin
   assert.ok(grid.firstHit(5.9, 1, 5, 9, 1, 5, 0.5) === 1, 'ignores the start of the path');
   assert.equal(grid.firstHit(2, 1, 5, Infinity, 1, 5), 1, 'a runaway endpoint cannot hang the search');
   assert.equal(grid.firstHit(2, 1, 5, NaN, 1, 5), 1);
+});
+
+test('human movement checks the full body path against room geometry', () => {
+  const grid = new OcclusionGrid({ minX: 0, minY: 0, minZ: 0, maxX: 10, maxY: 3, maxZ: 10 });
+  grid.addTriangle(6, 0, 0, 6, 3, 0, 6, 0, 10);
+  grid.addTriangle(6, 3, 0, 6, 3, 10, 6, 0, 10);
+  assert.equal(bodyPathIntersectsGrid(grid, 4.5, 5, 6.5, 5), true);
+  assert.equal(bodyPathIntersectsGrid(grid, 4.5, 8, 5.5, 8), false);
+});
+
+test('human quarter and half turns both pivot in place before movement resumes', () => {
+  for (const target of [Math.PI / 2, Math.PI]) {
+    let yaw = 0;
+    let turn = advancePlayerFacing(yaw, target, 0.1);
+    assert.equal(turn.turning, true);
+    while (turn.turning) {
+      yaw = turn.yaw;
+      turn = advancePlayerFacing(yaw, target, 0.1);
+    }
+    assert.ok(Math.abs(turn.yaw - target) < 1e-9);
+    assert.equal(turn.turning, false);
+  }
 });

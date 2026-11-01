@@ -149,7 +149,7 @@ test('power, monitor, and keyring rows implement X022, X023, X025, X033, and A07
   game.moveToArea('local', 'GuardRoom');
   assert.equal(game.interact('local', 'S15').interactionId, 'X022');
   assert.equal(game.state.powerCut, true);
-  assert.equal(game.transform('local', 'F10').interactionId, 'X023');
+  assert.equal(game.interact('local', 'S21').interactionId, 'X023');
   assert.equal(game.player().canSeeWholeMap, true);
   game.transform('local', 'F11');
   game.moveToArea('local', 'Corridor');
@@ -165,6 +165,6 @@ test('power, monitor, and keyring rows implement X022, X023, X025, X033, and A07
   const electric = new Game();
   enterCorridor(electric);
   electric.moveToArea('local', 'GuardRoom');
-  electric.transform('local', 'F10');
+  electric.transform('local', 'F11');
   assert.equal(electric.interact('local', 'S15').interactionId, 'X025');
 });

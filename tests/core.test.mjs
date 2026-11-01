@@ -226,11 +226,11 @@ test('the window route triggers E03 and the ending achievement', () => {
   assert.equal(game.hasAchievement('local', 'E03'), true);
 });
 
-test('the camera form unlocks whole-map view and tracked achievements stay in memory only', () => {
+test('the monitor unlocks whole-map view and tracked achievements stay in memory only', () => {
   const game = new Game();
   enterCorridor(game);
   game.moveToArea('local', 'GuardRoom');
-  game.transform('local', 'F10');
+  game.interact('local', 'S21');
   assert.equal(game.player().canSeeWholeMap, true);
   game.unlock('local', 'A04');
   assert.equal(game.hasAchievement('local', 'A04'), true);
@@ -251,8 +251,51 @@ test('default responses, repeated transformations, and time in an item unlock A0
 
 test('all object IDs and form IDs from the design table are represented', () => {
   const game = new Game();
-  for (let i = 1; i <= 20; i++) assert.ok(game.objectName(`S${String(i).padStart(2, '0')}`));
-  for (let i = 0; i <= 12; i++) assert.ok(game.formName(`F${String(i).padStart(2, '0')}`));
+  for (let i = 1; i <= 21; i++) assert.ok(game.objectName(`S${String(i).padStart(2, '0')}`));
+  for (let i = 0; i <= 12; i++) if (i !== 10) assert.ok(game.formName(`F${String(i).padStart(2, '0')}`));
+});
+
+test('the monitor is a guard room object, not a form the player can become', () => {
+  const game = new Game();
+  assert.equal(game.formName('F10'), undefined);
+  assert.equal(game.item('F10'), undefined);
+  assert.equal(game.objectName('S21'), '監視器');
+  enterCorridor(game);
+  game.moveToArea('local', 'GuardRoom');
+  assert.equal(game.transform('local', 'F10').rejected, true);
+});
+
+test('each interaction with the monitor switches between the normal view and the whole-map view', () => {
+  const game = new Game();
+  enterCorridor(game);
+  game.moveToArea('local', 'GuardRoom');
+  const on = game.interact('local', 'S21');
+  assert.equal(on.interactionId, 'X023');
+  assert.equal(game.player().canSeeWholeMap, true);
+  const off = game.interact('local', 'S21');
+  assert.equal(off.interactionId, 'X023');
+  assert.notEqual(off.text, on.text);
+  assert.equal(game.player().canSeeWholeMap, false);
+  game.transform('local', 'F11');
+  game.interact('local', 'S21');
+  assert.equal(game.player().canSeeWholeMap, true);
+});
+
+test('the monitor only works from inside the guard room', () => {
+  const game = new Game();
+  enterCorridor(game);
+  assert.equal(game.interact('local', 'S21').rejected, true);
+  assert.equal(game.player().canSeeWholeMap, false);
+});
+
+test('a restart after health reaches zero returns the player to the normal view', () => {
+  const game = new Game();
+  enterCorridor(game);
+  game.moveToArea('local', 'GuardRoom');
+  game.interact('local', 'S21');
+  game.state.health = 1;
+  assert.equal(game.damage(1).ending, 'E05');
+  assert.equal(game.player().canSeeWholeMap, false);
 });
 
 test('switching forms inside the drink machine leaves the can inside, even after the player leaves', () => {

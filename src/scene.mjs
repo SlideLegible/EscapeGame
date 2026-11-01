@@ -18,11 +18,12 @@ export const OBJECT_POSITIONS = {
   S06: [13, -20], S07: [9, -21], S08: [13, -24], S09: [-15, -21], S10: [4, -10],
   S11: [-12, -19], S12: [-8, -23], S13: [-9, -17], S14: [-7.65, 0], S15: [25, -22],
   S16: [-6.2, 0], S17: [-3, -10], S18: [9, -24], S19: [-5.55, -5.45], S20: [-5.65, 0.35],
+  S21: [22.5, -22],
 };
 
 const ITEM_POSITIONS = {
   F01: [-4.8, -11], F02: [38, -9], F03: [38, -21], F04: [4.8, -9.3], F05: [12, -20.8],
-  F06: [11.8, -24], F07: [-22, -21], F08: [-5.2, 0.9], F09: [-5, 2.2], F10: [22.5, -22],
+  F06: [11.8, -24], F07: [-22, -21], F08: [-5.2, 0.9], F09: [-5, 2.2],
   F11: [20.5, -22], F12: [-5, -2.8],
 };
 
@@ -316,6 +317,13 @@ export class AcademyScene {
         }
         break;
       }
+      case 'S21': {
+        this.#box(group, 0, 0.36, 0, 1.1, 0.72, 0.6, wood);
+        this.#box(group, 0, 0.98, -0.05, 0.9, 0.56, 0.08, this.#material(0x374c45, 0.3));
+        this.#box(group, 0, 0.98, 0, 0.78, 0.44, 0.02, this.#material(0x789b91, 0.2), false);
+        this.#box(group, 0, 0.75, -0.08, 0.12, 0.1, 0.12, this.#material(0x63766a));
+        break;
+      }
       case 'S04': {
         this.#box(group, 0, 0.5, 0.15, 1.36, 1.0, 0.3, this.#material(0x637f72));
         break;
@@ -584,13 +592,6 @@ export class AcademyScene {
       add(new THREE.Mesh(new THREE.BoxGeometry(0.045,0.025,0.23), mat(0xd6c88c)), 0, 0.95, -0.04);
       const hand = new THREE.Mesh(new THREE.BoxGeometry(0.04,0.025,0.16), mat(0xe2b877)); hand.rotation.y = -0.75; add(hand, 0.04, 0.96, 0.02);
       add(new THREE.Mesh(new THREE.SphereGeometry(0.045,10,8), mat(0xd6c88c)), 0, 0.96, 0);
-    } else if (id === 'F10') {
-      add(new THREE.Mesh(new THREE.BoxGeometry(0.92,0.52,0.56), mat(0x4d675d,0.18)), 0, 0.77, -0.08);
-      add(new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.23,0.34,18), mat(0x374c45,0.28)), 0, 0.73, 0.34);
-      const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.14,0.14,0.045,18), mat(0x789b91,0.18)); lens.rotation.x = Math.PI / 2; add(lens,0,0.73,0.53);
-      add(new THREE.Mesh(new THREE.BoxGeometry(0.5,0.09,0.62), mat(0x9eb99b)), 0, 0.83, -0.08);
-      add(new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.07,0.3,10), mat(0x63766a)), 0, 0.31, -0.04);
-      add(new THREE.Mesh(new THREE.BoxGeometry(0.42,0.08,0.36), mat(0x63766a)), 0, 0.12, -0.04);
     } else if (id === 'F12') {
       add(new THREE.Mesh(new THREE.BoxGeometry(0.8,0.13,0.75), mat(palette.wood)), 0, 0.58);
       add(new THREE.Mesh(new THREE.BoxGeometry(0.8,0.75,0.14), mat(palette.wood)), 0, 1.0, -0.3);
@@ -787,7 +788,7 @@ export class AcademyScene {
     let right = Number(this.keys.has('KeyD') || this.keys.has('ArrowRight')) - Number(this.keys.has('KeyA') || this.keys.has('ArrowLeft'));
     if (!forward && !right) return;
     const length = Math.hypot(forward, right); forward /= length; right /= length;
-    const speed = this.game.player().form === 'F08' ? 2.6 : this.game.player().form === 'F09' || this.game.player().form === 'F10' ? 1.8 : 4.4;
+    const speed = this.game.player().form === 'F08' ? 2.6 : this.game.player().form === 'F09' ? 1.8 : 4.4;
     const fx = Math.sin(this.yaw), fz = -Math.cos(this.yaw);
     const rx = Math.cos(this.yaw), rz = Math.sin(this.yaw);
     const oldX = this.playerPosition.x, oldZ = this.playerPosition.z;
@@ -819,7 +820,7 @@ export class AcademyScene {
       return;
     }
     const distance = this.game.player().form === 'F12' ? 8.5 : this.game.player().form === 'F08' ? 6.2 : 7.2;
-    const height = (this.game.player().form === 'F09' || this.game.player().form === 'F10' ? 3.4 : 3.8) + this.pitch * 1.5;
+    const height = (this.game.player().form === 'F09' ? 3.4 : 3.8) + this.pitch * 1.5;
     const dx = Math.sin(this.yaw) * distance;
     const dz = Math.cos(this.yaw) * distance;
     this.cameraDesired.set(this.playerPosition.x - dx, height, this.playerPosition.z + dz);

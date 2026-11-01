@@ -1,7 +1,7 @@
 const FORMS = {
   F00: '人類', F01: '飲料罐垃圾', F02: '飲料', F03: '學生證', F04: '辦公室鑰匙',
   F05: '不知道用來做甚麼的鑰匙', F06: '期中考考卷', F07: '長竿子', F08: '骰子',
-  F09: '時鐘', F10: '監視器', F11: '一大串鑰匙圈', F12: '椅子',
+  F09: '時鐘', F11: '一大串鑰匙圈', F12: '椅子',
 };
 
 const OBJECTS = {
@@ -9,6 +9,7 @@ const OBJECTS = {
   S06: '辦公桌抽屜', S07: '電腦', S08: '牛皮紙包', S09: '儲物間門', S10: '花盆',
   S11: '馬桶', S12: '廁所垃圾桶', S13: '高窗', S14: '黑板', S15: '配電箱',
   S16: '講桌', S17: '公布欄', S18: '月曆', S19: '教室門', S20: '講桌抽屜',
+  S21: '監視器',
 };
 
 const OBJECT_AREAS = {
@@ -16,9 +17,10 @@ const OBJECT_AREAS = {
   S06: 'Office', S07: 'Office', S08: 'Office', S09: 'Restroom', S10: 'Corridor',
   S11: 'Restroom', S12: 'Restroom', S13: 'Restroom', S14: 'Classroom', S15: 'GuardRoom',
   S16: 'Classroom', S17: 'Corridor', S18: 'Office', S19: 'Classroom', S20: 'Classroom',
+  S21: 'GuardRoom',
 };
 
-const INITIAL_ITEMS = ['F08', 'F09', 'F10', 'F11', 'F12'];
+const INITIAL_ITEMS = ['F08', 'F09', 'F11', 'F12'];
 const DOORS = ['S01', 'S05', 'S09', 'S19'];
 const DEFAULT_TEXT = (name) => `${name}紋絲不動，好像在嘲笑你：「就這？你是認真的嗎？」`;
 
@@ -35,7 +37,7 @@ function seededRandom(seed) {
 
 function freshItems() {
   return Object.fromEntries(Object.keys(FORMS).filter((id) => id !== 'F00').map((id) => [id, {
-    exists: INITIAL_ITEMS.includes(id), occupiedBy: null, area: id === 'F08' || id === 'F09' || id === 'F12' ? 'Classroom' : id === 'F10' || id === 'F11' ? 'GuardRoom' : null,
+    exists: INITIAL_ITEMS.includes(id), occupiedBy: null, area: id === 'F08' || id === 'F09' || id === 'F12' ? 'Classroom' : id === 'F11' ? 'GuardRoom' : null,
   }]));
 }
 
@@ -102,9 +104,8 @@ export class Game {
     player.form = formId;
     player.transformCount += 1;
     if (player.transformCount >= 20) this.unlock(playerId, 'A02');
-    if (formId === 'F10') player.canSeeWholeMap = true;
-    let interactionId = formId === 'F10' ? 'X023' : null;
-    let text = formId === 'F10' ? '變成監視器，可以看到整張地圖' : '';
+    let interactionId = null;
+    let text = '';
     let ending = null;
     if (formId === 'F06') {
       interactionId = 'X027'; text = '你看到了考題，受到精神傷害';
@@ -196,6 +197,7 @@ export class Game {
       player.area = 'Classroom';
       player.humanArea = 'Classroom';
       player.nonHumanSeconds = 0;
+      player.canSeeWholeMap = false;
     }
   }
 
@@ -264,6 +266,10 @@ export class Game {
     if (targetId === 'S13' && form === 'F07') return this.#resolve(playerId, 'X015', '用竿子頂開高窗，成功逃出', { ending: 'E03' });
     if (targetId === 'S11') return form === 'F00' ? this.#resolve(playerId, 'X011', '你舒服的上了個廁所') : this.#resolve(playerId, 'X024', '你被沖進了下水道……又爬了回來', { damage: 1 });
     if (targetId === 'S12' && form === 'F00') return this.#resolve(playerId, 'X012', '你為什麼會想在這裡翻到東西');
+    if (targetId === 'S21') {
+      player.canSeeWholeMap = !player.canSeeWholeMap;
+      return this.#resolve(playerId, 'X023', player.canSeeWholeMap ? '你盯著監視器，看到了整張地圖' : '你把視線從監視器上移開');
+    }
     if (targetId === 'S15') return form === 'F00' ? this.#cutPower(playerId) : this.#resolve(playerId, 'X025', '滋滋滋——你觸電了', { damage: 1 });
     if (targetId === 'S10' && form !== 'F00') return this.#default(playerId, name);
     return this.#default(playerId, name);

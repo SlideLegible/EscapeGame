@@ -91,12 +91,12 @@ test('the first drink heals once, later drinks hurt, and damage restarts the rou
   const game = new Game({ random: () => 0.2 });
   obtainCan(game);
   game.interact('local', 'S03');
-  game.transform('local', 'F02');
+  assert.equal(game.transform('local', 'F02').interactionId, 'X004');
   assert.equal(game.state.health, 6);
   game.returnToHuman('local');
   game.moveToArea('local', 'Corridor');
   game.transform('local', 'F01');
-  game.transform('local', 'F02');
+  assert.equal(game.transform('local', 'F02').interactionId, 'X026');
   assert.equal(game.state.health, 5);
   game.unlock('local', 'A04');
   game.state.health = 1;
@@ -104,6 +104,24 @@ test('the first drink heals once, later drinks hurt, and damage restarts the rou
   assert.equal(game.state.health, 5);
   assert.equal(game.player().form, 'F00');
   assert.equal(game.hasAchievement('local', 'A04'), true);
+});
+
+test('E05 from a repeated exam transformation is shown, restarts the round, and preserves achievements', () => {
+  const game = new Game();
+  unlockOffice(game);
+  game.returnToHuman('local');
+  game.moveToArea('local', 'Corridor');
+  game.moveToArea('local', 'Office');
+  game.interact('local', 'S08');
+  game.unlock('local', 'A04');
+  game.state.health = 1;
+  const result = game.transform('local', 'F06');
+  assert.equal(result.interactionId, 'X027');
+  assert.equal(result.ending, 'E05');
+  assert.equal(game.state.health, 5);
+  assert.equal(game.player().form, 'F00');
+  assert.equal(game.hasAchievement('local', 'A04'), true);
+  assert.equal(game.hasAchievement('local', 'E05'), true);
 });
 
 test('office and storage keys open their doors and spawn the exam and pole', () => {
@@ -216,6 +234,18 @@ test('the camera form unlocks whole-map view and tracked achievements stay in me
   game.unlock('local', 'A04');
   assert.equal(game.hasAchievement('local', 'A04'), true);
   assert.equal(Object.hasOwn(globalThis, 'localStorage'), false);
+});
+
+test('default responses, repeated transformations, and time in an item unlock A01, A02, and A03', () => {
+  const game = new Game();
+  for (let i = 0; i < 10; i++) game.interact('local', 'S16');
+  assert.equal(game.hasAchievement('local', 'A01'), true);
+  for (let i = 0; i < 20; i++) game.transform('local', i % 2 ? 'F08' : 'F12');
+  assert.equal(game.hasAchievement('local', 'A02'), true);
+  game.tick(600);
+  assert.equal(game.hasAchievement('local', 'A03'), false);
+  game.tick(0.02);
+  assert.equal(game.hasAchievement('local', 'A03'), true);
 });
 
 test('all object IDs and form IDs from the design table are represented', () => {

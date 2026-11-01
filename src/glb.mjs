@@ -155,7 +155,8 @@ function createModel(json, binary) {
     }
     geometry.computeBoundingSphere();
     const material = materials[primitive.material] ?? new THREE.MeshStandardMaterial({ color: 0xffffff });
-    const mesh = new THREE.Mesh(geometry, material);
+    const isSkinned = geometry.hasAttribute('skinIndex') && geometry.hasAttribute('skinWeight');
+    const mesh = isSkinned ? new THREE.SkinnedMesh(geometry, material) : new THREE.Mesh(geometry, material);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     return mesh;
@@ -197,10 +198,25 @@ function createModel(json, binary) {
     for (const index of json.scenes?.[json.scene ?? 0]?.nodes ?? []) scene.add(makeNode(index));
     scene.updateMatrixWorld(true);
     scene.traverse((node) => {
+      if (!node.isBone || node.matrixAutoUpdate) return;
+      node.matrix.decompose(node.position, node.quaternion, node.scale);
+      node.matrixAutoUpdate = true;
+    });
+    scene.updateMatrixWorld(true);
+    scene.traverse((node) => {
       if (!node.isMesh || node.userData.gltfSkinIndex === undefined) return;
       const skin = json.skins[node.userData.gltfSkinIndex];
       const bones = skin.joints.map((index) => nodeByIndex[index]);
-      node.userData.gltfSkin = { joints: bones };
+      const inverseBindMatrices = skin.inverseBindMatrices === undefined
+        ? null
+        : readAccessor(skin.inverseBindMatrices).array;
+      const inverses = inverseBindMatrices
+        ? bones.map((_, index) => new THREE.Matrix4().fromArray(inverseBindMatrices.subarray(index * 16, index * 16 + 16)))
+        : bones.map((bone) => bone.matrixWorld.clone().invert());
+      const skeleton = new THREE.Skeleton(bones, inverses);
+      node.bind(skeleton, new THREE.Matrix4());
+      skeleton.update();
+      node.userData.gltfSkin = { joints: bones, skeleton };
       delete node.userData.gltfSkinIndex;
     });
     return scene;

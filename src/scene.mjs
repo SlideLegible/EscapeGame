@@ -627,6 +627,8 @@ export class AcademyScene {
   async #loadPlayerModel() {
     try {
       const source = await loadGlb(new URL('../assets/models/vivi_manga_student_girl_style.glb', import.meta.url));
+      source.updateMatrixWorld(true);
+      source.traverse((node) => { if (node.isSkinnedMesh) node.skeleton.update(); });
       const bounds = new THREE.Box3().setFromObject(source);
       const size = bounds.getSize(new THREE.Vector3());
       if (!Number.isFinite(size.y) || size.y <= 0) throw new Error('玩家模型沒有有效高度');
@@ -637,27 +639,11 @@ export class AcademyScene {
       source.position.set(-center.x, -bounds.min.y, -center.z);
       source.name = 'Vivi manga student';
       source.updateMatrixWorld(true);
-      const inverseSource = source.matrixWorld.clone().invert();
       source.traverse((node) => {
         if (!node.isMesh) return;
         node.castShadow = true;
         node.receiveShadow = true;
         node.frustumCulled = false;
-        const joints = node.userData.gltfSkin?.joints;
-        const positions = node.geometry.getAttribute('position');
-        const skinIndex = node.geometry.getAttribute('skinIndex');
-        const skinWeight = node.geometry.getAttribute('skinWeight');
-        if (joints && skinIndex && skinWeight) {
-          const meshToModel = inverseSource.clone().multiply(node.matrixWorld);
-          const modelToMesh = meshToModel.clone().invert();
-          node.userData.playerSkin = {
-            joints,
-            skinIndex,
-            skinWeight,
-            originalPositions: positions.array.slice(),
-            modelOffsetToMesh: new THREE.Matrix3().setFromMatrix4(modelToMesh),
-          };
-        }
       });
       this.humanModel = source;
       this.playerRig = this.#createSkinnedPlayerRig(source);
@@ -677,63 +663,51 @@ export class AcademyScene {
       leftKnee: find('LeftLeg'), rightKnee: find('RightLeg'),
       leftFoot: find('LeftFoot'), rightFoot: find('RightFoot'),
     };
-    const meshes = [];
-    model.traverse((node) => { if (node.isMesh && node.userData.playerSkin) meshes.push(node); });
+    const restRotations = new Map(Object.values(parts).filter(Boolean).map((bone) => [bone, bone.quaternion.clone()]));
     return {
-      kind: 'weighted', parts, meshes,
+      kind: 'skinned', parts, restRotations,
     };
   }
 
   #updatePlayerSkin() {
     const rig = this.playerRig;
-    if (!rig || rig.kind !== 'weighted') return;
+    if (!rig || rig.kind !== 'skinned') return;
     const gait = this.walking ? Math.sin(this.playerAnimationTime * 8) : 0;
     const { parts } = rig;
     const jump = this.jumpHeight > 0.02;
-    const jointOffsets = new Map();
-    const setOffset = (bone, x, y, z) => {
-      if (bone) jointOffsets.set(bone, new THREE.Vector3(x, y, z));
+    const model = this.humanModel;
+    const modelRotation = model.getWorldQuaternion(new THREE.Quaternion());
+    const parentRotation = new THREE.Quaternion();
+    const desiredParentDirection = new THREE.Vector3();
+    const restDirection = new THREE.Vector3();
+    const deltaRotation = new THREE.Quaternion();
+    const setBoneDirection = (bone, child, direction) => {
+      if (!bone || !child || !bone.parent) return;
+      bone.parent.getWorldQuaternion(parentRotation).invert();
+      desiredParentDirection.copy(direction).applyQuaternion(modelRotation).applyQuaternion(parentRotation).normalize();
+      restDirection.copy(child.position).applyQuaternion(rig.restRotations.get(bone)).normalize();
+      deltaRotation.setFromUnitVectors(restDirection, desiredParentDirection);
+      bone.quaternion.copy(deltaRotation).multiply(rig.restRotations.get(bone));
+      model.updateMatrixWorld(true);
     };
-    const upperArmUp = jump ? 0.0004 : 0;
-    const forearmUp = jump ? 0.0008 : -0.0008;
-    const handUp = jump ? 0.0012 : -0.0016;
-    setOffset(parts.leftArm, 0, gait * 0.00022, upperArmUp);
-    setOffset(parts.rightArm, 0, -gait * 0.00022, upperArmUp);
-    setOffset(parts.leftForearm, 0, gait * 0.00017, forearmUp);
-    setOffset(parts.rightForearm, 0, -gait * 0.00017, forearmUp);
-    setOffset(parts.leftHand, 0, gait * 0.00017, handUp);
-    setOffset(parts.rightHand, 0, -gait * 0.00017, handUp);
-    setOffset(parts.leftLeg, 0, jump ? 0 : -gait * 0.00028, 0);
-    setOffset(parts.rightLeg, 0, jump ? 0 : gait * 0.00028, 0);
-    setOffset(parts.leftKnee, 0, jump ? -0.00012 : Math.max(0, -gait) * 0.00014, jump ? -0.0001 : 0);
-    setOffset(parts.rightKnee, 0, jump ? -0.00012 : Math.max(0, gait) * 0.00014, jump ? -0.0001 : 0);
-    setOffset(parts.leftFoot, 0, jump ? -0.00008 : -Math.max(0, gait) * 0.00008, jump ? -0.00008 : 0);
-    setOffset(parts.rightFoot, 0, jump ? -0.00008 : -Math.max(0, -gait) * 0.00008, jump ? -0.00008 : 0);
-
-    const offset = new THREE.Vector3();
-    const localOffset = new THREE.Vector3();
-    for (const mesh of rig.meshes) {
-      const skin = mesh.userData.playerSkin;
-      const position = mesh.geometry.getAttribute('position');
-      for (let vertex = 0; vertex < position.count; vertex++) {
-        offset.set(0, 0, 0);
-        for (let influence = 0; influence < 4; influence++) {
-          const jointIndex = skin.skinIndex.getComponent(vertex, influence);
-          const weight = skin.skinWeight.getComponent(vertex, influence);
-          const jointOffset = jointOffsets.get(skin.joints[jointIndex]);
-          if (jointOffset && weight) offset.addScaledVector(jointOffset, weight);
-        }
-        localOffset.copy(offset).applyMatrix3(skin.modelOffsetToMesh);
-        const start = vertex * 3;
-        position.setXYZ(
-          vertex,
-          skin.originalPositions[start] + localOffset.x,
-          skin.originalPositions[start + 1] + localOffset.y,
-          skin.originalPositions[start + 2] + localOffset.z,
-        );
-      }
-      position.needsUpdate = true;
-      mesh.geometry.computeVertexNormals();
+    const armSwing = jump ? 0.42 : gait * 0.16;
+    const forearmSwing = jump ? 0.24 : gait * 0.07 + 0.08;
+    for (const [side, arm, forearm, hand] of [
+      [-1, parts.leftArm, parts.leftForearm, parts.leftHand],
+      [1, parts.rightArm, parts.rightForearm, parts.rightHand],
+    ]) {
+      setBoneDirection(arm, forearm, new THREE.Vector3(-side * 0.1, -Math.cos(armSwing), Math.sin(armSwing)));
+      setBoneDirection(forearm, hand, new THREE.Vector3(-side * 0.06, -Math.cos(forearmSwing), Math.sin(forearmSwing)));
+    }
+    for (const [side, leg, knee] of [
+      [-1, parts.leftLeg, parts.leftKnee],
+      [1, parts.rightLeg, parts.rightKnee],
+    ]) {
+      const stride = jump ? side * 0.16 : -gait * side * 0.24;
+      setBoneDirection(leg, knee, new THREE.Vector3(0, -Math.cos(stride), Math.sin(stride)));
+      const kneeFlex = jump ? 0.2 : Math.max(0, -stride) * 0.45;
+      const foot = side < 0 ? parts.leftFoot : parts.rightFoot;
+      setBoneDirection(knee, foot, new THREE.Vector3(0, -Math.cos(kneeFlex), Math.sin(kneeFlex)));
     }
   }
 
@@ -897,7 +871,7 @@ export class AcademyScene {
       const gait = moving ? Math.sin(this.playerAnimationTime * 10) : 0;
       this.playerGroup.rotation.y = this.yaw + Math.PI;
       if (this.playerRig) {
-        if (this.playerRig.kind === 'weighted') this.#updatePlayerSkin();
+        if (this.playerRig.kind === 'skinned') this.#updatePlayerSkin();
         else {
           this.playerRig.torso.position.y = 0.68 + (moving ? Math.abs(gait) * 0.018 : Math.sin(this.playerAnimationTime * 2) * 0.006);
           this.playerRig.head.rotation.z = moving ? Math.sin(this.playerAnimationTime * 5) * 0.025 : 0;

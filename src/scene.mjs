@@ -13,8 +13,8 @@ const ROOM = {
   L02: { label: '飲料機底下', x: 38, z: -21, w: 9, d: 8, color: 0x50564e },
 };
 
-const OBJECT_POSITIONS = {
-  S01: [0, -14], S02: [-6, -10], S03: [-14, -10], S04: [-18, -10], S05: [11, -15],
+export const OBJECT_POSITIONS = {
+  S01: [0, -14], S02: [-6, -10], S03: [-14, -10], S04: [-14, -10.7], S05: [11, -15],
   S06: [13, -20], S07: [9, -21], S08: [13, -24], S09: [-15, -21], S10: [4, -10],
   S11: [-12, -19], S12: [-8, -23], S13: [-9, -17], S14: [-7.65, 0], S15: [25, -22],
   S16: [-6.2, 0], S17: [-3, -10], S18: [9, -24], S19: [-5.55, -5.45], S20: [-5.65, 0.35],
@@ -30,7 +30,7 @@ const ITEM_POSITIONS = {
 const CLASSROOM_DESK_COLUMNS = [-3.77, -1.67, 0.41, 2.43, 4.45, 6.5];
 const CLASSROOM_DESK_ROWS = [-3.96, -1.96, -0.01, 1.93, 3.89];
 const CLASSROOM_EXIT_DOOR_PARTS = ['PUERTA_1_StingrayPBS9_0', 'PUERTA_3_StingrayPBS9_0', 'GRIPPUERTA_StingrayPBS1_0', 'GRIPPUERTA2_StingrayPBS1_0'];
-const MODEL_TARGETS = new Set(['S14', 'S16', 'S19', 'S20']);
+const MODEL_TARGETS = new Set(['S04', 'S14', 'S16', 'S19', 'S20']);
 
 const ROOM_NAMES = Object.fromEntries(Object.entries(ROOM).map(([id, room]) => [id, room.label]));
 const palette = { wall: 0xb3a789, trim: 0x51483b, wood: 0x8d704a, light: 0xe8d8b6, dark: 0x292720, lime: 0xc4ef80 };
@@ -49,7 +49,7 @@ export function areaAt(x, z) {
 
 export const SPECIAL_EXITS = {
   L01: { at: [34.1, -11.8], to: [-14, -6.9], text: '你從飲料機的出貨口鑽了出來' },
-  L02: { at: [34.1, -23.8], to: [-18, -6.9], text: '你從飲料機底下滾了出來' },
+  L02: { at: [34.1, -23.8], to: [-14, -12.2], text: '你從飲料機底下滾了出來' },
 };
 
 export function entryPoint(area) {
@@ -58,7 +58,7 @@ export function entryPoint(area) {
 
 export function dropPoint(x, z) {
   if (areaAt(x, z) === 'L01') return [-14 + (x - 38) / 3, -8];
-  if (areaAt(x, z) === 'L02') return [-18 + (x - 38) / 3, -8];
+  if (areaAt(x, z) === 'L02') return [-14 + (x - 38) / 3, -11.2];
   return [x, z];
 }
 
@@ -317,14 +317,7 @@ export class AcademyScene {
         break;
       }
       case 'S04': {
-        const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.58, 0.42, 0.68, 16), this.#material(0x987e60));
-        pot.position.y = 0.42; pot.castShadow = true; group.add(pot);
-        this.#box(group, 0, 0.79, 0, 1.2, 0.12, 0.85, wood);
-        const stem = this.#material(0x587c58);
-        for (const [x, y, z, scale] of [[-0.2,1.35,0,0.7],[0.2,1.55,0.08,0.6],[0,1.8,-0.05,0.65],[-0.4,1.65,0.04,0.5]]) {
-          const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.34, 10, 8), stem);
-          leaf.position.set(x, y, z); leaf.scale.set(1, scale, 0.7); leaf.castShadow = true; group.add(leaf);
-        }
+        this.#box(group, 0, 0.5, 0.15, 1.36, 1.0, 0.3, this.#material(0x637f72));
         break;
       }
       case 'S05': case 'S09': case 'S19': {

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { areaAt, dropPoint, entryPoint, SPECIAL_EXITS } from '../src/scene.mjs';
+import { areaAt, dropPoint, entryPoint, SPECIAL_EXITS, OBJECT_POSITIONS } from '../src/scene.mjs';
 
 test('walkable room areas touch across the classroom, corridor, office, restroom, and storage thresholds', () => {
   assert.equal(areaAt(7, -6.2), 'Corridor');
@@ -52,4 +52,26 @@ test('leaving a special location does not land the player on an item pushed out 
       assert.ok(Math.hypot(ox - dx, oz - dz) >= 0.9);
     }
   }
+});
+
+test('approaching the drink machine from the front reaches the machine, and from the back reaches its underside', () => {
+  const [mx, mz] = OBJECT_POSITIONS.S03;
+  const nearer = (x, z) => {
+    const machine = Math.hypot(x - mx, z - mz);
+    const underside = Math.hypot(x - OBJECT_POSITIONS.S04[0], z - OBJECT_POSITIONS.S04[1]);
+    return machine < underside ? 'S03' : 'S04';
+  };
+  for (const dx of [-0.5, 0, 0.5]) {
+    assert.equal(nearer(mx + dx, mz + 1.2), 'S03');
+    assert.equal(nearer(mx + dx, mz - 1.2), 'S04');
+  }
+  assert.equal(areaAt(...OBJECT_POSITIONS.S04), 'Corridor');
+});
+
+test('leaving each special location puts the player on the side of the machine it was entered from', () => {
+  const [, mz] = OBJECT_POSITIONS.S03;
+  assert.ok(SPECIAL_EXITS.L01.to[1] > mz);
+  assert.ok(SPECIAL_EXITS.L02.to[1] < mz);
+  assert.ok(dropPoint(38, -9)[1] > mz);
+  assert.ok(dropPoint(38, -21)[1] < mz);
 });

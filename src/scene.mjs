@@ -122,7 +122,7 @@ export class AcademyScene {
     this.renderer.toneMappingExposure = 1.1;
     this.keys = new Set();
     this.yaw = 0;
-    this.playerFacingYaw = 0;
+    this.playerFacingYaw = Math.PI;
     this.turningInPlace = false;
     this.pitch = 0.28;
     this.pointerDown = null;
@@ -754,6 +754,7 @@ export class AcademyScene {
     this.playerGroup = this.#formShape('F00');
     this.playerGroup.name = '玩家';
     this.playerGroup.position.copy(this.playerPosition);
+    this.playerGroup.rotation.y = this.playerFacingYaw;
     this.scene.add(this.playerGroup);
     this.#rebuildFormMesh(this.playerGroup, 'F00');
     this.humanGroup = new THREE.Group();
@@ -781,7 +782,6 @@ export class AcademyScene {
       const center = bounds.getCenter(new THREE.Vector3());
       source.position.set(-center.x, -bounds.min.y, -center.z);
       source.name = 'Vivi manga student';
-      source.rotation.y = Math.PI;
       source.updateMatrixWorld(true);
       source.traverse((node) => {
         if (!node.isMesh) return;
@@ -1056,7 +1056,7 @@ export class AcademyScene {
       const rx = Math.cos(this.yaw), rz = Math.sin(this.yaw);
       const moveX = fx * forward + rx * right;
       const moveZ = fz * forward + rz * right;
-      const targetYaw = Math.atan2(-moveX, -moveZ);
+      const targetYaw = Math.atan2(moveX, moveZ);
       let turnDelta = (targetYaw - this.playerFacingYaw + Math.PI) % (Math.PI * 2);
       if (turnDelta < 0) turnDelta += Math.PI * 2;
       turnDelta -= Math.PI;
@@ -1066,9 +1066,13 @@ export class AcademyScene {
       }
       if (this.game.player().form === 'F00') {
         const turnStep = Math.sign(turnDelta) * Math.min(Math.abs(turnDelta), 7 * dt);
-        this.playerFacingYaw += turnStep;
+        if (this.turningInPlace && Math.abs(turnDelta) <= Math.abs(turnStep) + 1e-6) {
+          this.playerFacingYaw = targetYaw;
+          this.turningInPlace = false;
+        } else {
+          this.playerFacingYaw += turnStep;
+        }
         this.playerGroup.rotation.y = this.playerFacingYaw;
-        if (this.turningInPlace && Math.abs(turnDelta - turnStep) <= 0.12) this.turningInPlace = false;
       }
     } else {
       this.turningInPlace = false;

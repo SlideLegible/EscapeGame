@@ -672,6 +672,7 @@ export class AcademyScene {
     const parts = {
       leftArm: find('LeftArm'), rightArm: find('RightArm'),
       leftForearm: find('LeftForeArm'), rightForearm: find('RightForeArm'),
+      leftHand: find('LeftHand'), rightHand: find('RightHand'),
       leftLeg: find('LeftUpLeg'), rightLeg: find('RightUpLeg'),
       leftKnee: find('LeftLeg'), rightKnee: find('RightLeg'),
       leftFoot: find('LeftFoot'), rightFoot: find('RightFoot'),
@@ -693,10 +694,16 @@ export class AcademyScene {
     const setOffset = (bone, x, y, z) => {
       if (bone) jointOffsets.set(bone, new THREE.Vector3(x, y, z));
     };
-    setOffset(parts.leftArm, 0, jump ? 0.0014 : -0.001, gait * 0.00022);
-    setOffset(parts.rightArm, 0, jump ? 0.0014 : -0.001, -gait * 0.00022);
-    setOffset(parts.leftForearm, 0, jump ? 0.0008 : -0.0007, gait * 0.00017);
-    setOffset(parts.rightForearm, 0, jump ? 0.0008 : -0.0007, -gait * 0.00017);
+    const armY = jump ? 0.0009 : -0.0005;
+    const upperArmY = armY;
+    const forearmY = armY;
+    const handY = armY;
+    setOffset(parts.leftArm, 0, upperArmY, gait * 0.00022);
+    setOffset(parts.rightArm, 0, upperArmY, -gait * 0.00022);
+    setOffset(parts.leftForearm, 0, forearmY, gait * 0.00017);
+    setOffset(parts.rightForearm, 0, forearmY, -gait * 0.00017);
+    setOffset(parts.leftHand, 0, handY, gait * 0.00017);
+    setOffset(parts.rightHand, 0, handY, -gait * 0.00017);
     setOffset(parts.leftLeg, 0, 0, jump ? 0 : -gait * 0.00028);
     setOffset(parts.rightLeg, 0, 0, jump ? 0 : gait * 0.00028);
     setOffset(parts.leftKnee, 0, jump ? -0.0001 : 0, jump ? -0.00012 : Math.max(0, -gait) * 0.00014);

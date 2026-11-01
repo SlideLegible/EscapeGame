@@ -150,7 +150,7 @@ test('restroom rows implement toilet, bin, storage key, alternate response, and 
   assert.equal(wrongKey.interact('local', 'S11').interactionId, 'X011');
 });
 
-test('power, monitor, and keyring rows implement X022, X023, X025, X033, X040, and A07', () => {
+test('power, monitor, and keyring rows implement X022, X023, X025, X033, and X040', () => {
   const game = new Game();
   enterCorridor(game);
   game.moveToArea('local', 'GuardRoom');
@@ -167,7 +167,7 @@ test('power, monitor, and keyring rows implement X022, X023, X025, X033, X040, a
   game.moveToArea('local', 'Corridor');
   game.moveToArea('local', 'Classroom');
   assert.equal(game.interact('local', 'S19').interactionId, 'X033');
-  assert.equal(game.hasAchievement('local', 'A07'), true);
+  assert.equal(game.hasAchievement('local', 'A07'), false);
 
   const electric = new Game();
   enterCorridor(electric);

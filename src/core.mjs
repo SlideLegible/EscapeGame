@@ -27,6 +27,7 @@ const ITEM_HOMES = {
 
 const INITIAL_ITEMS = ['F08', 'F09', 'F11', 'F12'];
 const DOORS = ['S01', 'S05', 'S09', 'S19'];
+const KEYS = ['F04', 'F05', 'F11'];
 
 const ACHIEVEMENTS = {
   E01: { name: '撿到就是我的', condition: '用撿到的學生證逃出' },
@@ -39,7 +40,7 @@ const ACHIEVEMENTS = {
   A03: { name: '魂不附體', condition: '人類身體離開超過 10 分鐘' },
   A04: { name: '這是夢，對吧？', condition: '拆開辦公室的牛皮紙包，拿到期中考考卷' },
   A06: { name: '時間管理大師', condition: '變成教室時鐘，把指針撥快' },
-  A07: { name: '鑰匙收藏家', condition: '變成鑰匙圈，碰過所有的門' },
+  A07: { name: '鑰匙收藏家', condition: '碰過所有的鑰匙' },
 };
 
 export function achievementEntries(unlockedIds) {
@@ -72,7 +73,7 @@ export class Game {
   #elapsed = 0;
   #drinkClaimed = false;
   #tried1031 = false;
-  #doorTouches = new Map();
+  #keysTouched = new Map();
 
   constructor({ seed = Date.now(), random } = {}) {
     this.#random = random ?? seededRandom(seed);
@@ -91,7 +92,7 @@ export class Game {
     if (this.players.has(id)) return this.players.get(id);
     const player = { id, form: 'F00', area: 'Classroom', humanArea: 'Classroom', ending: null, achievementIds: new Set(), transformCount: 0, defaultCount: 0, nonHumanSeconds: 0, canSeeWholeMap: false };
     this.players.set(id, player);
-    this.#doorTouches.set(id, new Set());
+    this.#keysTouched.set(id, new Set());
     return player;
   }
 
@@ -129,6 +130,10 @@ export class Game {
     player.form = formId;
     player.transformCount += 1;
     if (player.transformCount >= 20) this.unlock(playerId, 'A02');
+    if (KEYS.includes(formId)) {
+      this.#keysTouched.get(playerId).add(formId);
+      if (KEYS.every((id) => this.#keysTouched.get(playerId).has(id))) this.unlock(playerId, 'A07');
+    }
     let interactionId = null;
     let text = '';
     let ending = null;
@@ -256,10 +261,6 @@ export class Game {
     const name = OBJECTS[targetId];
     if (!name || OBJECT_AREAS[targetId] !== player.area) return { rejected: true, text: '' };
 
-    if (player.form === 'F11' && DOORS.includes(targetId)) {
-      this.#doorTouches.get(playerId).add(targetId);
-      if (DOORS.every((id) => this.#doorTouches.get(playerId).has(id))) this.unlock(playerId, 'A07');
-    }
     if (targetId === 'S01' && this.state.powerCut) return this.#resolve(playerId, 'X040', '門禁機的燈全熄了，大門沒電，怎麼碰都沒有反應');
     if (player.form === 'F11' && DOORS.includes(targetId)) return this.#resolve(playerId, 'X033', '你試了每一支鑰匙……沒有一支插得進去');
 

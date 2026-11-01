@@ -431,7 +431,7 @@ test('both keys share a name that does not hint which door they open', () => {
 test('the achievement list matches the design table names and conditions', () => {
   assert.deepEqual(Object.keys(ACHIEVEMENTS), ['E01', 'E02', 'E03', 'E04', 'E05', 'A01', 'A02', 'A03', 'A04', 'A06', 'A07']);
   assert.equal(ACHIEVEMENTS.E04.name, '跟無數個趕作業的日子一樣，又看到了清晨的太陽');
-  assert.equal(ACHIEVEMENTS.A07.condition, '變成鑰匙圈，碰過所有的門');
+  assert.equal(ACHIEVEMENTS.A07.condition, '碰過所有的鑰匙');
   for (const { name, condition } of Object.values(ACHIEVEMENTS)) assert.ok(name && condition);
 });
 
@@ -487,20 +487,55 @@ test('the no-power gate message is not a default response and does not count tow
   assert.equal(game.hasAchievement('local', 'A01'), false);
 });
 
-test('the keyring at the unpowered gate gets the no-power message but the gate still counts toward A07', () => {
+test('the keyring at the unpowered gate gets the no-power message', () => {
   const game = new Game();
   cutPower(game);
   game.moveToArea('local', 'GuardRoom');
   game.transform('local', 'F11');
   game.moveToArea('local', 'Corridor');
   assert.equal(game.interact('local', 'S01').interactionId, 'X040');
-  game.interact('local', 'S05');
+});
+
+// unlockOffice always becomes the flowerpot key (F04) on the way into the office.
+function collectKeys(game, keys) {
+  unlockOffice(game);
+  game.returnToHuman('local');
+  game.moveToArea('local', 'Corridor');
+  game.moveToArea('local', 'Office');
+  game.interact('local', 'S06');
+  if (keys.includes('F05')) game.transform('local', 'F05');
+  game.returnToHuman('local');
+  game.moveToArea('local', 'Corridor');
+  game.moveToArea('local', 'GuardRoom');
+  if (keys.includes('F11')) game.transform('local', 'F11');
+}
+
+test('touching both keys and the keyring unlocks the key collector achievement', () => {
+  const game = new Game();
+  collectKeys(game, ['F04', 'F05', 'F11']);
+  assert.equal(game.hasAchievement('local', 'A07'), true);
+});
+
+test('missing any one of the keys or the keyring keeps the key collector achievement locked', () => {
+  for (const missing of ['F05', 'F11']) {
+    const game = new Game();
+    collectKeys(game, ['F04', 'F05', 'F11'].filter((id) => id !== missing));
+    assert.equal(game.hasAchievement('local', 'A07'), false, missing);
+  }
+});
+
+test('touching every door with the keyring no longer unlocks the key collector achievement', () => {
+  const game = new Game();
+  enterCorridor(game);
+  game.returnToHuman('local');
+  game.moveToArea('local', 'Corridor');
+  game.moveToArea('local', 'GuardRoom');
+  game.transform('local', 'F11');
+  game.moveToArea('local', 'Corridor');
+  for (const door of ['S01', 'S05']) game.interact('local', door);
   game.moveToArea('local', 'Restroom');
   game.interact('local', 'S09');
-  game.moveToArea('local', 'Corridor');
-  game.moveToArea('local', 'Classroom');
-  game.interact('local', 'S19');
-  assert.equal(game.hasAchievement('local', 'A07'), true);
+  assert.equal(game.hasAchievement('local', 'A07'), false);
 });
 
 test('before the power is cut, the gate does not mention power', () => {

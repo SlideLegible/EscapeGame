@@ -1,0 +1,8 @@
+{
+  "name": "escape-game-threejs",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}

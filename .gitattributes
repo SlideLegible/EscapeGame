@@ -1,0 +1,7 @@
+# Keep source text and web assets diffable.
+* text=auto
+*.mjs text eol=lf
+*.js text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+*.md text eol=lf

@@ -11,6 +11,8 @@ function enterCorridor(game, playerId = 'local') {
 
 function unlockOffice(game, playerId = 'local') {
   enterCorridor(game, playerId);
+  game.returnToHuman(playerId);
+  game.moveToArea(playerId, 'Corridor');
   game.interact(playerId, 'S10');
   game.transform(playerId, 'F04');
   game.interact(playerId, 'S05');
@@ -19,6 +21,8 @@ function unlockOffice(game, playerId = 'local') {
 
 function obtainCan(game, playerId = 'local') {
   enterCorridor(game, playerId);
+  game.returnToHuman(playerId);
+  game.moveToArea(playerId, 'Corridor');
   game.interact(playerId, 'S02');
   game.transform(playerId, 'F01');
 }
@@ -29,6 +33,9 @@ test('a new round starts with five health, 30 minutes, a human form, and a priva
   assert.equal(game.state.remainingSeconds, 1800);
   assert.equal(game.player().form, 'F00');
   assert.equal(Object.hasOwn(game, 'password'), false);
+  enterCorridor(game);
+  game.returnToHuman('local');
+  game.moveToArea('local', 'Corridor');
   assert.equal(game.submitPassword('local', '1031').ending, null);
 });
 
@@ -39,8 +46,8 @@ test('classroom chair opens the exit, and unmatched interactions use the default
   assert.equal(game.interact('local', 'S19').interactionId, 'X036');
   assert.equal(game.isDoorOpen('S19'), true);
   const before = game.state.health;
-  const result = game.interact('local', 'S18');
-  assert.match(result.text, /月曆紋絲不動/);
+  const result = game.interact('local', 'S16');
+  assert.match(result.text, /講桌紋絲不動/);
   assert.equal(game.state.health, before);
 });
 
@@ -72,6 +79,8 @@ test('the drink machine and its underside are special locations for the can form
   assert.equal(game.interact('local', 'S03').location, 'L01');
   assert.equal(game.interact('local', 'F02').interactionId, 'X004');
   assert.equal(game.state.health, 6);
+  game.returnToHuman('local');
+  game.moveToArea('local', 'Corridor');
   game.transform('local', 'F01');
   game.interact('local', 'S04');
   assert.equal(game.player().area, 'L02');
@@ -81,24 +90,32 @@ test('the drink machine and its underside are special locations for the can form
 test('the first drink heals once, later drinks hurt, and damage restarts the round without losing achievements', () => {
   const game = new Game({ random: () => 0.2 });
   obtainCan(game);
-  game.transform('local', 'F02');
-  assert.equal(game.state.health, 6);
-  game.transform('local', 'F01');
   game.interact('local', 'S03');
   game.transform('local', 'F02');
+  assert.equal(game.state.health, 6);
+  game.returnToHuman('local');
+  game.moveToArea('local', 'Corridor');
+  game.transform('local', 'F01');
+  game.transform('local', 'F02');
   assert.equal(game.state.health, 5);
+  game.unlock('local', 'A04');
   game.state.health = 1;
   game.damage(1);
   assert.equal(game.state.health, 5);
   assert.equal(game.player().form, 'F00');
+  assert.equal(game.hasAchievement('local', 'A04'), true);
 });
 
 test('office and storage keys open their doors and spawn the exam and pole', () => {
   const game = new Game();
   unlockOffice(game);
+  game.returnToHuman('local');
+  game.moveToArea('local', 'Corridor');
+  game.moveToArea('local', 'Office');
   assert.equal(game.interact('local', 'S06').spawned, 'F05');
   assert.equal(game.interact('local', 'S08').spawned, 'F06');
   game.transform('local', 'F05');
+  game.moveToArea('local', 'Corridor');
   game.moveToArea('local', 'Restroom');
   assert.equal(game.interact('local', 'S09').interactionId, 'X013');
   assert.equal(game.item('F07').exists, true);
@@ -106,6 +123,9 @@ test('office and storage keys open their doors and spawn the exam and pole', () 
 
 test('the password route accepts the generated code without exposing it in the game state', () => {
   const game = new Game({ random: () => 0.2 });
+  enterCorridor(game);
+  game.returnToHuman('local');
+  game.moveToArea('local', 'Corridor');
   assert.equal(game.submitPassword('local', '0000').ending, null);
   assert.equal(game.submitPassword('local', '2000').ending, 'E02');
   assert.equal(game.player().ending, 'E02');
@@ -114,6 +134,9 @@ test('the password route accepts the generated code without exposing it in the g
 test('1031 is rejected and unlocks the teacher birthday detail on the calendar', () => {
   const game = new Game({ random: () => 0.2 });
   unlockOffice(game);
+  game.returnToHuman('local');
+  game.moveToArea('local', 'Corridor');
+  game.moveToArea('local', 'Office');
   game.interact('local', 'S08');
   game.moveToArea('local', 'Corridor');
   game.submitPassword('local', '1031');
@@ -124,8 +147,11 @@ test('1031 is rejected and unlocks the teacher birthday detail on the calendar',
 test('power cut permanently disables both door escape methods for the round', () => {
   const game = new Game({ random: () => 0.2 });
   enterCorridor(game);
+  game.returnToHuman('local');
+  game.moveToArea('local', 'Corridor');
   game.moveToArea('local', 'GuardRoom');
   game.interact('local', 'S15');
+  game.moveToArea('local', 'Corridor');
   game.interact('local', 'S02');
   game.transform('local', 'F01');
   game.interact('local', 'S04');
@@ -133,7 +159,8 @@ test('power cut permanently disables both door escape methods for the round', ()
   game.moveToArea('local', 'Corridor');
   assert.equal(game.interact('local', 'S01').ending, null);
   assert.equal(game.state.powerCut, true);
-  assert.equal(game.submitPassword('local', '2000').ending, null);
+  game.returnToHuman('local');
+  assert.equal(game.submitPassword('local', '1999').ending, null);
 });
 
 test('the clock ending applies to active players, while an escaped player is unaffected', () => {
@@ -142,6 +169,7 @@ test('the clock ending applies to active players, while an escaped player is una
   obtainCan(game);
   game.interact('local', 'S04');
   game.interact('local', 'F03');
+  game.returnToHuman('local');
   game.moveToArea('local', 'Corridor');
   game.transform('local', 'F03');
   game.interact('local', 'S01');
@@ -166,10 +194,13 @@ test('the timer counts down and expires into E04', () => {
 test('the window route triggers E03 and the ending achievement', () => {
   const game = new Game();
   unlockOffice(game);
+  game.returnToHuman('local');
+  game.moveToArea('local', 'Corridor');
+  game.moveToArea('local', 'Office');
   game.interact('local', 'S06');
+  game.transform('local', 'F05');
   game.moveToArea('local', 'Corridor');
   game.moveToArea('local', 'Restroom');
-  game.transform('local', 'F05');
   game.interact('local', 'S09');
   game.transform('local', 'F07');
   assert.equal(game.interact('local', 'S13').ending, 'E03');
@@ -178,6 +209,8 @@ test('the window route triggers E03 and the ending achievement', () => {
 
 test('the camera form unlocks whole-map view and tracked achievements stay in memory only', () => {
   const game = new Game();
+  enterCorridor(game);
+  game.moveToArea('local', 'GuardRoom');
   game.transform('local', 'F10');
   assert.equal(game.player().canSeeWholeMap, true);
   game.unlock('local', 'A04');

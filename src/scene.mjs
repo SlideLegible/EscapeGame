@@ -77,6 +77,7 @@ export class AcademyScene {
     this.roomGroups = new Map();
     this.playerGroup = null;
     this.playerRig = null;
+    this.humanRig = null;
     this.humanModel = null;
     this.playerAnimationTime = 0;
     this.jumpHeight = 0;
@@ -606,6 +607,7 @@ export class AcademyScene {
     }
     if (formId === 'F00' && this.humanModel) {
       target.add(this.humanModel);
+      this.playerRig = this.humanRig;
       target.userData.rig = this.playerRig;
       if (target === this.playerGroup) this.playerRig = target.userData.rig;
       return;
@@ -646,7 +648,8 @@ export class AcademyScene {
         node.frustumCulled = false;
       });
       this.humanModel = source;
-      this.playerRig = this.#createSkinnedPlayerRig(source);
+      this.humanRig = this.#createSkinnedPlayerRig(source);
+      this.playerRig = this.humanRig;
       if (this.game.player().form === 'F00') this.#rebuildFormMesh(this.playerGroup, 'F00');
     } catch (error) {
       console.error('玩家模型載入失敗，使用簡化角色。', error);

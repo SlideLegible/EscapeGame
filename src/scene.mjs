@@ -44,6 +44,19 @@ const ITEM_MODELS = {
   F12: { fit: 1.4 },
 };
 
+// Room models from Sketchfab (downloaded to assets/models/rooms/, see ATTRIBUTION.sketchfab.txt). `fitFootprint` scales to the room's
+// floor minus a margin; `scale` is used as-is (the desk and closet files are in centimetres); `fitMax` sets the largest dimension.
+// `x`/`z` default to the room centre and `y` to the floor. `replaces` hides the procedural shape of that interaction target.
+const ROOM_MODELS = [
+  { room: 'Corridor', file: 'rooms/corridor.glb', rotateY: Math.PI / 2, fitFootprint: true },
+  { room: 'Restroom', file: 'rooms/restroom.glb', fitFootprint: true },
+  { room: 'Office', file: 'rooms/computer_desk.glb', scale: 0.01, x: 11, z: -21.5 },
+  { room: 'Office', file: 'rooms/bulletin_board.glb', rotateY: Math.PI / 2, x: 6.25, y: 1.2, z: -21 },
+  { room: 'GuardRoom', file: 'rooms/guard_room.glb', fitFootprint: true },
+  { room: 'Storage', file: 'rooms/janitor_closet.glb', scale: 0.01, x: -21.5, z: -24.5 },
+  { room: 'GuardRoom', file: 'items/f10.glb', fitMax: 1.0, x: 22.5, z: -22, replaces: 'S21' },
+];
+
 // Footprint (x, z) of the teacher's lectern in the bundled classroom, parallel to the blackboard.
 export const LECTERN_SIZE = [0.9, 1.48];
 
@@ -56,14 +69,6 @@ const MODEL_TARGETS = new Set(['S04', 'S14', 'S16', 'S19', 'S20']);
 const ROOM_NAMES = Object.fromEntries(Object.entries(ROOM).map(([id, room]) => [id, room.label]));
 const palette = { wall: 0xb3a789, trim: 0x51483b, wood: 0x8d704a, light: 0xe8d8b6, dark: 0x292720, lime: 0xc4ef80 };
 
-export function areaAt(x, z) {
-  for (const [id, minX, maxX, minZ, maxZ] of AREA_RECTS) {
-    if (x >= minX && x <= maxX && z >= minZ && z <= maxZ) return id;
-  }
-  return null;
-}
-
-export const SPECIAL_EXITS = {
 // Walkable rectangles per area, checked in order (the first match wins where they overlap).
 const AREA_RECTS = [
   ['Classroom', -7.75, 7.75, -5.75, 5.75],
@@ -76,6 +81,25 @@ const AREA_RECTS = [
   ['L02', 33, 43, -25, -16],
 ];
 
+export function areaAt(x, z) {
+  for (const [id, minX, maxX, minZ, maxZ] of AREA_RECTS) {
+    if (x >= minX && x <= maxX && z >= minZ && z <= maxZ) return id;
+  }
+  return null;
+}
+
+// Keeps the orbit camera inside the room the player is in, so it never swings out through a wall.
+// The player's walkable rectangle is cut down to the room's real floor, then pulled in by `margin`.
+export function clampCameraToArea(area, x, z, margin = 0.3) {
+  const rect = AREA_RECTS.find(([id]) => id === area);
+  const room = ROOM[area];
+  if (!rect || !room) return { x, z };
+  const minX = Math.max(rect[1], room.x - room.w / 2) + margin, maxX = Math.min(rect[2], room.x + room.w / 2) - margin;
+  const minZ = Math.max(rect[3], room.z - room.d / 2) + margin, maxZ = Math.min(rect[4], room.z + room.d / 2) - margin;
+  return { x: Math.max(minX, Math.min(maxX, x)), z: Math.max(minZ, Math.min(maxZ, z)) };
+}
+
+export const SPECIAL_EXITS = {
   L01: { at: [34.1, -11.8], to: [-14, -6.9], text: '你從飲料機的出貨口鑽了出來' },
   L02: { at: [34.1, -23.8], to: [-14, -12.2], text: '你從飲料機底下滾了出來' },
 };
@@ -88,17 +112,6 @@ export function nearestCandidate(x, z, yaw, candidates, maxDistance = 3.7) {
   for (const candidate of candidates) {
     const { bounds } = candidate;
     const nx = bounds ? Math.max(candidate.x + bounds.min.x, Math.min(x, candidate.x + bounds.max.x)) : candidate.x;
-// Keeps the orbit camera inside the room the player is in, so it never swings out through a wall.
-// The player's walkable rectangle is cut down to the room's real floor, then pulled in by `margin`.
-export function clampCameraToArea(area, x, z, margin = 0.3) {
-  const rect = AREA_RECTS.find(([id]) => id === area);
-  const room = ROOM[area];
-  if (!rect || !room) return { x, z };
-  const minX = Math.max(rect[1], room.x - room.w / 2) + margin, maxX = Math.min(rect[2], room.x + room.w / 2) - margin;
-  const minZ = Math.max(rect[3], room.z - room.d / 2) + margin, maxZ = Math.min(rect[4], room.z + room.d / 2) - margin;
-  return { x: Math.max(minX, Math.min(maxX, x)), z: Math.max(minZ, Math.min(maxZ, z)) };
-}
-
     const nz = bounds ? Math.max(candidate.z + bounds.min.z, Math.min(z, candidate.z + bounds.max.z)) : candidate.z;
     const distance = Math.hypot(nx - x, nz - z);
     if (distance >= maxDistance) continue;
@@ -165,6 +178,7 @@ export class AcademyScene {
     this.cameraDesired = new THREE.Vector3();
     this.mapTarget = new THREE.Vector3(7, 0, -11);
     this.lastCameraUpdate = 0;
+    this.cameraArea = null;
     this.#buildLights();
     this.#buildRooms();
     this.#buildObjects();
@@ -172,13 +186,13 @@ export class AcademyScene {
     this.#buildPlayer();
     this.playerModelLoad = this.#loadPlayerModel();
     this.classroomLoad = this.#loadClassroomModel();
+    this.roomModelsLoad = this.#loadRoomModels();
     this.itemTemplates = new Map();
     this.itemModelsLoad = this.#loadItemModels();
     this.#onResize = () => this.resize();
     window.addEventListener('resize', this.#onResize);
     this.resize();
     this.refresh();
-    this.cameraArea = null;
   }
 
   #buildLights() {
@@ -325,6 +339,38 @@ export class AcademyScene {
     } catch (error) {
       console.error('教室模型載入失敗，使用簡化場景。', error);
     }
+  }
+
+  async #loadRoomModels() {
+    await Promise.all(ROOM_MODELS.map(async (config) => {
+      try {
+        const model = await loadGlb(new URL(`../assets/models/${config.file}`, import.meta.url));
+        this.#placeRoomModel(model, config);
+        model.name = config.file;
+        (this.roomGroups.get(config.room) ?? this.scene).add(model);
+        if (config.replaces) {
+          for (const child of this.targetGroups.get(config.replaces).children) child.visible = false;
+        }
+      } catch (error) {
+        console.error(`${config.file} 房間模型載入失敗，使用簡化場景。`, error);
+      }
+    }));
+    this.refresh();
+  }
+
+  #placeRoomModel(model, { room, rotateY = 0, scale = 1, fitFootprint, fitMax, x, y = 0, z }) {
+    const area = ROOM[room];
+    model.rotation.y = rotateY;
+    model.updateMatrixWorld(true);
+    const size = new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3());
+    let factor = scale;
+    if (fitFootprint) factor = Math.min((area.w - 0.6) / size.x, (area.d - 0.6) / size.z);
+    if (fitMax) factor = fitMax / Math.max(size.x, size.y, size.z);
+    model.scale.setScalar(factor);
+    model.updateMatrixWorld(true);
+    const bounds = new THREE.Box3().setFromObject(model);
+    const center = bounds.getCenter(new THREE.Vector3());
+    model.position.set((x ?? area.x) - center.x, y - bounds.min.y, (z ?? area.z) - center.z);
   }
 
   async #loadItemModels() {

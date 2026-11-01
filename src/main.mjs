@@ -14,7 +14,9 @@ const achievementPanel = $('achievements');
 const achievementBook = $('achievement-book');
 const storyPanel = $('story');
 const storyOpen = () => !storyPanel.classList.contains('hidden');
-const overlayOpen = () => !dialog.classList.contains('hidden') || !achievementBook.classList.contains('hidden') || storyOpen();
+const fade = $('fade');
+let fading = false;
+const overlayOpen = () => !dialog.classList.contains('hidden') || !achievementBook.classList.contains('hidden') || storyOpen() || fading;
 const movementCodes = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
 function movementCode(event) {
   if (movementCodes.has(event.code)) return event.code;
@@ -218,12 +220,25 @@ function startGame() {
   updateHud();
 }
 
+function passDoorway() {
+  fading = true;
+  fade.classList.add('visible');
+  setTimeout(() => {
+    scene.completeDoorway();
+    updateHud();
+    fade.classList.remove('visible');
+    setTimeout(() => { fading = false; }, 250);
+  }, 250);
+}
+
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, Math.max(0, (now - lastFrame) / 1000 || 0));
   lastFrame = now;
   if (started) {
     if (!overlayOpen() && !game.player().ending) scene?.move(dt);
+    if (scene?.pendingDoorway && !fading) passDoorway();
+    if (scene?.doorHint) { showMessage(scene.doorHint); scene.doorHint = null; }
     if (!game.player().ending && !storyOpen()) game.tick(dt);
     if (now - lastHud > 150) {
       lastHud = now;

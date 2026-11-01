@@ -1,19 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { areaAt, areaCameraRect, dropPoint, entryPoint, nearestCandidate, OcclusionGrid, rayRectLimit, SPECIAL_EXITS, OBJECT_POSITIONS, LECTERN_SIZE } from '../src/scene.mjs';
+import { areaAt, areaCameraRect, ITEM_POSITIONS, dropPoint, entryPoint, nearestCandidate, OcclusionGrid, rayRectLimit, roomClipRect, DOORWAYS, CORRIDOR_HALF_LENGTH, SPECIAL_EXITS, OBJECT_POSITIONS, LECTERN_SIZE } from '../src/scene.mjs';
 
 test('walkable room areas touch across the classroom, corridor, office, restroom, and storage thresholds', () => {
   assert.equal(areaAt(7, -6.2), 'Corridor');
-  assert.equal(areaAt(11, -15.9), 'Office');
+  assert.equal(areaAt(4.1, -15.9), 'Office');
   assert.equal(areaAt(-11, -15.9), 'Restroom');
-  assert.equal(areaAt(-16.3, -21), 'Storage');
-  assert.equal(areaAt(22, -15.9), 'GuardRoom');
+  assert.equal(areaAt(14.4, -15.9), 'GuardRoom');
 });
 
 test('area lookup still keeps the classroom and corridor interiors distinct', () => {
   assert.equal(areaAt(0, -3), 'Classroom');
   assert.equal(areaAt(0, -11), 'Corridor');
-  assert.equal(areaAt(11, -21), 'Office');
+  assert.equal(areaAt(4.1, -21), 'Office');
   assert.equal(areaAt(-11, -21), 'Restroom');
 });
 
@@ -76,16 +75,19 @@ test('leaving each special location puts the player on the side of the machine i
   assert.ok(dropPoint(38, -21)[1] < mz);
 });
 
-test('walking from the restroom into the storage room never steps outside every room', () => {
-  for (let x = -15.5; x >= -16.5; x -= 0.05) {
-    assert.ok(['Restroom', 'Storage'].includes(areaAt(x, -21)), `x=${x.toFixed(2)}`);
-  }
+test('there is no storage room behind the restroom', () => {
+  assert.equal(areaAt(-21.5, -21), null);
+  assert.equal(roomClipRect('Storage'), null);
 });
 
-test('the storage door sits on the wall between the restroom and the storage room', () => {
+test('the storage door is the door on the right-hand wall when entering the restroom from the corridor', () => {
   const [x, z] = OBJECT_POSITIONS.S09;
-  assert.equal(areaAt(x + 0.1, z), 'Restroom');
-  assert.equal(areaAt(x - 0.1, z), 'Storage');
+  assert.equal(areaAt(x - 0.2, z), 'Restroom');
+  assert.ok(x > -7.2 && x < -6.6, 'on the east wall');
+  assert.ok(z < -17.2 && z > -18.8, 'at the restroom model door');
+  const [px, pz] = ITEM_POSITIONS.F07;
+  assert.equal(areaAt(px, pz), 'Restroom');
+  assert.ok(Math.hypot(px - x, pz - z) < 1.5, 'the pole appears in front of the door');
 });
 
 const box = (w, d) => ({ min: { x: -w / 2, z: -d / 2 }, max: { x: w / 2, z: d / 2 } });
@@ -136,7 +138,7 @@ test('nothing farther than the reach distance is picked', () => {
 
 test('orbit camera rectangle follows the floor of the room the player is in', () => {
   const office = areaCameraRect('Office');
-  assert.ok(office.minZ >= -26 && office.maxZ <= -15.8 && office.minX >= 6 && office.maxX <= 16);
+  assert.ok(office.minZ >= -26 && office.maxZ <= -15.8 && office.minX >= -0.9 && office.maxX <= 9.1);
   const classroom = areaCameraRect('Classroom');
   assert.ok(classroom.maxX <= 7.75 && classroom.maxZ <= 5.75);
   const corridor = areaCameraRect('Corridor');
@@ -171,4 +173,102 @@ test('occlusion grid stops the camera ray at walls but ignores floors and ceilin
   assert.ok(grid.firstHit(5.9, 1, 5, 9, 1, 5, 0.5) === 1, 'ignores the start of the path');
   assert.equal(grid.firstHit(2, 1, 5, Infinity, 1, 5), 1, 'a runaway endpoint cannot hang the search');
   assert.equal(grid.firstHit(2, 1, 5, NaN, 1, 5), 1);
+});
+
+const ROOM_IDS = ['Classroom', 'Corridor', 'Office', 'Restroom', 'GuardRoom', 'L01', 'L02'];
+const inside = (rect, x, z) => x >= rect.minX && x <= rect.maxX && z >= rect.minZ && z <= rect.maxZ;
+const along = (axis, [x, z]) => (axis === 'z' ? z : x);
+
+test('every passage between two rooms is a doorway, matching the room connections in the rules', () => {
+  const pairs = DOORWAYS.map(({ sides }) => Object.keys(sides).sort().join('-')).sort();
+  assert.deepEqual(pairs, ['Classroom-Corridor', 'Corridor-GuardRoom', 'Corridor-Office', 'Corridor-Restroom']);
+  assert.deepEqual(DOORWAYS.filter(({ door }) => door).map(({ door }) => door).sort(), ['S05', 'S19']);
+});
+
+test('each room has its own doorway on its own side, between its arrival point and the other room', () => {
+  for (const { axis, sides } of DOORWAYS) {
+    const [a, b] = Object.keys(sides);
+    const order = [along(axis, sides[a].spawn), sides[a].line, sides[b].line, along(axis, sides[b].spawn)];
+    const rising = order.every((v, i) => i === 0 || v >= order[i - 1]);
+    const falling = order.every((v, i) => i === 0 || v <= order[i - 1]);
+    assert.ok(rising || falling, `${a}-${b}: ${order}`);
+    for (const area of [a, b]) {
+      const { span, spawn: [x, z] } = sides[area];
+      const lateral = axis === 'z' ? x : z;
+      assert.ok(lateral > span[0] && lateral < span[1], `${area} arrival is not in front of its doorway`);
+    }
+  }
+});
+
+test('arriving through a doorway lands inside the room, clear of its doorway', () => {
+  for (const { axis, sides } of DOORWAYS) {
+    for (const [area, { line, spawn }] of Object.entries(sides)) {
+      assert.equal(areaAt(...spawn), area);
+      assert.ok(Math.abs(along(axis, spawn) - line) >= 0.8, area);
+    }
+  }
+});
+
+test('a room draws its own doorways and arrival points', () => {
+  for (const { axis, sides } of DOORWAYS) {
+    for (const [area, { line, span, spawn }] of Object.entries(sides)) {
+      const rect = roomClipRect(area);
+      const mid = (span[0] + span[1]) / 2;
+      assert.ok(inside(rect, ...(axis === 'z' ? [mid, line] : [line, mid])), `${area} doorway`);
+      assert.ok(inside(rect, ...spawn), `${area} arrival`);
+    }
+  }
+});
+
+test('the corridor entrances are the painted doors on its walls, with no black block on the corridor side', () => {
+  const corridorSides = DOORWAYS.map(({ sides }) => sides.Corridor).filter(Boolean);
+  const centers = corridorSides.map(({ span }) => (span[0] + span[1]) / 2).sort((a, b) => a - b);
+  centers.forEach((x, i) => assert.ok(Math.abs(x - [-6.26, -6.26, 4.08, 14.44][i]) < 0.15, `door ${i} at ${x}`));
+  for (const side of corridorSides) {
+    assert.equal(side.block, false);
+    assert.ok(side.span[1] - side.span[0] <= 1.5);
+  }
+  assert.ok(Math.max(...centers) + 0.7 < 15.5, 'a corridor entrance reaches into the stairwell');
+});
+
+test('the office and guard room sit right behind their corridor doors', () => {
+  for (const [room, door] of [['Office', 4.08], ['GuardRoom', 14.44]]) {
+    const { sides } = DOORWAYS.find((d) => d.sides[room]);
+    const own = (sides[room].span[0] + sides[room].span[1]) / 2;
+    assert.ok(Math.abs(own - door) < 0.15, room);
+    assert.equal(areaAt(door, -21), room);
+  }
+});
+
+test('the corridor draws nothing beyond its own walls, so its windows show black', () => {
+  const rect = roomClipRect('Corridor');
+  assert.equal(inside(rect, 0, -7.4), false);
+  assert.equal(inside(rect, 0, -14.6), false);
+  assert.ok(inside(rect, 0, -11));
+});
+
+test('the drawn region of a room never reaches into the middle of another room', () => {
+  const centers = { Classroom: [0, 0], Corridor: [0, -11], Office: [4.1, -21], Restroom: [-11, -21], GuardRoom: [14.4, -21], L01: [38, -9], L02: [38, -21] };
+  for (const area of ROOM_IDS) {
+    const rect = roomClipRect(area);
+    for (const [other, [x, z]] of Object.entries(centers)) {
+      if (other !== area) assert.equal(inside(rect, x, z), false, `${area} shows the middle of ${other}`);
+    }
+  }
+});
+
+test('the classroom doorway block covers the door opening in front of the door glass and under the door frame', () => {
+  const classroom = DOORWAYS.find((d) => d.sides.Classroom).sides.Classroom;
+  assert.ok(classroom.height <= 2.5);
+  assert.ok(classroom.line > -5.34);
+  assert.ok(classroom.span[0] <= -7.0 && classroom.span[1] >= -4.15);
+});
+
+test('every corridor entrance and arrival point is in the main hall, not in the stairwells', () => {
+  for (const { sides } of DOORWAYS) {
+    const corridor = sides.Corridor;
+    if (!corridor) continue;
+    assert.ok(Math.abs(corridor.spawn[0]) + 0.22 < CORRIDOR_HALF_LENGTH);
+    assert.ok(Math.max(...corridor.span.map(Math.abs)) < CORRIDOR_HALF_LENGTH);
+  }
 });

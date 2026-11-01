@@ -20,6 +20,11 @@ const OBJECT_AREAS = {
   S21: 'GuardRoom',
 };
 
+const ITEM_HOMES = {
+  F01: 'Corridor', F02: 'L01', F03: 'L02', F04: 'Corridor', F05: 'Office', F06: 'Office',
+  F07: 'Storage', F08: 'Classroom', F09: 'Classroom', F11: 'GuardRoom', F12: 'Classroom',
+};
+
 const INITIAL_ITEMS = ['F08', 'F09', 'F11', 'F12'];
 const DOORS = ['S01', 'S05', 'S09', 'S19'];
 const DEFAULT_TEXT = (name) => `${name}紋絲不動，好像在嘲笑你：「就這？你是認真的嗎？」`;
@@ -37,7 +42,7 @@ function seededRandom(seed) {
 
 function freshItems() {
   return Object.fromEntries(Object.keys(FORMS).filter((id) => id !== 'F00').map((id) => [id, {
-    exists: INITIAL_ITEMS.includes(id), occupiedBy: null, area: id === 'F08' || id === 'F09' || id === 'F12' ? 'Classroom' : id === 'F11' ? 'GuardRoom' : null,
+    exists: INITIAL_ITEMS.includes(id), occupiedBy: null, area: INITIAL_ITEMS.includes(id) ? ITEM_HOMES[id] : null,
   }]));
 }
 
@@ -284,13 +289,13 @@ export class Game {
 
   #spawn(playerId, interactionId, formId, text) {
     const item = this.item(formId);
-    if (!item.exists) { item.exists = true; item.area = this.player(playerId).area; }
+    if (!item.exists) { item.exists = true; item.area = ITEM_HOMES[formId]; }
     return this.#resolve(playerId, interactionId, text, { spawned: formId });
   }
 
   #enterSpecial(playerId, interactionId, location, formId, text) {
     const item = this.item(formId);
-    if (!item.exists) { item.exists = true; item.area = location; }
+    if (!item.exists) { item.exists = true; item.area = ITEM_HOMES[formId]; }
     this.player(playerId).area = location;
     return this.#resolve(playerId, interactionId, text, { location, spawned: formId });
   }

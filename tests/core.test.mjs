@@ -138,6 +138,26 @@ test('office and storage keys open their doors and spawn the exam and pole', () 
   game.moveToArea('local', 'Restroom');
   assert.equal(game.interact('local', 'S09').interactionId, 'X013');
   assert.equal(game.item('F07').exists, true);
+  assert.equal(game.item('F07').area, 'Storage');
+  assert.equal(game.transform('local', 'F07').rejected, true);
+});
+
+test('every item appears in the place the design table lists for it', () => {
+  const game = new Game();
+  enterCorridor(game);
+  game.returnToHuman('local');
+  game.moveToArea('local', 'Corridor');
+  game.interact('local', 'S02');
+  assert.equal(game.item('F01').area, 'Corridor');
+  game.transform('local', 'F01');
+  game.interact('local', 'S03');
+  assert.equal(game.item('F02').area, 'L01');
+  game.returnToHuman('local');
+  game.moveToArea('local', 'Corridor');
+  game.interact('local', 'S10');
+  assert.equal(game.item('F04').area, 'Corridor');
+  assert.equal(new Game().item('F08').area, 'Classroom');
+  assert.equal(new Game().item('F11').area, 'GuardRoom');
 });
 
 test('the password route accepts the generated code without exposing it in the game state', () => {
@@ -221,7 +241,9 @@ test('the window route triggers E03 and the ending achievement', () => {
   game.moveToArea('local', 'Corridor');
   game.moveToArea('local', 'Restroom');
   game.interact('local', 'S09');
+  game.moveToArea('local', 'Storage');
   game.transform('local', 'F07');
+  game.moveToArea('local', 'Restroom');
   assert.equal(game.interact('local', 'S13').ending, 'E03');
   assert.equal(game.hasAchievement('local', 'E03'), true);
 });

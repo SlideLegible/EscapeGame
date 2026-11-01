@@ -133,7 +133,9 @@ test('restroom rows implement toilet, bin, storage key, alternate response, and 
   assert.equal(game.interact('local', 'S12').interactionId, 'X012');
   game.transform('local', 'F05');
   assert.equal(game.interact('local', 'S09').interactionId, 'X013');
+  game.moveToArea('local', 'Storage');
   game.transform('local', 'F07');
+  game.moveToArea('local', 'Restroom');
   assert.equal(game.interact('local', 'S13').interactionId, 'X015');
   assert.equal(game.player().ending, 'E03');
 

@@ -7,30 +7,34 @@ const ROOM = {
   Corridor: { label: '走廊', x: 0, z: -11, w: 50, d: 8, color: 0x756b58 },
   Office: { label: '辦公室', x: 11, z: -21, w: 10, d: 10, color: 0x766c58 },
   Restroom: { label: '廁所', x: -11, z: -21, w: 10, d: 10, color: 0x626b66 },
-  Storage: { label: '儲物間', x: -22, z: -21, w: 9, d: 10, color: 0x5b5244 },
+  Storage: { label: '儲物間', x: -21.5, z: -21, w: 11, d: 10, color: 0x5b5244 },
   GuardRoom: { label: '警衛室', x: 23, z: -21, w: 10, d: 10, color: 0x696553 },
   L01: { label: '飲料機內部', x: 38, z: -9, w: 9, d: 8, color: 0x515f58 },
   L02: { label: '飲料機底下', x: 38, z: -21, w: 9, d: 8, color: 0x50564e },
 };
 
-const OBJECT_POSITIONS = {
-  S01: [0, -14], S02: [-6, -10], S03: [-14, -10], S04: [-18, -10], S05: [11, -15],
-  S06: [13, -20], S07: [9, -21], S08: [13, -24], S09: [-15, -21], S10: [4, -10],
+export const OBJECT_POSITIONS = {
+  S01: [0, -14], S02: [-6, -10], S03: [-14, -10], S04: [-14, -10.7], S05: [11, -15],
+  S06: [13, -20], S07: [9, -21], S08: [13, -24], S09: [-16, -21], S10: [4, -10],
   S11: [-12, -19], S12: [-8, -23], S13: [-9, -17], S14: [-7.65, 0], S15: [25, -22],
-  S16: [-6.2, 0], S17: [-3, -10], S18: [9, -24], S19: [-5.55, -5.45], S20: [-5.65, 0.35],
+  S16: [-6.32, 0], S17: [-3, -10], S18: [9, -24], S19: [-5.55, -5.45], S20: [-5.65, 0.35],
+  S21: [22.5, -22],
 };
 
 const ITEM_POSITIONS = {
   F01: [-4.8, -11], F02: [38, -9], F03: [38, -21], F04: [4.8, -9.3], F05: [12, -20.8],
-  F06: [11.8, -24], F07: [-22, -21], F08: [-5.2, 0.9], F09: [-5, 2.2], F10: [22.5, -22],
+  F06: [11.8, -24], F07: [-22, -21], F08: [-5.2, 0.9], F09: [-5, 2.2],
   F11: [20.5, -22], F12: [-5, -2.8],
 };
+
+// Footprint (x, z) of the teacher's lectern in the bundled classroom, parallel to the blackboard.
+export const LECTERN_SIZE = [0.9, 1.48];
 
 // Walkable collision rows measured from the bundled classroom's desk and chair layout.
 const CLASSROOM_DESK_COLUMNS = [-3.77, -1.67, 0.41, 2.43, 4.45, 6.5];
 const CLASSROOM_DESK_ROWS = [-3.96, -1.96, -0.01, 1.93, 3.89];
 const CLASSROOM_EXIT_DOOR_PARTS = ['PUERTA_1_StingrayPBS9_0', 'PUERTA_3_StingrayPBS9_0', 'GRIPPUERTA_StingrayPBS1_0', 'GRIPPUERTA2_StingrayPBS1_0'];
-const MODEL_TARGETS = new Set(['S14', 'S16', 'S19', 'S20']);
+const MODEL_TARGETS = new Set(['S04', 'S14', 'S16', 'S19', 'S20']);
 
 const ROOM_NAMES = Object.fromEntries(Object.entries(ROOM).map(([id, room]) => [id, room.label]));
 const palette = { wall: 0xb3a789, trim: 0x51483b, wood: 0x8d704a, light: 0xe8d8b6, dark: 0x292720, lime: 0xc4ef80 };
@@ -39,12 +43,47 @@ export function areaAt(x, z) {
   if (Math.abs(x) <= 7.75 && z >= -5.75 && z <= 5.75) return 'Classroom';
   if (x >= 6 && x <= 16 && z >= -26 && z <= -15.8) return 'Office';
   if (x >= -16 && x <= -6 && z >= -26 && z <= -15.8) return 'Restroom';
-  if (x >= -27 && x <= -16.2 && z >= -26 && z <= -16) return 'Storage';
+  if (x >= -27 && x <= -16 && z >= -26 && z <= -16) return 'Storage';
   if (x >= 18 && x <= 28 && z >= -26 && z <= -15.8) return 'GuardRoom';
   if (x >= -25 && x <= 25 && z >= -16.2 && z <= -5.75) return 'Corridor';
   if (x >= 33 && x <= 43 && z >= -14 && z <= -5) return 'L01';
   if (x >= 33 && x <= 43 && z >= -25 && z <= -16) return 'L02';
   return null;
+}
+
+export const SPECIAL_EXITS = {
+  L01: { at: [34.1, -11.8], to: [-14, -6.9], text: '你從飲料機的出貨口鑽了出來' },
+  L02: { at: [34.1, -23.8], to: [-14, -12.2], text: '你從飲料機底下滾了出來' },
+};
+
+// Targets behind or beside the camera direction cost extra, so the one the player faces wins.
+export function nearestCandidate(x, z, yaw, candidates, maxDistance = 3.7) {
+  const fx = Math.sin(yaw), fz = -Math.cos(yaw);
+  let best = null;
+  let bestScore = Infinity;
+  for (const candidate of candidates) {
+    const { bounds } = candidate;
+    const nx = bounds ? Math.max(candidate.x + bounds.min.x, Math.min(x, candidate.x + bounds.max.x)) : candidate.x;
+    const nz = bounds ? Math.max(candidate.z + bounds.min.z, Math.min(z, candidate.z + bounds.max.z)) : candidate.z;
+    const distance = Math.hypot(nx - x, nz - z);
+    if (distance >= maxDistance) continue;
+    const [dx, dz] = distance > 1e-6 ? [nx - x, nz - z] : [candidate.x - x, candidate.z - z];
+    const length = Math.hypot(dx, dz);
+    const facing = length > 1e-6 ? (dx * fx + dz * fz) / length : 1;
+    const score = distance + 0.4 * (1 - facing);
+    if (score < bestScore) { bestScore = score; best = { ...candidate, distance }; }
+  }
+  return best;
+}
+
+export function entryPoint(area) {
+  return area === 'L01' ? [35.5, -9] : [35.5, -21];
+}
+
+export function dropPoint(x, z) {
+  if (areaAt(x, z) === 'L01') return [-14 + (x - 38) / 3, -8];
+  if (areaAt(x, z) === 'L02') return [-14 + (x - 38) / 3, -11.2];
+  return [x, z];
 }
 
 export class AcademyScene {
@@ -71,9 +110,11 @@ export class AcademyScene {
     this.started = false;
     this.playerPosition = new THREE.Vector3(-5.2, 0, -4.5);
     this.humanPosition = this.playerPosition.clone();
+    this.itemDrops = new Map();
     this.targetMeshes = [];
     this.targetGroups = new Map();
     this.itemGroups = new Map();
+    this.exitGroups = new Map();
     this.roomGroups = new Map();
     this.playerGroup = null;
     this.playerRig = null;
@@ -92,6 +133,7 @@ export class AcademyScene {
     this.#buildLights();
     this.#buildRooms();
     this.#buildObjects();
+    this.#buildExits();
     this.#buildPlayer();
     this.playerModelLoad = this.#loadPlayerModel();
     this.classroomLoad = this.#loadClassroomModel();
@@ -187,14 +229,13 @@ export class AcademyScene {
         wall((right + room.x + 1.3) / 2, top, room.w / 2 - 1.3, 0.22);
       } else if (id === 'Restroom') {
         wall(room.x, bottom, room.w, 0.22);
-        wall(left, room.z + 3.25, 0.22, room.d / 2 - 3.25);
-        wall(left, room.z - 3.25, 0.22, room.d / 2 - 3.25);
+        wall(left, (top + room.z + 1.1) / 2, 0.22, top - room.z - 1.1);
+        wall(left, (bottom + room.z - 1.1) / 2, 0.22, room.z - 1.1 - bottom);
         wall(right, room.z, 0.22, room.d);
         wall((left + room.x - 1.3) / 2, top, room.w / 2 - 1.3, 0.22);
         wall((right + room.x + 1.3) / 2, top, room.w / 2 - 1.3, 0.22);
       } else if (id === 'Storage') {
         wall(room.x, top, room.w, 0.22); wall(left, room.z, 0.22, room.d); wall(room.x, bottom, room.w, 0.22);
-        wall(right, room.z - 1.5, 0.22, room.d - 3);
       } else if (id === 'L01' || id === 'L02') {
         wall(room.x, top, room.w, 0.22); wall(room.x, bottom, room.w, 0.22);
         wall(left, room.z, 0.22, room.d); wall(right, room.z, 0.22, room.d);
@@ -306,15 +347,15 @@ export class AcademyScene {
         }
         break;
       }
+      case 'S21': {
+        this.#box(group, 0, 0.36, 0, 1.1, 0.72, 0.6, wood);
+        this.#box(group, 0, 0.98, -0.05, 0.9, 0.56, 0.08, this.#material(0x374c45, 0.3));
+        this.#box(group, 0, 0.98, 0, 0.78, 0.44, 0.02, this.#material(0x789b91, 0.2), false);
+        this.#box(group, 0, 0.75, -0.08, 0.12, 0.1, 0.12, this.#material(0x63766a));
+        break;
+      }
       case 'S04': {
-        const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.58, 0.42, 0.68, 16), this.#material(0x987e60));
-        pot.position.y = 0.42; pot.castShadow = true; group.add(pot);
-        this.#box(group, 0, 0.79, 0, 1.2, 0.12, 0.85, wood);
-        const stem = this.#material(0x587c58);
-        for (const [x, y, z, scale] of [[-0.2,1.35,0,0.7],[0.2,1.55,0.08,0.6],[0,1.8,-0.05,0.65],[-0.4,1.65,0.04,0.5]]) {
-          const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.34, 10, 8), stem);
-          leaf.position.set(x, y, z); leaf.scale.set(1, scale, 0.7); leaf.castShadow = true; group.add(leaf);
-        }
+        this.#box(group, 0, 0.5, 0.15, 1.36, 1.0, 0.3, this.#material(0x637f72));
         break;
       }
       case 'S05': case 'S09': case 'S19': {
@@ -397,10 +438,7 @@ export class AcademyScene {
         break;
       }
       case 'S16': {
-        for (const x of [-0.72, 0.72]) for (const z of [-0.25, 0.25]) this.#box(group, x, 0.5, z, 0.14, 0.98, 0.14, this.#material(0x655740));
-        this.#box(group, 0, 0.72, 0, 1.95, 0.62, 0.76, wood);
-        this.#box(group, 0, 1.06, 0, 2.15, 0.14, 0.94, this.#material(0x918064));
-        this.#box(group, 0, 1.08, 0.49, 0.48, 0.08, 0.04, this.#material(0x4d5d53), false);
+        this.#box(group, 0, 0.56, 0, LECTERN_SIZE[0], 1.12, LECTERN_SIZE[1], wood);
         break;
       }
       case 'S17': {
@@ -436,6 +474,7 @@ export class AcademyScene {
       const group = this.#objectShape(id);
       const [x, z] = OBJECT_POSITIONS[id];
       group.position.set(x, 0, z);
+      if (id === 'S09') group.rotation.y = Math.PI / 2;
       group.userData.targetId = id;
       group.userData.interactionOnly = MODEL_TARGETS.has(id);
       group.name = `${id} ${label}`;
@@ -470,6 +509,35 @@ export class AcademyScene {
       this.#rebuildFormMesh(group, id);
       group.userData.localBounds = this.#localBounds(group);
     }
+  }
+
+  #buildExits() {
+    for (const [area, exit] of Object.entries(SPECIAL_EXITS)) {
+      const group = new THREE.Group();
+      const [x, z] = exit.at;
+      group.position.set(x, 0, z);
+      group.name = `${area} 出口`;
+      group.userData.targetId = 'EXIT';
+      this.#box(group, -0.5, 0.55, 0, 0.08, 1.1, 1.3, this.#material(0x0b1214), false);
+      this.#box(group, -0.45, 1.13, 0, 0.12, 0.08, 1.46, this.#material(palette.lime, 0.4), false);
+      for (const side of [-1, 1]) this.#box(group, -0.45, 0.55, side * 0.69, 0.12, 1.1, 0.08, this.#material(palette.lime, 0.4), false);
+      const ring = new THREE.Mesh(new THREE.RingGeometry(0.45, 0.58, 32), new THREE.MeshBasicMaterial({ color: palette.lime, transparent: true, opacity: 0.55 }));
+      ring.rotation.x = -Math.PI / 2; ring.position.y = 0.02; group.add(ring);
+      this.scene.add(group);
+      this.exitGroups.set(area, group);
+      this.targetMeshes.push(group);
+    }
+  }
+
+  exitSpecialLocation() {
+    const area = this.game.player().area;
+    const exit = SPECIAL_EXITS[area];
+    if (!exit || !this.game.moveToArea('local', 'Corridor')) return { rejected: true, text: '' };
+    const [x, z] = exit.to;
+    this.playerPosition.set(x, 0, z);
+    this.playerGroup.position.copy(this.playerPosition);
+    this.refresh();
+    return { text: exit.text, location: 'Corridor' };
   }
 
   #formShape(id) {
@@ -577,13 +645,6 @@ export class AcademyScene {
       add(new THREE.Mesh(new THREE.BoxGeometry(0.045,0.025,0.23), mat(0xd6c88c)), 0, 0.95, -0.04);
       const hand = new THREE.Mesh(new THREE.BoxGeometry(0.04,0.025,0.16), mat(0xe2b877)); hand.rotation.y = -0.75; add(hand, 0.04, 0.96, 0.02);
       add(new THREE.Mesh(new THREE.SphereGeometry(0.045,10,8), mat(0xd6c88c)), 0, 0.96, 0);
-    } else if (id === 'F10') {
-      add(new THREE.Mesh(new THREE.BoxGeometry(0.92,0.52,0.56), mat(0x4d675d,0.18)), 0, 0.77, -0.08);
-      add(new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.23,0.34,18), mat(0x374c45,0.28)), 0, 0.73, 0.34);
-      const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.14,0.14,0.045,18), mat(0x789b91,0.18)); lens.rotation.x = Math.PI / 2; add(lens,0,0.73,0.53);
-      add(new THREE.Mesh(new THREE.BoxGeometry(0.5,0.09,0.62), mat(0x9eb99b)), 0, 0.83, -0.08);
-      add(new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.07,0.3,10), mat(0x63766a)), 0, 0.31, -0.04);
-      add(new THREE.Mesh(new THREE.BoxGeometry(0.42,0.08,0.36), mat(0x63766a)), 0, 0.12, -0.04);
     } else if (id === 'F12') {
       add(new THREE.Mesh(new THREE.BoxGeometry(0.8,0.13,0.75), mat(palette.wood)), 0, 0.58);
       add(new THREE.Mesh(new THREE.BoxGeometry(0.8,0.75,0.14), mat(palette.wood)), 0, 1.0, -0.3);
@@ -624,6 +685,15 @@ export class AcademyScene {
     this.playerGroup.position.copy(this.playerPosition);
     this.scene.add(this.playerGroup);
     this.#rebuildFormMesh(this.playerGroup, 'F00');
+    this.humanGroup = new THREE.Group();
+    this.humanGroup.name = '人類身體';
+    this.humanGroup.visible = false;
+    this.scene.add(this.humanGroup);
+    this.#rebuildFormMesh(this.humanGroup, 'F00');
+  }
+
+  #itemPosition(id) {
+    return this.itemDrops.get(id) ?? ITEM_POSITIONS[id];
   }
 
   async #loadPlayerModel() {
@@ -715,6 +785,11 @@ export class AcademyScene {
   }
 
   setForm(formId) {
+    // The single character model moves to the body left behind while the player is an item.
+    if (formId !== 'F00' && this.humanModel?.parent === this.playerGroup) {
+      this.humanGroup.rotation.y = this.playerGroup.rotation.y;
+      this.#rebuildFormMesh(this.humanGroup, 'F00');
+    }
     this.#rebuildFormMesh(this.playerGroup, formId);
     this.jumpHeight = 0;
     this.jumpVelocity = 0;
@@ -723,13 +798,29 @@ export class AcademyScene {
 
   syncAfterAction(previousForm, result) {
     const player = this.game.player();
+    const changedForm = player.form !== previousForm;
+    if (result.ending === 'E05') this.itemDrops.clear();
+    else if (changedForm && previousForm !== 'F00') this.itemDrops.set(previousForm, [this.playerPosition.x, this.playerPosition.z]);
     if (previousForm === 'F00' && player.form !== 'F00') this.humanPosition.copy(this.playerPosition);
-    if (result.location === 'L01') this.playerPosition.set(38, 0, -9);
-    else if (result.location === 'L02') this.playerPosition.set(38, 0, -21);
-    else if (result.ending === 'E05') this.playerPosition.set(-5.2, 0, -4.5);
-    else if (!result.ending && player.form === 'F00' && previousForm !== 'F00') this.playerPosition.copy(this.humanPosition);
+    if (result.location) {
+      const [x, z] = entryPoint(result.location);
+      this.playerPosition.set(x, 0, z);
+    } else if (result.ending === 'E05') this.playerPosition.set(-5.2, 0, -4.5);
+    else if (changedForm && player.form !== 'F00') {
+      const [x, z] = this.#itemPosition(player.form);
+      this.playerPosition.set(x, 0, z);
+    } else if (!result.ending && player.form === 'F00' && previousForm !== 'F00') this.playerPosition.copy(this.humanPosition);
     this.playerGroup.position.copy(this.playerPosition);
     this.setForm(player.form);
+    this.refresh();
+  }
+
+  resetRound() {
+    this.itemDrops.clear();
+    this.playerPosition.set(-5.2, 0, -4.5);
+    this.humanPosition.copy(this.playerPosition);
+    this.playerGroup.position.copy(this.playerPosition);
+    this.setForm(this.game.player().form);
     this.refresh();
   }
 
@@ -739,13 +830,16 @@ export class AcademyScene {
       const isPlayer = this.game.player().form === id;
       group.visible = Boolean(item?.exists && !item.occupiedBy && !isPlayer);
       if (group.visible && item.area) {
-        const pos = ITEM_POSITIONS[id];
-        const room = ROOM[item.area];
-        if (room && ['F05', 'F06', 'F07'].includes(id) && item.area !== (id === 'F05' || id === 'F06' ? 'Office' : 'Storage')) {
-          group.position.set(room.x, 0, room.z);
-        } else if (pos) group.position.set(pos[0], 0, pos[1]);
+        let [x, z] = this.#itemPosition(id);
+        if (areaAt(x, z) !== item.area) {
+          [x, z] = dropPoint(x, z);
+          this.itemDrops.set(id, [x, z]);
+        }
+        group.position.set(x, 0, z);
       }
     }
+    this.humanGroup.visible = this.game.player().form !== 'F00';
+    this.humanGroup.position.copy(this.humanPosition);
     for (const doorId of ['S05', 'S09', 'S19']) {
       const door = this.targetGroups.get(doorId);
       if (door) door.visible = !this.game.isDoorOpen(doorId);
@@ -761,20 +855,20 @@ export class AcademyScene {
   }
 
   nearestTarget(maxDistance = 3.7) {
-    let best = null;
-    let bestDistance = maxDistance;
+    const candidates = [];
+    const exit = this.exitGroups.get(this.game.player().area);
+    if (exit) candidates.push({ id: 'EXIT', name: '離開這裡', x: exit.position.x, z: exit.position.z });
     for (const [id, group] of this.targetGroups) {
       if (!group.visible) continue;
       if (OBJECT_AREAS[id] !== this.game.player().area) continue;
-      const distance = Math.hypot(group.position.x - this.playerPosition.x, group.position.z - this.playerPosition.z);
-      if (distance < bestDistance) { bestDistance = distance; best = { id, name: OBJECTS[id], distance }; }
+      candidates.push({ id, name: OBJECTS[id], x: group.position.x, z: group.position.z, bounds: group.userData.localBounds });
     }
     for (const [id, group] of this.itemGroups) {
       if (!group.visible) continue;
-      const distance = Math.hypot(group.position.x - this.playerPosition.x, group.position.z - this.playerPosition.z);
-      if (distance < bestDistance) { bestDistance = distance; best = { id, name: FORMS[id], distance }; }
+      candidates.push({ id, name: FORMS[id], x: group.position.x, z: group.position.z });
     }
-    return best;
+    const best = nearestCandidate(this.playerPosition.x, this.playerPosition.z, this.yaw, candidates, maxDistance);
+    return best && { id: best.id, name: best.name, distance: best.distance };
   }
 
   pickTarget(clientX, clientY) {
@@ -848,7 +942,7 @@ export class AcademyScene {
       return x >= 21.7 && x <= 24.3;
     }
     if ((from === 'Restroom' && to === 'Storage') || (from === 'Storage' && to === 'Restroom')) {
-      return this.game.isDoorOpen('S09') && z >= -22.3 && z <= -19.7;
+      return this.game.isDoorOpen('S09') && z >= -21.9 && z <= -20.1;
     }
     return true;
   }
@@ -894,7 +988,7 @@ export class AcademyScene {
     let right = Number(this.keys.has('KeyD') || this.keys.has('ArrowRight')) - Number(this.keys.has('KeyA') || this.keys.has('ArrowLeft'));
     if (!forward && !right) return;
     const length = Math.hypot(forward, right); forward /= length; right /= length;
-    const speed = this.game.player().form === 'F08' ? 2.6 : this.game.player().form === 'F09' || this.game.player().form === 'F10' ? 1.8 : 4.4;
+    const speed = this.game.player().form === 'F08' ? 2.6 : this.game.player().form === 'F09' ? 1.8 : 4.4;
     const fx = Math.sin(this.yaw), fz = -Math.cos(this.yaw);
     const rx = Math.cos(this.yaw), rz = Math.sin(this.yaw);
     const oldX = this.playerPosition.x, oldZ = this.playerPosition.z;
@@ -926,7 +1020,7 @@ export class AcademyScene {
       return;
     }
     const distance = this.game.player().form === 'F12' ? 8.5 : this.game.player().form === 'F08' ? 6.2 : this.game.player().form === 'F00' ? 6.5 : 7.2;
-    const height = (this.game.player().form === 'F09' || this.game.player().form === 'F10' ? 3.4 : 3.8) + this.pitch * 1.5;
+    const height = (this.game.player().form === 'F09' ? 3.4 : 3.8) + this.pitch * 1.5;
     const dx = Math.sin(this.yaw) * distance;
     const dz = Math.cos(this.yaw) * distance;
     this.cameraDesired.set(this.playerPosition.x - dx, height, this.playerPosition.z + dz);

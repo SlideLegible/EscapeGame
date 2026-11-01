@@ -1,7 +1,7 @@
 // STEP 1–3 rules coverage → VERIFY STEP 1–3
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Game } from '../src/core.mjs';
+import { Game, ACHIEVEMENTS, achievementEntries } from '../src/core.mjs';
 
 function enterCorridor(game, playerId = 'local') {
   game.transform(playerId, 'F12');
@@ -79,6 +79,7 @@ test('the drink machine and its underside are special locations for the can form
   assert.equal(game.interact('local', 'S03').location, 'L01');
   assert.equal(game.interact('local', 'F02').interactionId, 'X004');
   assert.equal(game.state.health, 6);
+  game.transform('local', 'F01');
   game.returnToHuman('local');
   game.moveToArea('local', 'Corridor');
   game.transform('local', 'F01');
@@ -137,6 +138,26 @@ test('office and storage keys open their doors and spawn the exam and pole', () 
   game.moveToArea('local', 'Restroom');
   assert.equal(game.interact('local', 'S09').interactionId, 'X013');
   assert.equal(game.item('F07').exists, true);
+  assert.equal(game.item('F07').area, 'Storage');
+  assert.equal(game.transform('local', 'F07').rejected, true);
+});
+
+test('every item appears in the place the design table lists for it', () => {
+  const game = new Game();
+  enterCorridor(game);
+  game.returnToHuman('local');
+  game.moveToArea('local', 'Corridor');
+  game.interact('local', 'S02');
+  assert.equal(game.item('F01').area, 'Corridor');
+  game.transform('local', 'F01');
+  game.interact('local', 'S03');
+  assert.equal(game.item('F02').area, 'L01');
+  game.returnToHuman('local');
+  game.moveToArea('local', 'Corridor');
+  game.interact('local', 'S10');
+  assert.equal(game.item('F04').area, 'Corridor');
+  assert.equal(new Game().item('F08').area, 'Classroom');
+  assert.equal(new Game().item('F11').area, 'GuardRoom');
 });
 
 test('the password route accepts the generated code without exposing it in the game state', () => {
@@ -220,16 +241,18 @@ test('the window route triggers E03 and the ending achievement', () => {
   game.moveToArea('local', 'Corridor');
   game.moveToArea('local', 'Restroom');
   game.interact('local', 'S09');
+  game.moveToArea('local', 'Storage');
   game.transform('local', 'F07');
+  game.moveToArea('local', 'Restroom');
   assert.equal(game.interact('local', 'S13').ending, 'E03');
   assert.equal(game.hasAchievement('local', 'E03'), true);
 });
 
-test('the camera form unlocks whole-map view and tracked achievements stay in memory only', () => {
+test('the monitor unlocks whole-map view and tracked achievements stay in memory only', () => {
   const game = new Game();
   enterCorridor(game);
   game.moveToArea('local', 'GuardRoom');
-  game.transform('local', 'F10');
+  game.interact('local', 'S21');
   assert.equal(game.player().canSeeWholeMap, true);
   game.unlock('local', 'A04');
   assert.equal(game.hasAchievement('local', 'A04'), true);
@@ -250,6 +273,378 @@ test('default responses, repeated transformations, and time in an item unlock A0
 
 test('all object IDs and form IDs from the design table are represented', () => {
   const game = new Game();
-  for (let i = 1; i <= 20; i++) assert.ok(game.objectName(`S${String(i).padStart(2, '0')}`));
-  for (let i = 0; i <= 12; i++) assert.ok(game.formName(`F${String(i).padStart(2, '0')}`));
+  for (let i = 1; i <= 21; i++) assert.ok(game.objectName(`S${String(i).padStart(2, '0')}`));
+  for (let i = 0; i <= 12; i++) if (i !== 10) assert.ok(game.formName(`F${String(i).padStart(2, '0')}`));
+});
+
+test('the monitor is a guard room object, not a form the player can become', () => {
+  const game = new Game();
+  assert.equal(game.formName('F10'), undefined);
+  assert.equal(game.item('F10'), undefined);
+  assert.equal(game.objectName('S21'), '監視器');
+  enterCorridor(game);
+  game.moveToArea('local', 'GuardRoom');
+  assert.equal(game.transform('local', 'F10').rejected, true);
+});
+
+test('each interaction with the monitor switches between the normal view and the whole-map view', () => {
+  const game = new Game();
+  enterCorridor(game);
+  game.moveToArea('local', 'GuardRoom');
+  const on = game.interact('local', 'S21');
+  assert.equal(on.interactionId, 'X023');
+  assert.equal(game.player().canSeeWholeMap, true);
+  const off = game.interact('local', 'S21');
+  assert.equal(off.interactionId, 'X023');
+  assert.notEqual(off.text, on.text);
+  assert.equal(game.player().canSeeWholeMap, false);
+  game.transform('local', 'F11');
+  game.interact('local', 'S21');
+  assert.equal(game.player().canSeeWholeMap, true);
+});
+
+test('the monitor only works from inside the guard room', () => {
+  const game = new Game();
+  enterCorridor(game);
+  assert.equal(game.interact('local', 'S21').rejected, true);
+  assert.equal(game.player().canSeeWholeMap, false);
+});
+
+test('a restart after health reaches zero returns the player to the normal view', () => {
+  const game = new Game();
+  enterCorridor(game);
+  game.moveToArea('local', 'GuardRoom');
+  game.interact('local', 'S21');
+  game.state.health = 1;
+  assert.equal(game.damage(1).ending, 'E05');
+  assert.equal(game.player().canSeeWholeMap, false);
+});
+
+test('switching forms inside the drink machine leaves the can inside, even after the player leaves', () => {
+  const game = new Game();
+  obtainCan(game);
+  game.interact('local', 'S03');
+  game.transform('local', 'F02');
+  assert.equal(game.item('F01').area, 'L01');
+  assert.equal(game.transform('local', 'F01').transformed, true);
+  game.transform('local', 'F02');
+  game.returnToHuman('local');
+  assert.equal(game.item('F01').area, 'L01');
+  assert.equal(game.item('F02').area, 'Corridor');
+});
+
+test('the drink can go back into the drink machine and become the can left inside', () => {
+  const game = new Game();
+  obtainCan(game);
+  game.interact('local', 'S03');
+  game.transform('local', 'F02');
+  game.moveToArea('local', 'Corridor');
+  const result = game.interact('local', 'S03');
+  assert.equal(result.interactionId, 'X038');
+  assert.equal(result.location, 'L01');
+  assert.equal(game.player().area, 'L01');
+  assert.equal(game.transform('local', 'F01').transformed, true);
+  assert.equal(game.interact('local', 'S04').rejected, true);
+});
+
+test('the student ID can slide back under the drink machine and become the can left there', () => {
+  const game = new Game();
+  obtainCan(game);
+  game.interact('local', 'S04');
+  game.transform('local', 'F03');
+  assert.equal(game.moveToArea('local', 'Corridor'), true);
+  assert.equal(game.item('F01').area, 'L02');
+  const result = game.interact('local', 'S04');
+  assert.equal(result.interactionId, 'X039');
+  assert.equal(result.location, 'L02');
+  assert.equal(game.transform('local', 'F01').transformed, true);
+  game.transform('local', 'F03');
+  game.returnToHuman('local');
+  assert.equal(game.item('F01').area, 'L02');
+  assert.equal(game.item('F03').area, 'Corridor');
+});
+
+test('the student ID cannot get into the drink machine itself', () => {
+  const game = new Game();
+  obtainCan(game);
+  game.interact('local', 'S04');
+  game.transform('local', 'F03');
+  game.moveToArea('local', 'Corridor');
+  assert.match(game.interact('local', 'S03').text, /飲料機紋絲不動/);
+  assert.equal(game.player().area, 'Corridor');
+});
+
+test('the drink can roll under the drink machine just like the can, finding the student ID', () => {
+  const game = new Game();
+  obtainCan(game);
+  game.interact('local', 'S03');
+  game.transform('local', 'F02');
+  game.moveToArea('local', 'Corridor');
+  const result = game.interact('local', 'S04');
+  assert.equal(result.interactionId, 'X003');
+  assert.equal(result.location, 'L02');
+  assert.equal(result.spawned, 'F03');
+  assert.equal(game.player().area, 'L02');
+  assert.equal(game.transform('local', 'F03').transformed, true);
+  assert.equal(game.item('F02').area, 'L02');
+});
+
+test('the drink can do everything the can does at the drink machine', () => {
+  for (const [target, location] of [['S03', 'L01'], ['S04', 'L02']]) {
+    const game = new Game();
+    obtainCan(game);
+    game.interact('local', 'S03');
+    game.transform('local', 'F02');
+    game.moveToArea('local', 'Corridor');
+    assert.equal(game.interact('local', target).location, location, target);
+  }
+});
+
+test('leaving the machine underside as the can leaves an untouched student ID inside', () => {
+  const game = new Game();
+  obtainCan(game);
+  game.interact('local', 'S04');
+  game.returnToHuman('local');
+  assert.equal(game.item('F01').area, 'Corridor');
+  assert.equal(game.item('F03').area, 'L02');
+});
+
+test('an item form can walk out of the drink machine into the corridor while the can stays inside', () => {
+  const game = new Game();
+  obtainCan(game);
+  game.interact('local', 'S03');
+  game.transform('local', 'F02');
+  assert.equal(game.moveToArea('local', 'Corridor'), true);
+  assert.equal(game.player().area, 'Corridor');
+  assert.equal(game.player().form, 'F02');
+  assert.equal(game.item('F01').area, 'L01');
+  assert.equal(game.interact('local', 'S01').interactionId, null);
+});
+
+test('both keys share a name that does not hint which door they open', () => {
+  const game = new Game();
+  assert.equal(game.formName('F04'), '不知道用來做什麼的鑰匙');
+  assert.equal(game.formName('F05'), game.formName('F04'));
+  for (const id of ['F04', 'F05']) assert.doesNotMatch(game.formName(id), /辦公室|儲物間/);
+});
+
+test('the achievement list matches the design table names and conditions', () => {
+  assert.deepEqual(Object.keys(ACHIEVEMENTS), ['E01', 'E02', 'E03', 'E04', 'E05', 'A01', 'A02', 'A03', 'A04', 'A06', 'A07']);
+  assert.equal(ACHIEVEMENTS.E04.name, '跟無數個趕作業的日子一樣，又看到了清晨的太陽');
+  assert.equal(ACHIEVEMENTS.A07.condition, '碰過所有的鑰匙');
+  for (const { name, condition } of Object.values(ACHIEVEMENTS)) assert.ok(name && condition);
+});
+
+test('locked achievements show no name or condition, unlocked ones show both', () => {
+  const entries = achievementEntries(new Set(['E01', 'A01']));
+  assert.equal(entries.length, 11);
+  const e01 = entries.find((entry) => entry.id === 'E01');
+  assert.deepEqual(e01, { id: 'E01', unlocked: true, name: '撿到就是我的', condition: '用撿到的學生證逃出' });
+  const a06 = entries.find((entry) => entry.id === 'A06');
+  assert.deepEqual(a06, { id: 'A06', unlocked: false, name: '？？？', condition: '' });
+});
+
+test('achievements unlocked by play appear as unlocked entries and survive an E05 restart', () => {
+  const game = new Game();
+  for (let i = 0; i < 10; i++) game.interact('local', 'S16');
+  game.state.health = 1;
+  game.damage(1);
+  const unlocked = achievementEntries(game.player().achievementIds).filter((entry) => entry.unlocked).map((entry) => entry.id);
+  assert.deepEqual(unlocked, ['E05', 'A01']);
+});
+
+function cutPower(game) {
+  enterCorridor(game);
+  game.returnToHuman('local');
+  game.moveToArea('local', 'Corridor');
+  game.moveToArea('local', 'GuardRoom');
+  game.interact('local', 'S15');
+  game.moveToArea('local', 'Corridor');
+}
+
+test('after the power is cut, touching the academy gate in any form says it has no power', () => {
+  const game = new Game();
+  cutPower(game);
+  const health = game.state.health;
+  const human = game.interact('local', 'S01');
+  assert.equal(human.interactionId, 'X040');
+  assert.match(human.text, /沒電/);
+  game.interact('local', 'S02');
+  game.transform('local', 'F01');
+  game.interact('local', 'S04');
+  game.transform('local', 'F03');
+  game.moveToArea('local', 'Corridor');
+  const card = game.interact('local', 'S01');
+  assert.equal(card.interactionId, 'X040');
+  assert.equal(card.ending, null);
+  assert.equal(game.state.health, health);
+});
+
+test('the no-power gate message is not a default response and does not count toward A01', () => {
+  const game = new Game();
+  cutPower(game);
+  for (let i = 0; i < 10; i++) game.interact('local', 'S01');
+  assert.equal(game.hasAchievement('local', 'A01'), false);
+});
+
+test('the keyring at the unpowered gate gets the no-power message', () => {
+  const game = new Game();
+  cutPower(game);
+  game.moveToArea('local', 'GuardRoom');
+  game.transform('local', 'F11');
+  game.moveToArea('local', 'Corridor');
+  assert.equal(game.interact('local', 'S01').interactionId, 'X040');
+});
+
+// unlockOffice always becomes the flowerpot key (F04) on the way into the office.
+function collectKeys(game, keys) {
+  unlockOffice(game);
+  game.returnToHuman('local');
+  game.moveToArea('local', 'Corridor');
+  game.moveToArea('local', 'Office');
+  game.interact('local', 'S06');
+  if (keys.includes('F05')) game.transform('local', 'F05');
+  game.returnToHuman('local');
+  game.moveToArea('local', 'Corridor');
+  game.moveToArea('local', 'GuardRoom');
+  if (keys.includes('F11')) game.transform('local', 'F11');
+}
+
+test('touching both keys and the keyring unlocks the key collector achievement', () => {
+  const game = new Game();
+  collectKeys(game, ['F04', 'F05', 'F11']);
+  assert.equal(game.hasAchievement('local', 'A07'), true);
+});
+
+test('missing any one of the keys or the keyring keeps the key collector achievement locked', () => {
+  for (const missing of ['F05', 'F11']) {
+    const game = new Game();
+    collectKeys(game, ['F04', 'F05', 'F11'].filter((id) => id !== missing));
+    assert.equal(game.hasAchievement('local', 'A07'), false, missing);
+  }
+});
+
+test('touching every door with the keyring no longer unlocks the key collector achievement', () => {
+  const game = new Game();
+  enterCorridor(game);
+  game.returnToHuman('local');
+  game.moveToArea('local', 'Corridor');
+  game.moveToArea('local', 'GuardRoom');
+  game.transform('local', 'F11');
+  game.moveToArea('local', 'Corridor');
+  for (const door of ['S01', 'S05']) game.interact('local', door);
+  game.moveToArea('local', 'Restroom');
+  game.interact('local', 'S09');
+  assert.equal(game.hasAchievement('local', 'A07'), false);
+});
+
+test('before the power is cut, the gate does not mention power', () => {
+  const game = new Game();
+  enterCorridor(game);
+  game.returnToHuman('local');
+  game.moveToArea('local', 'Corridor');
+  assert.notEqual(game.interact('local', 'S01').interactionId, 'X040');
+});
+
+function corridorHuman() {
+  const game = new Game();
+  enterCorridor(game);
+  game.returnToHuman('local');
+  game.moveToArea('local', 'Corridor');
+  return game;
+}
+
+test('the trash can and the flowerpot only give their item once, then answer with the default response', () => {
+  const game = corridorHuman();
+  assert.equal(game.interact('local', 'S02').interactionId, 'X001');
+  const trash = game.interact('local', 'S02');
+  assert.equal(trash.interactionId, null);
+  assert.match(trash.text, /垃圾桶紋絲不動/);
+  assert.equal(game.interact('local', 'S10').interactionId, 'X009');
+  const health = game.state.health;
+  const pot = game.interact('local', 'S10');
+  assert.equal(pot.interactionId, null);
+  assert.match(pot.text, /花盆紋絲不動/);
+  assert.equal(game.state.health, health);
+});
+
+test('the office drawer and parcel only give their item once', () => {
+  const game = new Game();
+  unlockOffice(game);
+  game.returnToHuman('local');
+  game.moveToArea('local', 'Corridor');
+  game.moveToArea('local', 'Office');
+  assert.equal(game.interact('local', 'S06').interactionId, 'X006');
+  assert.equal(game.interact('local', 'S06').interactionId, null);
+  assert.equal(game.interact('local', 'S08').interactionId, 'X008');
+  assert.equal(game.interact('local', 'S08').interactionId, null);
+});
+
+test('the breaker only cuts the power once, then answers with the default response', () => {
+  const game = corridorHuman();
+  game.moveToArea('local', 'GuardRoom');
+  assert.equal(game.interact('local', 'S15').interactionId, 'X022');
+  const again = game.interact('local', 'S15');
+  assert.equal(again.interactionId, null);
+  assert.match(again.text, /配電箱紋絲不動/);
+});
+
+test('opened doors do not open again', () => {
+  const game = new Game();
+  unlockOffice(game);
+  game.moveToArea('local', 'Corridor');
+  assert.equal(game.interact('local', 'S05').interactionId, null);
+});
+
+test('clue, flavor, and refusal texts can still be read again and again', () => {
+  const game = new Game();
+  for (let i = 0; i < 2; i++) assert.equal(game.interact('local', 'S14').interactionId, 'X018');
+  for (let i = 0; i < 2; i++) assert.equal(game.interact('local', 'S20').interactionId, 'X030');
+  for (let i = 0; i < 2; i++) assert.equal(game.interact('local', 'S19').interactionId, 'X037');
+  const corridor = corridorHuman();
+  for (let i = 0; i < 2; i++) assert.equal(corridor.interact('local', 'S17').interactionId, 'X031');
+});
+
+test('one-time events become available again after an E05 restart', () => {
+  const game = corridorHuman();
+  game.interact('local', 'S02');
+  game.state.health = 1;
+  game.damage(1);
+  enterCorridor(game);
+  game.returnToHuman('local');
+  game.moveToArea('local', 'Corridor');
+  assert.equal(game.interact('local', 'S02').interactionId, 'X001');
+});
+
+test('starting a new round after escaping keeps achievements and resets the round', () => {
+  const game = corridorHuman();
+  game.interact('local', 'S02');
+  game.transform('local', 'F01');
+  game.interact('local', 'S04');
+  game.transform('local', 'F03');
+  game.moveToArea('local', 'Corridor');
+  game.interact('local', 'S01');
+  assert.equal(game.player().ending, 'E01');
+  game.state.health = 7;
+  game.newRound();
+  assert.equal(game.player().ending, null);
+  assert.equal(game.player().form, 'F00');
+  assert.equal(game.player().area, 'Classroom');
+  assert.equal(game.state.health, 5);
+  assert.equal(game.state.remainingSeconds, 1800);
+  assert.equal(game.isDoorOpen('S19'), false);
+  assert.equal(game.item('F01').exists, false);
+  assert.equal(game.hasAchievement('local', 'E01'), true);
+});
+
+test('a new round after the clock ending lets time run again and keeps the clock achievements', () => {
+  const game = new Game();
+  game.transform('local', 'F09');
+  game.interact('local', 'SELF');
+  assert.equal(game.player().ending, 'E04');
+  game.newRound();
+  game.tick(10);
+  assert.equal(game.state.remainingSeconds, 1790);
+  assert.equal(game.hasAchievement('local', 'E04'), true);
+  assert.equal(game.hasAchievement('local', 'A06'), true);
 });

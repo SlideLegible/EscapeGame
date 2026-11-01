@@ -401,3 +401,5 @@ deploy/                      Pixel Streaming：Wilbur 設定、配對頁、實�
   - **Build.cs**：10a 關掉 unity build（`bUseUnity = false`），原因是 Logic 各檔匿名 namespace 的同名常數在新增檔案後被併進同一個編譯單元而撞名；關掉後增量編譯仍很快，整個 `tools/run_tests.sh` 約 32 秒。
   - **測試修正（人同意）**：實作完才發現 10a 的測試有 3 處自己的錯，我停下來回報，人明確同意修正後才改（`fae0219`，斷言沒有放寬）：(1) `tests/test_step10_ui_data.py` 成就列數 10→11（同一個測試已要求 id 清單等於 11 個的 `ACHIEVEMENT_IDS`，兩個斷言互相矛盾；方法名改 `eleven_rows`）；(2) `Step10_UI.spec.cpp` 的 `ToastCount` 10→11（同一原因）；(3) `test_font_files_and_license_exist` 的 `assertRegex` 沒有 `re.MULTILINE`，`^` 只能對到整個檔案開頭，三個副檔名不可能同時成立，加 `(?m)`。根本原因是共用約定把成就數寫成 10。
   - **時間／測試**：10b 約 1 小時。最後 Python 74/74；UE 153/153。實作第一次編譯就過，除上述 3 處之外沒有改過測試。
+
+- **2026-11-01 停在步驟 11 之前（人要求）**：人說「先停在這裡，因為現在要求變成靜態網頁」。步驟 4～10 完成（Python 74/74；UE 153/153）；步驟 11 的測試（11a）做到一半就停下，沒有 commit；步驟 11、12 沒做。BRIEF「網頁遊玩」的做法（Pixel Streaming）要依新需求重新評估，見 BRIEF「對限制的做法說明」：若「網頁遊戲」必須在瀏覽器內執行，要另開分支重新評估引擎。

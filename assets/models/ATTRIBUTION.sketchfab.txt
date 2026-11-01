@@ -10,3 +10,9 @@ F09 | Wall Clock | FelipeMSX | CC Attribution | https://sketchfab.com/3d-models/
 F10 | TV CCTV Monitor | Simon_M2099 | CC Attribution | https://sketchfab.com/3d-models/tv-cctv-monitor-2273be0837bc453b982dfb19d82c9cc0
 F11 | Stylized Low Poly Key Bunch | FrieDev | CC Attribution | https://sketchfab.com/3d-models/stylized-low-poly-key-bunch-e8caa78fc4c442cdb671004b716c45cd
 F12 | Old school chair | carlesferrero | CC Attribution | https://sketchfab.com/3d-models/old-school-chair-4d0e98f0ed7443d7bccc5e075bfeda36
+f7775fea6fc34f518424ef9cad55c926 | The Japanese School Corridor | volvor | CC Attribution | https://sketchfab.com/3d-models/the-japanese-school-corridor-f7775fea6fc34f518424ef9cad55c926 | rooms/corridor.glb
+6cd96d1703ec44f1bff910581c087ff8 | The Restroom | racche | CC Attribution | https://sketchfab.com/3d-models/the-restroom-6cd96d1703ec44f1bff910581c087ff8 | rooms/restroom.glb
+9a2ef796667449cfbace0ff446557738 | Bulletin Board | lydia.la | CC Attribution | https://sketchfab.com/3d-models/bulletin-board-9a2ef796667449cfbace0ff446557738 | rooms/bulletin_board.glb
+646ed84ecd9d40089c31d94f79334ca5 | Low Poly Computer Desk | Nyangire | CC Attribution | https://sketchfab.com/3d-models/low-poly-computer-desk-646ed84ecd9d40089c31d94f79334ca5 | rooms/computer_desk.glb
+7fd56cd3917443a99966352beefd8304 | Surveillance room | wa_rouk | Free Standard | https://sketchfab.com/3d-models/surveillance-room-7fd56cd3917443a99966352beefd8304 | rooms/guard_room.glb
+5ce8d22eecdc44adbdb84cb6fa010860 | Janitors Closet | KahmarO | CC Attribution | https://sketchfab.com/3d-models/janitors-closet-5ce8d22eecdc44adbdb84cb6fa010860 | rooms/janitor_closet.glb

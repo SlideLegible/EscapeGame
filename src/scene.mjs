@@ -44,6 +44,19 @@ const ITEM_MODELS = {
   F12: { fit: 1.4 },
 };
 
+// Room models from Sketchfab (downloaded to assets/models/rooms/, see ATTRIBUTION.sketchfab.txt). `fitFootprint` scales to the room's
+// floor minus a margin; `scale` is used as-is (the desk and closet files are in centimetres); `fitMax` sets the largest dimension.
+// `x`/`z` default to the room centre and `y` to the floor. `replaces` hides the procedural shape of that interaction target.
+const ROOM_MODELS = [
+  { room: 'Corridor', file: 'rooms/corridor.glb', rotateY: Math.PI / 2, fitFootprint: true },
+  { room: 'Restroom', file: 'rooms/restroom.glb', fitFootprint: true },
+  { room: 'Office', file: 'rooms/computer_desk.glb', scale: 0.01, x: 11, z: -21.5 },
+  { room: 'Office', file: 'rooms/bulletin_board.glb', rotateY: Math.PI / 2, x: 6.25, y: 1.2, z: -21 },
+  { room: 'GuardRoom', file: 'rooms/guard_room.glb', fitFootprint: true },
+  { room: 'Storage', file: 'rooms/janitor_closet.glb', scale: 0.01, x: -21.5, z: -24.5 },
+  { room: 'GuardRoom', file: 'items/f10.glb', fitMax: 1.0, x: 22.5, z: -22, replaces: 'S21' },
+];
+
 // Footprint (x, z) of the teacher's lectern in the bundled classroom, parallel to the blackboard.
 export const LECTERN_SIZE = [0.9, 1.48];
 
@@ -154,6 +167,7 @@ export class AcademyScene {
     this.#buildPlayer();
     this.playerModelLoad = this.#loadPlayerModel();
     this.classroomLoad = this.#loadClassroomModel();
+    this.roomModelsLoad = this.#loadRoomModels();
     this.itemTemplates = new Map();
     this.itemModelsLoad = this.#loadItemModels();
     this.#onResize = () => this.resize();
@@ -306,6 +320,38 @@ export class AcademyScene {
     } catch (error) {
       console.error('教室模型載入失敗，使用簡化場景。', error);
     }
+  }
+
+  async #loadRoomModels() {
+    await Promise.all(ROOM_MODELS.map(async (config) => {
+      try {
+        const model = await loadGlb(new URL(`../assets/models/${config.file}`, import.meta.url));
+        this.#placeRoomModel(model, config);
+        model.name = config.file;
+        (this.roomGroups.get(config.room) ?? this.scene).add(model);
+        if (config.replaces) {
+          for (const child of this.targetGroups.get(config.replaces).children) child.visible = false;
+        }
+      } catch (error) {
+        console.error(`${config.file} 房間模型載入失敗，使用簡化場景。`, error);
+      }
+    }));
+    this.refresh();
+  }
+
+  #placeRoomModel(model, { room, rotateY = 0, scale = 1, fitFootprint, fitMax, x, y = 0, z }) {
+    const area = ROOM[room];
+    model.rotation.y = rotateY;
+    model.updateMatrixWorld(true);
+    const size = new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3());
+    let factor = scale;
+    if (fitFootprint) factor = Math.min((area.w - 0.6) / size.x, (area.d - 0.6) / size.z);
+    if (fitMax) factor = fitMax / Math.max(size.x, size.y, size.z);
+    model.scale.setScalar(factor);
+    model.updateMatrixWorld(true);
+    const bounds = new THREE.Box3().setFromObject(model);
+    const center = bounds.getCenter(new THREE.Vector3());
+    model.position.set((x ?? area.x) - center.x, y - bounds.min.y, (z ?? area.z) - center.z);
   }
 
   async #loadItemModels() {

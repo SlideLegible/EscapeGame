@@ -215,7 +215,7 @@ window.addEventListener('keyup', (event) => {
   if (code) scene?.keys.delete(code);
 });
 window.addEventListener('blur', () => scene?.keys.clear());
-window.addEventListener('contextmenu', (event) => event.preventDefault());
+document.addEventListener('contextmenu', (event) => event.preventDefault(), true);
 
 canvas.addEventListener('pointerdown', (event) => {
   if (!started || !dialog.classList.contains('hidden')) return;

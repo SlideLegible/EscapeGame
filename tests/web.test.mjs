@@ -59,3 +59,21 @@ test('restarting after an ending starts a new round in the page instead of reloa
   assert.match(main, /game\.newRound\(\)/);
   assert.match(main, /resetRound\(\)/);
 });
+
+test('the opening and endings play as click-through stories', async () => {
+  const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+  const main = await readFile(new URL('../src/main.mjs', import.meta.url), 'utf8');
+  for (const id of ['story', 'story-title', 'story-lines', 'story-hint', 'skip-story']) {
+    assert.match(html, new RegExp(`id=["']${id}["']`), `missing ${id}`);
+  }
+  assert.match(main, /from '\.\/story\.mjs'/);
+  assert.match(main, /OPENING_STORY/);
+  assert.match(main, /ENDING_STORIES/);
+});
+
+test('nothing the player sees before an ending hints that the game is a dream', async () => {
+  const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+  const main = await readFile(new URL('../src/main.mjs', import.meta.url), 'utf8');
+  assert.doesNotMatch(html, /夢|dream/i);
+  assert.doesNotMatch(main, /夢/);
+});

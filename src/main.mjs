@@ -1,5 +1,6 @@
 import { Game, FORMS, ACHIEVEMENTS, achievementEntries } from './core.mjs';
 import { AcademyScene } from './scene.mjs';
+import { OPENING_STORY, ENDING_STORIES } from './story.mjs';
 
 const game = new Game();
 const $ = (id) => document.getElementById(id);
@@ -11,20 +12,15 @@ const messages = $('toast');
 const prompt = $('prompt');
 const achievementPanel = $('achievements');
 const achievementBook = $('achievement-book');
-const overlayOpen = () => !dialog.classList.contains('hidden') || !achievementBook.classList.contains('hidden');
+const storyPanel = $('story');
+const storyOpen = () => !storyPanel.classList.contains('hidden');
+const overlayOpen = () => !dialog.classList.contains('hidden') || !achievementBook.classList.contains('hidden') || storyOpen();
 const movementCodes = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
 function movementCode(event) {
   if (movementCodes.has(event.code)) return event.code;
   const key = event.key?.toLowerCase();
   return ({ w: 'KeyW', a: 'KeyA', s: 'KeyS', d: 'KeyD' })[key] ?? null;
 }
-const endingCopy = {
-  E01: ['夢醒', '眼前一片白光。你睜開眼睛，回到了原本的課堂。下課鐘響了，老師說：「好，那我們今天就上到這邊，下課。」原來剛剛的一切都是夢。'],
-  E02: ['密室逃脫大神', '四位數密碼剛好被你猜中了。眼前一片白光，你回到了原本的課堂。'],
-  E03: ['誰說一定要走正門', '你用長竿頂開高窗，成功離開了學院。眼前一片白光，原來剛剛的一切都是夢。'],
-  E04: ['天亮了', '窗外透進清晨的陽光。有人拍了拍你的肩膀：「同學，下課了喔，睡得很熟嘛。」原來你整堂課都在睡。'],
-  E05: ['上課睡覺的代價', '夢境崩塌了。你又回到密碼學教室，生命值恢復，重新開始這場夢。'],
-};
 
 let scene;
 let started = false;
@@ -34,6 +30,8 @@ let toastTimer = 0;
 let password = '';
 let lastAchievementIds = new Set();
 let lastShownEnding = null;
+let storyQueue = [];
+let storyDone = null;
 
 try {
   scene = new AcademyScene(canvas, game);
@@ -114,13 +112,41 @@ function toggleAchievementBook(open = achievementBook.classList.contains('hidden
   updateHud();
 }
 
+function playStory({ title, lines }, onDone) {
+  $('story-title').textContent = title;
+  $('story-lines').replaceChildren();
+  storyQueue = [...lines];
+  storyDone = onDone;
+  storyPanel.classList.remove('hidden');
+  prompt.classList.remove('visible');
+  scene?.keys.clear();
+  advanceStory();
+}
+
+function advanceStory() {
+  if (!storyQueue.length) { finishStory(); return; }
+  const line = document.createElement('p');
+  line.textContent = storyQueue.shift();
+  $('story-lines').append(line);
+  $('story-hint').textContent = storyQueue.length ? '點一下繼續' : '點一下結束';
+}
+
+function finishStory() {
+  storyPanel.classList.add('hidden');
+  const done = storyDone;
+  storyQueue = [];
+  storyDone = null;
+  done?.();
+}
+
 function showEnding(ending) {
-  if (!ending || !endingCopy[ending] || ending !== 'E05' && lastShownEnding === ending) return;
+  if (!ending || !ENDING_STORIES[ending] || ending !== 'E05' && lastShownEnding === ending) return;
   lastShownEnding = ending;
-  $('ending-title').textContent = endingCopy[ending][0];
-  $('ending-copy').textContent = endingCopy[ending][1];
-  $('ending-button').textContent = ending === 'E05' ? '回到夢境 →' : '重新開始 →';
-  endingPanel.classList.remove('hidden');
+  playStory(ENDING_STORIES[ending], () => {
+    $('ending-title').textContent = ENDING_STORIES[ending].title;
+    $('ending-button').textContent = '重新開始 →';
+    endingPanel.classList.remove('hidden');
+  });
 }
 
 function sync(previousForm, result) {
@@ -198,7 +224,7 @@ function frame(now) {
   lastFrame = now;
   if (started) {
     if (!overlayOpen() && !game.player().ending) scene?.move(dt);
-    if (!game.player().ending) game.tick(dt);
+    if (!game.player().ending && !storyOpen()) game.tick(dt);
     if (now - lastHud > 150) {
       lastHud = now;
       scene?.refresh();
@@ -210,7 +236,14 @@ function frame(now) {
   scene?.render();
 }
 
-$('start-button').addEventListener('click', startGame);
+$('start-button').addEventListener('click', () => {
+  if (scene) playStory(OPENING_STORY, startGame);
+  else startGame();
+});
+storyPanel.addEventListener('click', (event) => {
+  if (!event.target.closest('#skip-story')) advanceStory();
+});
+$('skip-story').addEventListener('click', finishStory);
 $('close-dialog').addEventListener('click', closeKeypad);
 $('achievement-button').addEventListener('click', () => toggleAchievementBook());
 $('close-achievements').addEventListener('click', () => toggleAchievementBook(false));
@@ -233,6 +266,12 @@ $('keypad').addEventListener('click', (event) => {
 });
 
 window.addEventListener('keydown', (event) => {
+  if (storyOpen()) {
+    if (['Space', 'Enter', 'KeyE'].includes(event.code) && !event.repeat) advanceStory();
+    if (event.code === 'Escape') finishStory();
+    if (['Space', 'Enter', 'Tab'].includes(event.code)) event.preventDefault();
+    return;
+  }
   if (event.code === 'Escape' && !dialog.classList.contains('hidden')) { closeKeypad(); return; }
   if (event.code === 'Escape' && !achievementBook.classList.contains('hidden')) { toggleAchievementBook(false); return; }
   if (event.code === 'Tab') {

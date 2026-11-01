@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#0a1419">
-    <meta name="description" content="變身成物品，在夢裡逃離學院。">
+    <meta name="description" content="變身成物品，想辦法逃離學院。">
     <title>逃離學院 — Three.js</title>
     <link rel="stylesheet" href="./styles.css">
   </head>
@@ -12,7 +12,7 @@
     <main id="game">
       <canvas id="view" tabindex="0" aria-label="逃離學院 3D 遊戲場景"></canvas>
       <header class="hud" aria-label="遊戲狀態">
-        <div class="brand"><span class="brand-mark">夢</span><div><strong>逃離學院</strong><small>CRYPT CLASSROOM · 01</small></div></div>
+        <div class="brand"><span class="brand-mark">逃</span><div><strong>逃離學院</strong><small>CRYPT CLASSROOM · 01</small></div></div>
         <div class="status"><span class="status-label">團隊生命</span><strong id="health">♥ 5</strong></div>
         <div class="status timer-status"><span class="status-label">天亮倒數</span><strong id="timer">30:00</strong></div>
         <div class="status form-status"><span class="status-label">目前形態</span><strong id="form-name">人類</strong></div>
@@ -26,10 +26,10 @@
 
       <section id="start" class="overlay start-overlay">
         <div class="start-card">
-          <div class="eyebrow">A DREAM ESCAPE · WEBGL</div>
+          <div class="eyebrow">AN ACADEMY ESCAPE · WEBGL</div>
           <h1>逃離學院<span>。</span></h1>
           <p id="start-copy">密碼學課上睡著的你，醒來時被鎖在陌生的學院。<br>變成物品，找到離開的方法。</p>
-          <button id="start-button" class="primary-button">進入夢境 <span>→</span></button>
+          <button id="start-button" class="primary-button">開始遊戲 <span>→</span></button>
           <button id="start-achievements" class="secondary-button">查看成就</button>
           <div class="start-foot"><span>單人遊玩 · 無須連線</span><span>WASD 移動　E 互動　Q 變回人類</span></div>
         </div>
@@ -53,13 +53,22 @@
       </section>
 
       <section id="ending" class="overlay hidden" aria-live="assertive">
-        <div class="ending-card"><div class="eyebrow" id="ending-id">ENDING</div><h2 id="ending-title">夢醒</h2><p id="ending-copy"></p><button id="ending-button" class="primary-button">繼續遊玩 <span>→</span></button><button id="ending-achievements" class="secondary-button">查看成就</button></div>
+        <div class="ending-card"><div class="eyebrow" id="ending-id">ENDING</div><h2 id="ending-title"></h2><button id="ending-button" class="primary-button">繼續遊玩 <span>→</span></button><button id="ending-achievements" class="secondary-button">查看成就</button></div>
+      </section>
+
+      <section id="story" class="overlay story-overlay hidden" aria-live="polite">
+        <div class="story-card">
+          <div class="eyebrow">STORY</div>
+          <h2 id="story-title"></h2>
+          <div id="story-lines" class="story-lines"></div>
+          <div class="story-foot"><span id="story-hint">點一下繼續</span><button id="skip-story" class="skip-button">略過 »</button></div>
+        </div>
       </section>
 
       <section id="achievement-book" class="overlay hidden" aria-label="成就">
         <div class="book-card">
           <button id="close-achievements" class="close-button" aria-label="關閉">×</button>
-          <div class="eyebrow">ACHIEVEMENTS · 本次夢境</div>
+          <div class="eyebrow">ACHIEVEMENTS · 本次遊玩</div>
           <h2>成就</h2>
           <p id="achievement-summary"></p>
           <div id="achievement-entries" class="book-entries"></div>

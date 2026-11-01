@@ -16,7 +16,7 @@ const OBJECT_POSITIONS = {
   S01: [0, -14], S02: [-6, -10], S03: [-14, -10], S04: [-18, -10], S05: [11, -15],
   S06: [13, -20], S07: [9, -21], S08: [13, -24], S09: [-15, -21], S10: [4, -10],
   S11: [-12, -19], S12: [-8, -23], S13: [-9, -17], S14: [0, 4], S15: [25, -22],
-  S16: [-4, 0], S17: [-3, -10], S18: [9, -24], S19: [0, -5], S20: [-4, -1],
+  S16: [-4, 0], S17: [-3, -10], S18: [9, -24], S19: [0, -5.9], S20: [-4, -1],
 };
 
 const ITEM_POSITIONS = {
@@ -241,12 +241,15 @@ export class AcademyScene {
       }
       case 'S05': case 'S09': case 'S19': {
         const door = this.#material(id === 'S09' ? 0x5d6b5e : 0x53675b);
-        this.#box(group, 0, 1.4, 0, 2.18, 2.82, 0.2, this.#material(0xb2b69c));
-        this.#box(group, 0, 1.36, 0.12, 1.92, 2.62, 0.16, door);
-        this.#box(group, 0, 1.56, 0.22, 1.56, 1.94, 0.055, this.#material(0x46584d));
-        this.#box(group, 0, 1.56, 0.255, 1.36, 1.74, 0.035, door, false);
+        const frameWidth = id === 'S19' ? 3.8 : 2.18;
+        const leafWidth = id === 'S19' ? 3.5 : 1.92;
+        const panelWidth = id === 'S19' ? 3.0 : 1.56;
+        this.#box(group, 0, 1.4, 0, frameWidth, 2.82, 0.2, this.#material(0xb2b69c));
+        this.#box(group, 0, 1.36, 0.12, leafWidth, 2.62, 0.16, door);
+        this.#box(group, 0, 1.56, 0.22, panelWidth, 1.94, 0.055, this.#material(0x46584d));
+        this.#box(group, 0, 1.56, 0.255, panelWidth - 0.2, 1.74, 0.035, door, false);
         const knob = new THREE.Mesh(new THREE.SphereGeometry(0.075, 12, 10), this.#material(0xd2b776, 0.35));
-        knob.position.set(0.68, 1.28, 0.31); group.add(knob);
+        knob.position.set(leafWidth / 2 - 0.28, 1.28, 0.31); group.add(knob);
         break;
       }
       case 'S06': {

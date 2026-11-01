@@ -694,21 +694,21 @@ export class AcademyScene {
     const setOffset = (bone, x, y, z) => {
       if (bone) jointOffsets.set(bone, new THREE.Vector3(x, y, z));
     };
-    const upperArmY = jump ? 0.0004 : 0;
-    const forearmY = jump ? 0.0008 : -0.0008;
-    const handY = jump ? 0.0012 : -0.0016;
-    setOffset(parts.leftArm, 0, upperArmY, gait * 0.00022);
-    setOffset(parts.rightArm, 0, upperArmY, -gait * 0.00022);
-    setOffset(parts.leftForearm, 0, forearmY, gait * 0.00017);
-    setOffset(parts.rightForearm, 0, forearmY, -gait * 0.00017);
-    setOffset(parts.leftHand, 0, handY, gait * 0.00017);
-    setOffset(parts.rightHand, 0, handY, -gait * 0.00017);
-    setOffset(parts.leftLeg, 0, 0, jump ? 0 : -gait * 0.00028);
-    setOffset(parts.rightLeg, 0, 0, jump ? 0 : gait * 0.00028);
-    setOffset(parts.leftKnee, 0, jump ? -0.0001 : 0, jump ? -0.00012 : Math.max(0, -gait) * 0.00014);
-    setOffset(parts.rightKnee, 0, jump ? -0.0001 : 0, jump ? -0.00012 : Math.max(0, gait) * 0.00014);
-    setOffset(parts.leftFoot, 0, jump ? -0.00008 : 0, jump ? -0.00008 : -Math.max(0, gait) * 0.00008);
-    setOffset(parts.rightFoot, 0, jump ? -0.00008 : 0, jump ? -0.00008 : -Math.max(0, -gait) * 0.00008);
+    const upperArmUp = jump ? 0.0004 : 0;
+    const forearmUp = jump ? 0.0008 : -0.0008;
+    const handUp = jump ? 0.0012 : -0.0016;
+    setOffset(parts.leftArm, 0, gait * 0.00022, upperArmUp);
+    setOffset(parts.rightArm, 0, -gait * 0.00022, upperArmUp);
+    setOffset(parts.leftForearm, 0, gait * 0.00017, forearmUp);
+    setOffset(parts.rightForearm, 0, -gait * 0.00017, forearmUp);
+    setOffset(parts.leftHand, 0, gait * 0.00017, handUp);
+    setOffset(parts.rightHand, 0, -gait * 0.00017, handUp);
+    setOffset(parts.leftLeg, 0, jump ? 0 : -gait * 0.00028, 0);
+    setOffset(parts.rightLeg, 0, jump ? 0 : gait * 0.00028, 0);
+    setOffset(parts.leftKnee, 0, jump ? -0.00012 : Math.max(0, -gait) * 0.00014, jump ? -0.0001 : 0);
+    setOffset(parts.rightKnee, 0, jump ? -0.00012 : Math.max(0, gait) * 0.00014, jump ? -0.0001 : 0);
+    setOffset(parts.leftFoot, 0, jump ? -0.00008 : -Math.max(0, gait) * 0.00008, jump ? -0.00008 : 0);
+    setOffset(parts.rightFoot, 0, jump ? -0.00008 : -Math.max(0, -gait) * 0.00008, jump ? -0.00008 : 0);
 
     const offset = new THREE.Vector3();
     const localOffset = new THREE.Vector3();

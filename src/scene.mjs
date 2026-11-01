@@ -118,6 +118,7 @@ export class AcademyScene {
     this.roomGroups = new Map();
     this.playerGroup = null;
     this.playerRig = null;
+    this.humanRig = null;
     this.humanModel = null;
     this.playerAnimationTime = 0;
     this.jumpHeight = 0;
@@ -667,6 +668,7 @@ export class AcademyScene {
     }
     if (formId === 'F00' && this.humanModel) {
       target.add(this.humanModel);
+      this.playerRig = this.humanRig;
       target.userData.rig = this.playerRig;
       if (target === this.playerGroup) this.playerRig = target.userData.rig;
       return;
@@ -702,7 +704,7 @@ export class AcademyScene {
       const bounds = new THREE.Box3().setFromObject(source);
       const size = bounds.getSize(new THREE.Vector3());
       if (!Number.isFinite(size.y) || size.y <= 0) throw new Error('玩家模型沒有有效高度');
-      source.scale.setScalar(1.3 / size.y);
+      source.scale.setScalar((1.3 * 1.3) / size.y);
       source.updateMatrixWorld(true);
       bounds.setFromObject(source);
       const center = bounds.getCenter(new THREE.Vector3());
@@ -716,7 +718,8 @@ export class AcademyScene {
         node.frustumCulled = false;
       });
       this.humanModel = source;
-      this.playerRig = this.#createSkinnedPlayerRig(source);
+      this.humanRig = this.#createSkinnedPlayerRig(source);
+      this.playerRig = this.humanRig;
       if (this.game.player().form === 'F00') this.#rebuildFormMesh(this.playerGroup, 'F00');
     } catch (error) {
       console.error('玩家模型載入失敗，使用簡化角色。', error);
@@ -766,8 +769,8 @@ export class AcademyScene {
       [-1, parts.leftArm, parts.leftForearm, parts.leftHand],
       [1, parts.rightArm, parts.rightForearm, parts.rightHand],
     ]) {
-      setBoneDirection(arm, forearm, new THREE.Vector3(-side * 0.1, -Math.cos(armSwing), Math.sin(armSwing)));
-      setBoneDirection(forearm, hand, new THREE.Vector3(-side * 0.06, -Math.cos(forearmSwing), Math.sin(forearmSwing)));
+      setBoneDirection(arm, forearm, new THREE.Vector3(side * 0.42, -Math.cos(armSwing), Math.sin(armSwing)));
+      setBoneDirection(forearm, hand, new THREE.Vector3(side * 0.24, -Math.cos(forearmSwing), Math.sin(forearmSwing)));
     }
     for (const [side, leg, knee] of [
       [-1, parts.leftLeg, parts.leftKnee],
@@ -963,7 +966,7 @@ export class AcademyScene {
     this.walking = Boolean(moving);
     if (this.game.player().form === 'F00') {
       const gait = moving ? Math.sin(this.playerAnimationTime * 10) : 0;
-      this.playerGroup.rotation.y = this.yaw + Math.PI;
+      this.playerGroup.rotation.y = -this.yaw;
       if (this.playerRig) {
         if (this.playerRig.kind === 'skinned') this.#updatePlayerSkin();
         else {

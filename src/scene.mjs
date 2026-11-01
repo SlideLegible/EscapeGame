@@ -77,6 +77,7 @@ export class AcademyScene {
     this.roomGroups = new Map();
     this.playerGroup = null;
     this.playerRig = null;
+    this.humanModel = null;
     this.playerAnimationTime = 0;
     this.jumpHeight = 0;
     this.jumpVelocity = 0;
@@ -91,6 +92,7 @@ export class AcademyScene {
     this.#buildRooms();
     this.#buildObjects();
     this.#buildPlayer();
+    this.playerModelLoad = this.#loadPlayerModel();
     this.classroomLoad = this.#loadClassroomModel();
     this.#onResize = () => this.resize();
     window.addEventListener('resize', this.#onResize);
@@ -592,6 +594,7 @@ export class AcademyScene {
   #rebuildFormMesh(target, formId) {
     for (const child of [...target.children]) {
       target.remove(child);
+      if (child === this.humanModel) continue;
       child.traverse((node) => {
         node.geometry?.dispose();
         const materials = Array.isArray(node.material) ? node.material : [node.material];
@@ -600,6 +603,12 @@ export class AcademyScene {
           material?.dispose();
         }
       });
+    }
+    if (formId === 'F00' && this.humanModel) {
+      target.add(this.humanModel);
+      target.userData.rig = this.playerRig;
+      if (target === this.playerGroup) this.playerRig = target.userData.rig;
+      return;
     }
     const shape = this.#formShape(formId);
     target.userData.rig = shape.userData.rig ?? null;
@@ -613,6 +622,86 @@ export class AcademyScene {
     this.playerGroup.position.copy(this.playerPosition);
     this.scene.add(this.playerGroup);
     this.#rebuildFormMesh(this.playerGroup, 'F00');
+  }
+
+  async #loadPlayerModel() {
+    try {
+      const source = await loadGlb(new URL('../assets/models/vivi_manga_student_girl_style.glb', import.meta.url));
+      const bounds = new THREE.Box3().setFromObject(source);
+      const size = bounds.getSize(new THREE.Vector3());
+      if (!Number.isFinite(size.y) || size.y <= 0) throw new Error('玩家模型沒有有效高度');
+      source.scale.setScalar(1.3 / size.y);
+      source.updateMatrixWorld(true);
+      bounds.setFromObject(source);
+      const center = bounds.getCenter(new THREE.Vector3());
+      source.position.set(-center.x, -bounds.min.y, -center.z);
+      source.name = 'Vivi manga student';
+      source.updateMatrixWorld(true);
+      const inverseSource = source.matrixWorld.clone().invert();
+      source.traverse((node) => {
+        if (!node.isMesh) return;
+        node.castShadow = true;
+        node.receiveShadow = true;
+        node.frustumCulled = false;
+        const relative = inverseSource.clone().multiply(node.matrixWorld);
+        const inverseRelative = relative.clone().invert();
+        const positions = node.geometry.getAttribute('position');
+        const modelPositions = new Float32Array(positions.count * 3);
+        const point = new THREE.Vector3();
+        for (let i = 0; i < positions.count; i++) {
+          point.fromBufferAttribute(positions, i).applyMatrix4(relative);
+          modelPositions.set([point.x, point.y, point.z], i * 3);
+        }
+        node.userData.playerPose = { modelPositions, relative, inverseRelative };
+      });
+      this.humanModel = source;
+      this.playerRig = { kind: 'vertex', meshes: [] };
+      source.traverse((node) => { if (node.isMesh) this.playerRig.meshes.push(node); });
+      if (this.game.player().form === 'F00') this.#rebuildFormMesh(this.playerGroup, 'F00');
+    } catch (error) {
+      console.error('玩家模型載入失敗，使用簡化角色。', error);
+    }
+  }
+
+  #updatePlayerSkin() {
+    if (!this.humanModel) return;
+    const gait = this.walking ? Math.sin(this.playerAnimationTime * 10) : 0;
+    this.humanModel.rotation.z = this.walking ? Math.sin(this.playerAnimationTime * 5) * 0.018 : 0;
+    this.humanModel.rotation.x = this.jumpHeight > 0.02 ? -0.04 : gait * 0.015;
+    for (const mesh of this.playerRig?.meshes ?? []) {
+      const pose = mesh.userData.playerPose;
+      const attribute = mesh.geometry.getAttribute('position');
+      const { modelPositions, inverseRelative } = pose;
+      const point = new THREE.Vector3();
+      for (let i = 0; i < attribute.count; i++) {
+        const offset = i * 3;
+        point.set(modelPositions[offset], modelPositions[offset + 1], modelPositions[offset + 2]);
+        const side = Math.sign(point.x);
+        const armWeight = side && point.y > 0.68 && point.y < 1.08
+          ? THREE.MathUtils.smoothstep(Math.abs(point.x), 0.13, 0.23) : 0;
+        if (armWeight) {
+          const armPose = this.jumpHeight > 0.02 ? -0.25 : 1.02 + gait * 0.14;
+          const angle = -side * armPose * armWeight;
+          const x = point.x - side * 0.145;
+          const y = point.y - 0.91;
+          point.x = side * 0.145 + (x * Math.cos(angle) - y * Math.sin(angle));
+          point.y = 0.91 + (x * Math.sin(angle) + y * Math.cos(angle));
+        }
+        const legWeight = side && point.y > 0.05 && point.y < 0.52
+          ? THREE.MathUtils.smoothstep(Math.abs(point.x), 0.035, 0.105) : 0;
+        if (legWeight && (gait || this.jumpHeight > 0.02)) {
+          const angle = (this.jumpHeight > 0.02 ? 0.35 : side * gait * 0.22) * legWeight;
+          const y = point.y - 0.43;
+          const z = point.z;
+          point.y = 0.43 + y * Math.cos(angle) - z * Math.sin(angle);
+          point.z = y * Math.sin(angle) + z * Math.cos(angle);
+        }
+        point.applyMatrix4(inverseRelative);
+        attribute.setXYZ(i, point.x, point.y, point.z);
+      }
+      attribute.needsUpdate = true;
+      mesh.geometry.computeVertexNormals();
+    }
   }
 
   setForm(formId) {
@@ -775,16 +864,19 @@ export class AcademyScene {
       const gait = moving ? Math.sin(this.playerAnimationTime * 10) : 0;
       this.playerGroup.rotation.y = this.yaw + Math.PI;
       if (this.playerRig) {
-        this.playerRig.torso.position.y = 0.68 + (moving ? Math.abs(gait) * 0.018 : Math.sin(this.playerAnimationTime * 2) * 0.006);
-        this.playerRig.head.rotation.z = moving ? Math.sin(this.playerAnimationTime * 5) * 0.025 : 0;
-        for (const { upper, elbow, side } of this.playerRig.arms) {
-          upper.rotation.x = this.jumpHeight > 0.02 ? -0.7 : gait * 0.48;
-          upper.rotation.z = side * (this.jumpHeight > 0.02 ? 0.18 : 0.04);
-          elbow.rotation.x = this.jumpHeight > 0.02 ? -0.35 : -0.08 - Math.max(0, gait) * 0.13;
-        }
-        for (const { hip, knee, side } of this.playerRig.hips) {
-          hip.rotation.x = this.jumpHeight > 0.02 ? (side < 0 ? -0.32 : 0.22) : gait * (side < 0 ? 0.42 : -0.42);
-          knee.rotation.x = this.jumpHeight > 0.02 ? 0.4 : Math.max(0, -gait * (side < 0 ? 1 : -1)) * 0.4;
+        if (this.playerRig.kind === 'vertex') this.#updatePlayerSkin();
+        else {
+          this.playerRig.torso.position.y = 0.68 + (moving ? Math.abs(gait) * 0.018 : Math.sin(this.playerAnimationTime * 2) * 0.006);
+          this.playerRig.head.rotation.z = moving ? Math.sin(this.playerAnimationTime * 5) * 0.025 : 0;
+          for (const { upper, elbow, side } of this.playerRig.arms) {
+            upper.rotation.x = this.jumpHeight > 0.02 ? -0.7 : gait * 0.48;
+            upper.rotation.z = side * (this.jumpHeight > 0.02 ? 0.18 : 0.04);
+            elbow.rotation.x = this.jumpHeight > 0.02 ? -0.35 : -0.08 - Math.max(0, gait) * 0.13;
+          }
+          for (const { hip, knee, side } of this.playerRig.hips) {
+            hip.rotation.x = this.jumpHeight > 0.02 ? (side < 0 ? -0.32 : 0.22) : gait * (side < 0 ? 0.42 : -0.42);
+            knee.rotation.x = this.jumpHeight > 0.02 ? 0.4 : Math.max(0, -gait * (side < 0 ? 1 : -1)) * 0.4;
+          }
         }
       }
     }

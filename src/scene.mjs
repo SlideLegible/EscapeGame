@@ -27,7 +27,7 @@ const ITEM_POSITIONS = {
   F11: [20.5, -22], F12: [-5, -2.8],
 };
 
-// Item models packed by scripts/pack-item-models.mjs. `nodes` keeps only the named
+// Item models packed from Sketchfab downloads (the pack tool lives on the art/classroom-style-prompt branch). `nodes` keeps only the named
 // nodes of a multi-object pack; `rotate` stands the model upright; `fit` is the largest
 // dimension in world units.
 const ITEM_MODELS = {

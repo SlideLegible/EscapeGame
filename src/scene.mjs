@@ -1269,12 +1269,15 @@ export class AcademyScene {
       this.camera.lookAt(this.mapTarget);
       return;
     }
-    const distance = this.game.player().form === 'F12' ? 8.5 : this.game.player().form === 'F08' ? 6.2 : this.game.player().form === 'F00' ? 6.5 : 7.2;
+    const distance = this.game.player().form === 'F12' ? 8.5 : this.game.player().form === 'F08' ? 6.2 : this.game.player().form === 'F00' ? 4.8 : 7.2;
     // The camera orbits on a sphere around the player: pitch is its elevation angle and only the mouse changes it.
-    const targetY = 0.78 + this.jumpHeight * 0.35;
-    const reach = distance * Math.cos(this.pitch);
-    const height = Math.max(0.5, targetY + distance * Math.sin(this.pitch) - (this.game.player().form === 'F09' ? 0.4 : 0));
-    this.cameraDesired.set(this.playerPosition.x - Math.sin(this.yaw) * reach, height, this.playerPosition.z + Math.cos(this.yaw) * reach);
+    const targetY = (this.game.player().form === 'F00' ? 1.05 : 0.78) + this.jumpHeight * 0.35;
+    const pitch = this.game.player().form === 'F00' ? 0.45 : this.pitch;
+    const reach = distance * Math.cos(pitch);
+    const height = Math.max(0.5, targetY + distance * Math.sin(pitch) - (this.game.player().form === 'F09' ? 0.4 : 0));
+    const shoulder = this.game.player().form === 'F00' ? 1.1 : 0;
+    this.cameraDesired.set(this.playerPosition.x - Math.sin(this.yaw) * reach + Math.cos(this.yaw) * shoulder, height,
+      this.playerPosition.z + Math.cos(this.yaw) * reach + Math.sin(this.yaw) * shoulder);
     this.camera.position.lerp(this.cameraDesired, smooth);
     this.#pullCameraIn(this.playerPosition.x, targetY, this.playerPosition.z);
     this.cameraTarget.set(this.playerPosition.x, targetY, this.playerPosition.z);
@@ -1291,7 +1294,9 @@ export class AcademyScene {
     let t = 1;
     const rect = areaCameraRect(this.game.player().area);
     if (rect) t = Math.min(t, rayRectLimit(px, pz, dx, dz, rect));
-    if (this.occlusion) t = Math.min(t, this.occlusion.firstHit(px, py, pz, cam.x, cam.y, cam.z, Math.min(1, CAMERA_BODY_CLEARANCE / length)) - CAMERA_WALL_CLEARANCE / length);
+    if (this.occlusion && this.game.player().form !== 'F00') {
+      t = Math.min(t, this.occlusion.firstHit(px, py, pz, cam.x, cam.y, cam.z, Math.min(1, CAMERA_BODY_CLEARANCE / length)) - CAMERA_WALL_CLEARANCE / length);
+    }
     t = Math.max(t, Math.min(1, CAMERA_MIN_DISTANCE / length));
     cam.set(px + dx * t, py + dy * t, pz + dz * t);
   }

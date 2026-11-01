@@ -1,8 +1,0 @@
-Name,Text
-HudHp,生命值：{0}
-HudForm,形態：{0}
-KeypadTitle,請輸入四位數密碼
-KeypadDelete,刪除
-KeypadConfirm,確認
-EndingContinue,按任意鍵繼續
-ToastPrefix,成就解鎖：

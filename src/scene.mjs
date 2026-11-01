@@ -1,30 +1,29 @@
 import * as THREE from '../vendor/three.module.js';
-import { FORMS, OBJECTS, OBJECT_AREAS } from './core.mjs';
+import { FORMS, OBJECTS, OBJECT_AREAS, LOCKED_DOOR_TEXT } from './core.mjs';
 import { loadGlb } from './glb.mjs';
 
 const ROOM = {
   Classroom: { label: '密碼學教室', x: 0, z: 0, w: 18, d: 12, color: 0x8b7859 },
   Corridor: { label: '走廊', x: 0, z: -11, w: 50, d: 8, color: 0x756b58 },
-  Office: { label: '辦公室', x: 11, z: -21, w: 10, d: 10, color: 0x766c58 },
+  Office: { label: '辦公室', x: 4.1, z: -21, w: 10, d: 10, color: 0x766c58 },
   Restroom: { label: '廁所', x: -11, z: -21, w: 10, d: 10, color: 0x626b66 },
-  Storage: { label: '儲物間', x: -21.5, z: -21, w: 11, d: 10, color: 0x5b5244 },
-  GuardRoom: { label: '警衛室', x: 23, z: -21, w: 10, d: 10, color: 0x696553 },
+  GuardRoom: { label: '警衛室', x: 14.4, z: -21, w: 10, d: 10, color: 0x696553 },
   L01: { label: '飲料機內部', x: 38, z: -9, w: 9, d: 8, color: 0x515f58 },
   L02: { label: '飲料機底下', x: 38, z: -21, w: 9, d: 8, color: 0x50564e },
 };
 
 export const OBJECT_POSITIONS = {
-  S01: [0, -14], S02: [-6, -10], S03: [-14, -10], S04: [-14, -10.7], S05: [11, -15],
-  S06: [13, -20], S07: [12.5, -20], S08: [13, -24], S09: [-16, -21], S10: [4, -10],
-  S11: [-12, -19], S12: [-8, -23], S13: [-9, -17], S14: [-7.65, 0], S15: [27.68, -22],
-  S16: [-6.32, 0], S17: [-3, -10], S18: [9, -24], S19: [-5.55, -5.45], S20: [-5.65, 0.35],
-  S21: [22.5, -22],
+  S01: [0, -14], S02: [-6, -10], S03: [-14, -10], S04: [-14, -10.7], S05: [4.08, -13.8],
+  S06: [6.1, -20], S07: [5.6, -20], S08: [6.1, -24], S09: [-6.85, -18], S10: [4, -10],
+  S11: [-12, -19], S12: [-8, -23], S13: [-9, -17], S14: [-7.65, 0], S15: [19.08, -22],
+  S16: [-6.32, 0], S17: [-3, -10], S18: [2.1, -24], S19: [-5.55, -5.45], S20: [-5.65, 0.35],
+  S21: [13.9, -22],
 };
 
-const ITEM_POSITIONS = {
-  F01: [-4.8, -11], F02: [38, -9], F03: [38, -21], F04: [4.8, -9.3], F05: [12, -20.8],
-  F06: [11.8, -24], F07: [-22, -21], F08: [-5.2, 0.9], F09: [-5, 2.2],
-  F11: [20.5, -22], F12: [-5, -2.8],
+export const ITEM_POSITIONS = {
+  F01: [-4.8, -11], F02: [38, -9], F03: [38, -21], F04: [4.8, -9.3], F05: [5.1, -20.8],
+  F06: [4.9, -24], F07: [-7.7, -18.2], F08: [-5.2, 0.9], F09: [-5, 2.2],
+  F11: [11.9, -22], F12: [-5, -2.8],
 };
 
 // Item models packed from Sketchfab downloads (the pack tool lives on the art/classroom-style-prompt branch). `nodes` keeps only the named
@@ -48,13 +47,12 @@ const ITEM_MODELS = {
 // floor minus a margin; `scale` is used as-is (the desk and closet files are in centimetres); `fitMax` sets the largest dimension.
 // `x`/`z` default to the room centre and `y` to the floor. `replaces` lists the interaction targets whose procedural shapes are hidden; `doorOf` ties the model's visibility to that door's open state; `alignMaxX` slides the model so its largest-x edge touches that x (wall mounting).
 const ROOM_MODELS = [
-  { room: 'Corridor', file: 'rooms/corridor.glb', rotateY: Math.PI / 2, fitFootprint: true },
+  { room: 'Corridor', file: 'rooms/corridor.glb', rotateY: Math.PI / 2, fitFootprint: true, mirrorNorthWall: true },
   { room: 'Restroom', file: 'rooms/restroom.glb', fitFootprint: true },
-  { room: 'Office', file: 'rooms/computer_desk.glb', scale: 0.01, x: 11, z: -21.5 },
-  { room: 'Office', file: 'rooms/bulletin_board.glb', rotateY: Math.PI / 2, x: 6.25, y: 1.2, z: -21 },
+  { room: 'Office', file: 'rooms/computer_desk.glb', scale: 0.01, x: 4.1, z: -21.5 },
+  { room: 'Office', file: 'rooms/bulletin_board.glb', rotateY: Math.PI / 2, x: -0.65, y: 1.2, z: -21 },
   { room: 'GuardRoom', file: 'rooms/guard_room.glb', fitFootprint: true },
-  { room: 'Storage', file: 'rooms/janitor_closet.glb', scale: 0.01, x: -21.5, z: -24.5 },
-  { room: 'GuardRoom', file: 'items/f10.glb', rotateY: -Math.PI / 2, fitMax: 1.0, x: 22.5, z: -22, replaces: ['S21'] },
+  { room: 'GuardRoom', file: 'items/f10.glb', rotateY: -Math.PI / 2, fitMax: 1.0, x: 13.9, z: -22, replaces: ['S21'] },
   // Interaction-object models (assets/models/objects/sNN.glb, packed by scripts/pack-scene-objects.py). Sizes follow the old procedural shapes
   // because interaction range and collision still use their bounds. S04 (under the vending machine) reuses the S03 model.
   { room: 'Corridor', file: 'objects/s01.glb', fitMax: 2.9, x: 0, z: -14, replaces: ['S01'] },
@@ -62,16 +60,16 @@ const ROOM_MODELS = [
   { room: 'Corridor', file: 'objects/s03.glb', fitMax: 2.76, x: -14, z: -10, replaces: ['S03', 'S04'] },
   { room: 'Corridor', file: 'objects/s10.glb', fitMax: 1.1, x: 4, z: -10, replaces: ['S10'] },
   { room: 'Corridor', file: 'objects/s17.glb', fitMax: 2.4, y: 0.85, x: -3, z: -10, replaces: ['S17'] },
-  { room: 'Office', file: 'objects/s06.glb', fitMax: 1.6, x: 13, z: -20, replaces: ['S06'] },
-  { room: 'Office', file: 'objects/s07.glb', rotateY: -Math.PI / 2, fitMax: 0.7, y: 0.785, x: 12.5, z: -20, replaces: ['S07'] }, // on the S06 desk top
-  { room: 'GuardRoom', file: 'objects/s15.glb', rotateY: -Math.PI / 2, fitMax: 1.2, y: 0.9, z: -22, alignMaxX: 27.89, replaces: ['S15'] },
-  // Storage door on the restroom model's west wall (its inner face is x = -15.36); the model hides while the door is open (`doorOf`).
-  { room: 'Restroom', file: 'objects/s09.glb', rotateY: Math.PI / 2, fitMax: 2.8, x: -15.26, z: -21, replaces: ['S09'], doorOf: 'S09' },
-  { room: 'Office', file: 'objects/s08.glb', rotateY: Math.PI / 2, fitMax: 1.1, x: 13, z: -24, replaces: ['S08'] },
+  { room: 'Office', file: 'objects/s06.glb', fitMax: 1.6, x: 6.1, z: -20, replaces: ['S06'] },
+  { room: 'Office', file: 'objects/s07.glb', rotateY: -Math.PI / 2, fitMax: 0.7, y: 0.785, x: 5.6, z: -20, replaces: ['S07'] }, // on the S06 desk top
+  { room: 'GuardRoom', file: 'objects/s15.glb', rotateY: -Math.PI / 2, fitMax: 1.2, y: 0.9, z: -22, alignMaxX: 19.29, replaces: ['S15'] },
+  // Storage door on the restroom's east wall, right of the entrance (inner face x = -6.64), facing into the room; the model hides while the door is open (`doorOf`).
+  { room: 'Restroom', file: 'objects/s09.glb', rotateY: -Math.PI / 2, fitMax: 2.8, z: -18, alignMaxX: -6.7, replaces: ['S09'], doorOf: 'S09' },
+  { room: 'Office', file: 'objects/s08.glb', rotateY: Math.PI / 2, fitMax: 1.1, x: 6.1, z: -24, replaces: ['S08'] },
   { room: 'Restroom', file: 'objects/s12.glb', fitMax: 0.9, x: -8, z: -23, replaces: ['S12'] },
   // High window on the restroom's north wall (inner face z = -16.3), facing into the room.
   { room: 'Restroom', file: 'objects/s13.glb', rotateY: Math.PI, fitMax: 1.5, y: 2.1, x: -9, z: -16.4, replaces: ['S13'] },
-  { room: 'Office', file: 'objects/s18.glb', fitMax: 1.8, y: 0.5, x: 9, z: -24, replaces: ['S18'] },
+  { room: 'Office', file: 'objects/s18.glb', fitMax: 1.8, y: 0.5, x: 2.1, z: -24, replaces: ['S18'] },
 ];
 
 // Footprint (x, z) of the teacher's lectern in the bundled classroom, parallel to the blackboard.
@@ -81,7 +79,7 @@ export const LECTERN_SIZE = [0.9, 1.48];
 const CLASSROOM_DESK_COLUMNS = [-3.77, -1.67, 0.41, 2.43, 4.45, 6.5];
 const CLASSROOM_DESK_ROWS = [-3.96, -1.96, -0.01, 1.93, 3.89];
 const CLASSROOM_EXIT_DOOR_PARTS = ['PUERTA_1_StingrayPBS9_0', 'PUERTA_3_StingrayPBS9_0', 'GRIPPUERTA_StingrayPBS1_0', 'GRIPPUERTA2_StingrayPBS1_0'];
-const MODEL_TARGETS = new Set(['S04', 'S14', 'S16', 'S19', 'S20']);
+const MODEL_TARGETS = new Set(['S04', 'S05', 'S09', 'S14', 'S16', 'S19', 'S20']);
 
 const ROOM_NAMES = Object.fromEntries(Object.entries(ROOM).map(([id, room]) => [id, room.label]));
 // Orbit camera collision: how far into the ray the player's own body is ignored, how far to stay off a wall, and the closest it may get.
@@ -91,14 +89,56 @@ const palette = { wall: 0xb3a789, trim: 0x51483b, wood: 0x8d704a, light: 0xe8d8b
 // Walkable rectangles per area, checked in order (the first match wins where they overlap).
 const AREA_RECTS = [
   ['Classroom', -7.75, 7.75, -5.75, 5.75],
-  ['Office', 6, 16, -26, -15.8],
+  ['Office', -0.9, 9.1, -26, -15.8],
   ['Restroom', -16, -6, -26, -15.8],
-  ['Storage', -27, -16, -26, -16],
-  ['GuardRoom', 18, 28, -26, -15.8],
+  ['GuardRoom', 9.4, 19.4, -26, -15.8],
   ['Corridor', -25, 25, -16.2, -5.75],
   ['L01', 33, 43, -14, -5],
   ['L02', 33, 43, -25, -16],
 ];
+
+// Passages between rooms. Each room's entrance is on its own wall (`line`, measured on the room models) across `span`:
+// walking past it moves the player to the other room's arrival point. `axis` is the coordinate the line is on, and
+// `height` keeps a black block under a low door frame.
+// The corridor's entrances are the doors painted on its walls, so they get no black block.
+export const DOORWAYS = [
+  { door: 'S19', axis: 'z', sides: {
+    Classroom: { line: -5.3, span: [-7.05, -4.12], spawn: [-5.6, -4.4], height: 2.45 },
+    Corridor: { line: -7.95, span: [-6.96, -5.56], spawn: [-6.26, -9.0], block: false } } },
+  { door: 'S05', axis: 'z', sides: {
+    Corridor: { line: -13.72, span: [3.38, 4.78], spawn: [4.08, -12.7], block: false },
+    Office: { line: -16.05, span: [2.8, 5.4], spawn: [4.1, -17.1] } } },
+  { door: null, axis: 'z', sides: {
+    Corridor: { line: -13.72, span: [-6.96, -5.56], spawn: [-6.26, -12.7], block: false },
+    Restroom: { line: -16.42, span: [-12.3, -9.7], spawn: [-11, -17.4] } } },
+  { door: null, axis: 'z', sides: {
+    Corridor: { line: -13.72, span: [13.74, 15.14], spawn: [14.44, -12.7], block: false },
+    GuardRoom: { line: -16.05, span: [13.1, 15.7], spawn: [14.4, -17.1] } } },
+];
+
+// The corridor model's south wall (windows) is replaced by a mirror of its north wall, so both walls have doors.
+const CORRIDOR_MID_Z = -10.88;
+
+// The corridor model's main hall ends here; past it are the stairwells, which the player does not walk into.
+export const CORRIDOR_HALF_LENGTH = 15.3;
+
+// How close to a doorway's line the player has to get for it to open; the room's own wall keeps them that far back.
+const DOORWAY_REACH = 0.35;
+
+// Rooms whose model walls sit inside their floor rectangle draw only up to those walls, so their windows show black.
+const CLIP_OVERRIDES = { Corridor: { minZ: -14.3, maxZ: -7.7 } };
+
+// The part of the world drawn while the player is in `area`: the room and its walkable floor plus its walls.
+export function roomClipRect(area, margin = 0.35) {
+  const rect = AREA_RECTS.find(([id]) => id === area);
+  const room = ROOM[area];
+  if (!rect || !room) return null;
+  return {
+    minX: Math.min(rect[1], room.x - room.w / 2) - margin, maxX: Math.max(rect[2], room.x + room.w / 2) + margin,
+    minZ: Math.min(rect[3], room.z - room.d / 2) - margin, maxZ: Math.max(rect[4], room.z + room.d / 2) + margin,
+    ...CLIP_OVERRIDES[area],
+  };
+}
 
 export function areaAt(x, z) {
   for (const [id, minX, maxX, minZ, maxZ] of AREA_RECTS) {
@@ -176,6 +216,54 @@ export class OcclusionGrid {
   }
 }
 
+export function bodyPathIntersectsGrid(grid, fromX, fromZ, toX, toZ, radius = 0.3, height = 1.3, baseY = 0) {
+  const cell = grid?.cell ?? 0.2;
+  const verticalSteps = Math.max(1, Math.ceil(height / cell));
+  const pathLength = Math.hypot(toX - fromX, toZ - fromZ);
+  const pathSteps = Math.max(1, Math.ceil(pathLength / (cell * 0.4)));
+  for (let step = 1; step <= pathSteps; step++) {
+    const fraction = step / pathSteps;
+    const x = fromX + (toX - fromX) * fraction;
+    const z = fromZ + (toZ - fromZ) * fraction;
+    for (let level = 0; level <= verticalSteps; level++) {
+      const y = baseY + Math.max(0.1, Math.min(height, level * height / verticalSteps));
+      if (grid.isBlocked(x, y, z)) return true;
+      for (let around = 0; around < 8; around++) {
+        const angle = around * Math.PI / 4;
+        if (grid.isBlocked(x + Math.cos(angle) * radius, y, z + Math.sin(angle) * radius)) return true;
+      }
+    }
+  }
+  return false;
+}
+
+export function bodyPathStepHeight(grid, fromX, fromZ, toX, toZ, radius = 0.3, height = 1.3, baseY = 0, maxStep = 0.25) {
+  if (!bodyPathIntersectsGrid(grid, fromX, fromZ, toX, toZ, radius, height, baseY)) return baseY;
+  const increment = grid.cell * 0.25;
+  for (let lift = increment; lift <= maxStep + 1e-6; lift += increment) {
+    if (!bodyPathIntersectsGrid(grid, fromX, fromZ, toX, toZ, radius, height, baseY + lift)) return baseY + lift;
+  }
+  return null;
+}
+
+export function advancePlayerFacing(currentYaw, targetYaw, maxTurn) {
+  let delta = (targetYaw - currentYaw + Math.PI) % (Math.PI * 2);
+  if (delta < 0) delta += Math.PI * 2;
+  delta -= Math.PI;
+  if (Math.abs(Math.abs(delta) - Math.PI) < 1e-6) delta = -Math.PI;
+  if (Math.abs(delta) <= maxTurn) return { yaw: targetYaw, turning: false };
+  return { yaw: currentYaw + Math.sign(delta) * maxTurn, turning: true };
+}
+
+export function removeRootTranslationTrack(clip, root) {
+  if (!clip?.tracks || !root?.uuid) return false;
+  const rootPosition = `${root.uuid}.position`;
+  const tracks = clip.tracks.filter((track) => track.name !== rootPosition);
+  const removed = tracks.length !== clip.tracks.length;
+  if (removed) clip.tracks = tracks;
+  return removed;
+}
+
 export const SPECIAL_EXITS = {
   L01: { at: [34.1, -11.8], to: [-14, -6.9], text: '你從飲料機的出貨口鑽了出來' },
   L02: { at: [34.1, -23.8], to: [-14, -12.2], text: '你從飲料機底下滾了出來' },
@@ -218,8 +306,8 @@ export class AcademyScene {
     this.canvas = canvas;
     this.game = game;
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x101d20);
-    this.scene.fog = new THREE.FogExp2(0x101d20, 0.012);
+    this.scene.background = new THREE.Color(0x000000);
+    this.scene.fog = new THREE.FogExp2(0x000000, 0.012);
     this.camera = new THREE.PerspectiveCamera(52, 1, 0.1, 180);
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
@@ -230,10 +318,14 @@ export class AcademyScene {
     this.renderer.toneMappingExposure = 1.1;
     this.keys = new Set();
     this.yaw = 0;
-    this.pitch = 0.45;
+    this.playerFacingYaw = Math.PI;
+    this.turningInPlace = false;
+    this.pitch = 0.28;
     this.pointerDown = null;
     this.started = false;
     this.playerPosition = new THREE.Vector3(-5.2, 0, -4.5);
+    this.stepHeight = 0;
+    this.stepHeightTimer = 0;
     this.humanPosition = this.playerPosition.clone();
     this.itemDrops = new Map();
     this.targetMeshes = [];
@@ -241,6 +333,12 @@ export class AcademyScene {
     this.doorModels = new Map();
     this.itemGroups = new Map();
     this.exitGroups = new Map();
+    this.doorwayBlocks = [];
+    this.pendingDoorway = null;
+    this.doorHint = null;
+    this.lastDoorHint = -Infinity;
+    this.snapCamera = false;
+    this.clipPlanes = new Map();
     this.roomGroups = new Map();
     this.playerGroup = null;
     this.playerRig = null;
@@ -257,11 +355,15 @@ export class AcademyScene {
     this.mapTarget = new THREE.Vector3(7, 0, -11);
     this.lastCameraUpdate = 0;
     this.occlusion = null;
+    this.walls = null;
     this.#buildLights();
     this.#buildRooms();
     this.#buildObjects();
     this.#buildExits();
+    this.#buildDoorways();
     this.#buildPlayer();
+    this.playerMixer = null;
+    this.playerWalkAction = null;
     this.playerModelLoad = this.#loadPlayerModel();
     this.classroomLoad = this.#loadClassroomModel();
     this.roomModelsLoad = this.#loadRoomModels();
@@ -360,13 +462,10 @@ export class AcademyScene {
         wall((right + room.x + 1.3) / 2, top, room.w / 2 - 1.3, 0.22);
       } else if (id === 'Restroom') {
         wall(room.x, bottom, room.w, 0.22);
-        wall(left, (top + room.z + 1.1) / 2, 0.22, top - room.z - 1.1);
-        wall(left, (bottom + room.z - 1.1) / 2, 0.22, room.z - 1.1 - bottom);
+        wall(left, room.z, 0.22, room.d);
         wall(right, room.z, 0.22, room.d);
         wall((left + room.x - 1.3) / 2, top, room.w / 2 - 1.3, 0.22);
         wall((right + room.x + 1.3) / 2, top, room.w / 2 - 1.3, 0.22);
-      } else if (id === 'Storage') {
-        wall(room.x, top, room.w, 0.22); wall(left, room.z, 0.22, room.d); wall(room.x, bottom, room.w, 0.22);
       } else if (id === 'L01' || id === 'L02') {
         wall(room.x, top, room.w, 0.22); wall(room.x, bottom, room.w, 0.22);
         wall(left, room.z, 0.22, room.d); wall(right, room.z, 0.22, room.d);
@@ -425,6 +524,7 @@ export class AcademyScene {
       try {
         const model = await loadGlb(new URL(`../assets/models/${config.file}`, import.meta.url));
         this.#placeRoomModel(model, config);
+        if (config.mirrorNorthWall) this.#mirrorCorridorWall(model);
         model.name = config.file;
         (this.roomGroups.get(config.room) ?? this.scene).add(model);
         if (config.doorOf) this.doorModels.set(config.doorOf, model);
@@ -455,6 +555,20 @@ export class AcademyScene {
       model.updateMatrixWorld(true);
       model.position.x += alignMaxX - new THREE.Box3().setFromObject(model).max.x;
     }
+  }
+
+  #mirrorCorridorWall(model) {
+    const wall = model.getObjectByName('The Japanese school corridor_Wall_0');
+    const windows = model.getObjectByName('The Japanese school corridor_Windows_0');
+    if (!wall || !windows) return;
+    windows.visible = false;
+    model.updateMatrixWorld(true);
+    const mirror = new THREE.Matrix4().makeTranslation(0, 0, 2 * CORRIDOR_MID_Z).multiply(new THREE.Matrix4().makeScale(1, 1, -1));
+    const copy = wall.clone();
+    copy.name = 'Corridor south wall (mirrored north wall)';
+    new THREE.Matrix4().copy(model.matrixWorld).invert().multiply(mirror).multiply(wall.matrixWorld)
+      .decompose(copy.position, copy.quaternion, copy.scale);
+    model.add(copy);
   }
 
   async #loadItemModels() {
@@ -741,6 +855,44 @@ export class AcademyScene {
     }
   }
 
+  #buildDoorways() {
+    const black = new THREE.MeshBasicMaterial({ color: 0x000000 });
+    for (const doorway of DOORWAYS) {
+      for (const [area, { line, span: [from, to], block, height = 2.7 }] of Object.entries(doorway.sides)) {
+        if (block === false) continue;
+        const alongX = doorway.axis === 'z';
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(alongX ? to - from : 0.06, height, alongX ? 0.06 : to - from), black);
+        mesh.position.set(alongX ? (from + to) / 2 : line, height / 2, alongX ? line : (from + to) / 2);
+        mesh.name = `${area} 轉場`;
+        this.scene.add(mesh);
+        this.doorwayBlocks.push({ doorway, mesh });
+      }
+    }
+  }
+
+  completeDoorway() {
+    const pending = this.pendingDoorway;
+    this.pendingDoorway = null;
+    if (!pending || !this.game.moveToArea('local', pending.area)) return false;
+    const [x, z] = pending.doorway.sides[pending.area].spawn;
+    this.playerPosition.set(x, 0, z);
+    this.playerGroup.position.set(x, this.game.player().form === 'F00' ? this.jumpHeight : 0, z);
+    this.snapCamera = true;
+    this.refresh();
+    return true;
+  }
+
+  #clipPlanesFor(area) {
+    if (!this.clipPlanes.has(area)) {
+      const rect = roomClipRect(area);
+      this.clipPlanes.set(area, rect ? [
+        new THREE.Plane(new THREE.Vector3(1, 0, 0), -rect.minX), new THREE.Plane(new THREE.Vector3(-1, 0, 0), rect.maxX),
+        new THREE.Plane(new THREE.Vector3(0, 0, 1), -rect.minZ), new THREE.Plane(new THREE.Vector3(0, 0, -1), rect.maxZ),
+      ] : []);
+    }
+    return this.clipPlanes.get(area);
+  }
+
   exitSpecialLocation() {
     const area = this.game.player().area;
     const exit = SPECIAL_EXITS[area];
@@ -748,6 +900,7 @@ export class AcademyScene {
     const [x, z] = exit.to;
     this.playerPosition.set(x, 0, z);
     this.playerGroup.position.copy(this.playerPosition);
+    this.snapCamera = true;
     this.refresh();
     return { text: exit.text, location: 'Corridor' };
   }
@@ -900,6 +1053,7 @@ export class AcademyScene {
     this.playerGroup = this.#formShape('F00');
     this.playerGroup.name = '玩家';
     this.playerGroup.position.copy(this.playerPosition);
+    this.playerGroup.rotation.y = this.playerFacingYaw;
     this.scene.add(this.playerGroup);
     this.#rebuildFormMesh(this.playerGroup, 'F00');
     this.humanGroup = new THREE.Group();
@@ -935,7 +1089,19 @@ export class AcademyScene {
         node.frustumCulled = false;
       });
       this.humanModel = source;
-      this.humanRig = this.#createSkinnedPlayerRig(source);
+      const walkClip = source.animations?.find((clip) => clip.tracks.length > 0);
+      if (walkClip) {
+        removeRootTranslationTrack(walkClip, source.getObjectByName('mixamorig:Hips'));
+        this.playerMixer = new THREE.AnimationMixer(source);
+        this.playerWalkAction = this.playerMixer.clipAction(walkClip);
+        this.playerWalkAction.setLoop(THREE.LoopRepeat, Infinity);
+        this.playerWalkAction.reset().play();
+        this.playerMixer.update(0);
+        this.playerWalkAction.paused = true;
+        this.humanRig = { kind: 'animated' };
+      } else {
+        this.humanRig = this.#createSkinnedPlayerRig(source);
+      }
       this.playerRig = this.humanRig;
       if (this.game.player().form === 'F00') this.#rebuildFormMesh(this.playerGroup, 'F00');
     } catch (error) {
@@ -1002,6 +1168,7 @@ export class AcademyScene {
   }
 
   setForm(formId) {
+    if (formId !== 'F00') { this.stepHeight = 0; this.stepHeightTimer = 0; }
     // The single character model moves to the body left behind while the player is an item.
     if (formId !== 'F00' && this.humanModel?.parent === this.playerGroup) {
       this.humanGroup.rotation.y = this.playerGroup.rotation.y;
@@ -1015,6 +1182,7 @@ export class AcademyScene {
 
   syncAfterAction(previousForm, result) {
     const player = this.game.player();
+    const before = this.playerPosition.clone();
     const changedForm = player.form !== previousForm;
     if (result.ending === 'E05') this.itemDrops.clear();
     else if (changedForm && previousForm !== 'F00') this.itemDrops.set(previousForm, [this.playerPosition.x, this.playerPosition.z]);
@@ -1029,15 +1197,19 @@ export class AcademyScene {
     } else if (!result.ending && player.form === 'F00' && previousForm !== 'F00') this.playerPosition.copy(this.humanPosition);
     this.playerGroup.position.copy(this.playerPosition);
     this.setForm(player.form);
+    if (this.playerPosition.distanceTo(before) > 3) this.snapCamera = true;
     this.refresh();
   }
 
   resetRound() {
     this.itemDrops.clear();
+    this.stepHeight = 0;
+    this.stepHeightTimer = 0;
     this.playerPosition.set(-5.2, 0, -4.5);
     this.humanPosition.copy(this.playerPosition);
     this.playerGroup.position.copy(this.playerPosition);
     this.setForm(this.game.player().form);
+    this.snapCamera = true;
     this.refresh();
   }
 
@@ -1063,6 +1235,7 @@ export class AcademyScene {
       const doorModel = this.doorModels.get(doorId);
       if (doorModel) doorModel.visible = !this.game.isDoorOpen(doorId);
     }
+    for (const { doorway, mesh } of this.doorwayBlocks) mesh.visible = !doorway.door || this.game.isDoorOpen(doorway.door);
     const exitOpen = this.game.isDoorOpen('S19');
     for (const part of this.classroomExitDoors) part.visible = !exitOpen;
     const nearest = this.nearestTarget();
@@ -1083,11 +1256,16 @@ export class AcademyScene {
       candidates.push({ id, name: OBJECTS[id], x: group.position.x, z: group.position.z, bounds: group.userData.localBounds });
     }
     for (const [id, group] of this.itemGroups) {
-      if (!group.visible) continue;
+      if (!group.visible || this.game.item(id)?.area !== this.game.player().area) continue;
       candidates.push({ id, name: FORMS[id], x: group.position.x, z: group.position.z });
     }
     const best = nearestCandidate(this.playerPosition.x, this.playerPosition.z, this.yaw, candidates, maxDistance);
     return best && { id: best.id, name: best.name, distance: best.distance };
+  }
+
+  #targetArea(id) {
+    if (id === 'EXIT') return this.game.player().area;
+    return OBJECT_AREAS[id] ?? this.game.item(id)?.area;
   }
 
   pickTarget(clientX, clientY) {
@@ -1099,15 +1277,34 @@ export class AcademyScene {
     for (const hit of hits) {
       let node = hit.object;
       while (node && !node.userData.targetId) node = node.parent;
-      if (!node) continue;
+      if (!node || this.#targetArea(node.userData.targetId) !== this.game.player().area) continue;
       const dist = Math.hypot(node.position.x + (node.parent === this.scene ? 0 : node.parent.position.x) - this.playerPosition.x, node.position.z - this.playerPosition.z);
       if (dist <= 4.2) return node.userData.targetId;
     }
     return null;
   }
 
+  isWalkable(x, z, radius = 0.3) {
+    return areaAt(x, z) === this.game.player().area && !this.#blockedAt(x, z, radius);
+  }
+
+  // The room models' walls, partitions, stairs and furniture, sampled around the player's feet and waist.
+  #hitsWalls(x, z, radius) {
+    if (!this.walls) return false;
+    for (const y of [0.35, 0.9]) {
+      if (this.walls.isBlocked(x, y, z)) return true;
+      for (let i = 0; i < 8; i++) {
+        const angle = i * Math.PI / 4;
+        if (this.walls.isBlocked(x + Math.cos(angle) * radius, y, z + Math.sin(angle) * radius)) return true;
+      }
+    }
+    return false;
+  }
+
   #blockedAt(x, z, radius) {
+    if (this.#hitsWalls(x, z, radius)) return true;
     const area = areaAt(x, z);
+    if (area === 'Corridor' && Math.abs(x) + radius > CORRIDOR_HALF_LENGTH) return true;
     if (area === 'Classroom') {
       if (Math.abs(x) > 7.45 || z > 5.45) return true;
       if (z < -5.35 && !(this.game.isDoorOpen('S19') && x >= -6.8 && x <= -4.4)) return true;
@@ -1147,25 +1344,6 @@ export class AcademyScene {
     return (x - nearestX) ** 2 + (z - nearestZ) ** 2 < radius ** 2;
   }
 
-  #canCrossBoundary(from, to, x, z) {
-    if ((from === 'Classroom' && to === 'Corridor') || (from === 'Corridor' && to === 'Classroom')) {
-      return this.game.isDoorOpen('S19') && x >= -6.8 && x <= -4.4;
-    }
-    if ((from === 'Corridor' && to === 'Office') || (from === 'Office' && to === 'Corridor')) {
-      return this.game.isDoorOpen('S05') && x >= 9.7 && x <= 12.3;
-    }
-    if ((from === 'Corridor' && to === 'Restroom') || (from === 'Restroom' && to === 'Corridor')) {
-      return x >= -12.3 && x <= -9.7;
-    }
-    if ((from === 'Corridor' && to === 'GuardRoom') || (from === 'GuardRoom' && to === 'Corridor')) {
-      return x >= 21.7 && x <= 24.3;
-    }
-    if ((from === 'Restroom' && to === 'Storage') || (from === 'Storage' && to === 'Restroom')) {
-      return this.game.isDoorOpen('S09') && z >= -21.9 && z <= -20.1;
-    }
-    return true;
-  }
-
   jump() {
     if (!this.started || this.game.player().ending || this.game.player().form !== 'F00' || this.jumpHeight > 0) return false;
     this.jumpVelocity = 4.3;
@@ -1173,20 +1351,117 @@ export class AcademyScene {
   }
 
   move(dt) {
-    if (!this.started || this.game.player().ending) return;
+    if (!this.started || this.game.player().ending || this.pendingDoorway) return;
     this.playerAnimationTime += dt;
     if (this.jumpHeight > 0 || this.jumpVelocity > 0) {
       this.jumpVelocity -= 11.5 * dt;
       this.jumpHeight += this.jumpVelocity * dt;
       if (this.jumpHeight <= 0) { this.jumpHeight = 0; this.jumpVelocity = 0; }
     }
-    this.playerGroup.position.y = this.game.player().form === 'F00' ? this.jumpHeight : 0;
-    const moving = this.keys.has('KeyW') || this.keys.has('KeyA') || this.keys.has('KeyS') || this.keys.has('KeyD') || this.keys.has('ArrowUp') || this.keys.has('ArrowDown') || this.keys.has('ArrowLeft') || this.keys.has('ArrowRight');
-    this.walking = Boolean(moving);
-    if (this.game.player().form === 'F00') {
+    const human = this.game.player().form === 'F00';
+    this.playerGroup.position.y = human ? this.jumpHeight + this.stepHeight : 0;
+    let forward = Number(this.keys.has('KeyW') || this.keys.has('ArrowUp')) - Number(this.keys.has('KeyS') || this.keys.has('ArrowDown'));
+    let right = Number(this.keys.has('KeyD') || this.keys.has('ArrowRight')) - Number(this.keys.has('KeyA') || this.keys.has('ArrowLeft'));
+    const hasMovementInput = Boolean(forward || right);
+    if (hasMovementInput) {
+      const inputLength = Math.hypot(forward, right);
+      forward /= inputLength;
+      right /= inputLength;
+      const fx = Math.sin(this.yaw), fz = -Math.cos(this.yaw);
+      const rx = Math.cos(this.yaw), rz = Math.sin(this.yaw);
+      const moveX = fx * forward + rx * right;
+      const moveZ = fz * forward + rz * right;
+      const targetYaw = Math.atan2(moveX, moveZ);
+      if (this.game.player().form === 'F00') {
+        const wasTurningInPlace = this.turningInPlace;
+        const turn = advancePlayerFacing(this.playerFacingYaw, targetYaw, 7 * dt);
+        this.playerFacingYaw = turn.yaw;
+        this.turningInPlace = turn.turning;
+        this.playerGroup.rotation.y = this.playerFacingYaw;
+        if (turn.turning && !wasTurningInPlace && this.playerWalkAction) {
+          this.playerWalkAction.reset().play();
+          this.playerMixer.update(0);
+          this.playerWalkAction.paused = true;
+        }
+      } else {
+        this.turningInPlace = false;
+      }
+    } else {
+      this.turningInPlace = false;
+    }
+    let moving = false;
+    if (hasMovementInput && !(human && this.turningInPlace)) {
+      const speed = this.game.player().form === 'F08' ? 2.6 : this.game.player().form === 'F09' ? 1.8 : 4.4;
+      const fx = Math.sin(this.yaw), fz = -Math.cos(this.yaw);
+      const rx = Math.cos(this.yaw), rz = Math.sin(this.yaw);
+      const oldX = this.playerPosition.x, oldZ = this.playerPosition.z;
+      let nx = oldX + (fx * forward + rx * right) * speed * dt;
+      let nz = oldZ + (fz * forward + rz * right) * speed * dt;
+      const radius = this.game.player().form === 'F12' ? 0.38 : 0.3;
+      const from = this.game.player().area;
+      // Rooms never join directly: walking up to a room's doorway starts the transition to the room behind it.
+      for (const doorway of DOORWAYS) {
+        const side = doorway.sides[from];
+        if (!side) continue;
+        const [lateral, depth, home] = doorway.axis === 'z' ? [nx, nz, side.spawn[1]] : [nz, nx, side.spawn[0]];
+        if (lateral < side.span[0] || lateral > side.span[1] || (depth - side.line) * Math.sign(side.line - home) < -DOORWAY_REACH) continue;
+        // A locked door stops the player and says so, at most once every two seconds.
+        if (doorway.door && !this.game.isDoorOpen(doorway.door)) {
+          const now = performance.now();
+          if (now - this.lastDoorHint > 2000) { this.doorHint = LOCKED_DOOR_TEXT[doorway.door]; this.lastDoorHint = now; }
+        } else this.pendingDoorway = { doorway, area: Object.keys(doorway.sides).find((id) => id !== from) };
+        nx = oldX; nz = oldZ;
+        break;
+      }
+      const assessPath = (x, z) => {
+        if (this.#blockedAt(x, z, radius)) return null;
+        if (!human || !this.occlusion) return this.stepHeight;
+        return bodyPathStepHeight(this.occlusion, oldX, oldZ, x, z, radius, 1.3, this.stepHeight);
+      };
+      let nextStepHeight = assessPath(nx, nz);
+      if (nextStepHeight === null) {
+        const xStepHeight = assessPath(nx, oldZ);
+        if (xStepHeight !== null) { nz = oldZ; nextStepHeight = xStepHeight; }
+        else {
+          const zStepHeight = assessPath(oldX, nz);
+          if (zStepHeight !== null) { nx = oldX; nextStepHeight = zStepHeight; }
+        }
+      }
+      if (nextStepHeight !== null) {
+        const area = areaAt(nx, nz);
+        if (area === from) {
+          this.playerPosition.x = nx; this.playerPosition.z = nz;
+          if (human && nextStepHeight > this.stepHeight + 1e-6) this.stepHeightTimer = 0.35;
+          else if (human && this.stepHeight > 0) {
+            const lowerPathBlocked = bodyPathIntersectsGrid(this.occlusion, oldX, oldZ, nx, nz, radius, 1.3, 0);
+            if (lowerPathBlocked) this.stepHeightTimer = 0.12;
+            else if (this.stepHeightTimer > 0) {
+              this.stepHeightTimer = Math.max(0, this.stepHeightTimer - dt);
+              nextStepHeight = this.stepHeight;
+            } else nextStepHeight = Math.max(0, this.stepHeight - Math.min(0.08, dt * 2));
+          }
+          this.stepHeight = human ? nextStepHeight : 0;
+          if (!human) this.stepHeightTimer = 0;
+          this.playerGroup.position.set(nx, human ? this.jumpHeight + this.stepHeight : 0, nz);
+          if (!human) this.game.item(this.game.player().form).area = area;
+          moving = Math.hypot(nx - oldX, nz - oldZ) > 1e-6;
+        }
+      }
+    }
+    this.walking = moving;
+    if (human) {
       const gait = moving ? Math.sin(this.playerAnimationTime * 10) : 0;
-      this.playerGroup.rotation.y = -this.yaw;
-      if (this.playerRig) {
+      if (this.playerWalkAction) {
+        if (moving) {
+          if (this.playerWalkAction.paused) {
+            this.playerWalkAction.paused = false;
+            this.playerWalkAction.play();
+          }
+          this.playerMixer.update(dt);
+        } else if (!this.playerWalkAction.paused) {
+          this.playerWalkAction.paused = true;
+        }
+      } else if (this.playerRig) {
         if (this.playerRig.kind === 'skinned') this.#updatePlayerSkin();
         else {
           this.playerRig.torso.position.y = 0.68 + (moving ? Math.abs(gait) * 0.018 : Math.sin(this.playerAnimationTime * 2) * 0.006);
@@ -1202,48 +1477,31 @@ export class AcademyScene {
           }
         }
       }
+    } else if (this.playerWalkAction && !this.playerWalkAction.paused) {
+      this.playerWalkAction.paused = true;
     }
-    let forward = Number(this.keys.has('KeyW') || this.keys.has('ArrowUp')) - Number(this.keys.has('KeyS') || this.keys.has('ArrowDown'));
-    let right = Number(this.keys.has('KeyD') || this.keys.has('ArrowRight')) - Number(this.keys.has('KeyA') || this.keys.has('ArrowLeft'));
-    if (!forward && !right) return;
-    const length = Math.hypot(forward, right); forward /= length; right /= length;
-    const speed = this.game.player().form === 'F08' ? 2.6 : this.game.player().form === 'F09' ? 1.8 : 4.4;
-    const fx = Math.sin(this.yaw), fz = -Math.cos(this.yaw);
-    const rx = Math.cos(this.yaw), rz = Math.sin(this.yaw);
-    const oldX = this.playerPosition.x, oldZ = this.playerPosition.z;
-    let nx = oldX + (fx * forward + rx * right) * speed * dt;
-    let nz = oldZ + (fz * forward + rz * right) * speed * dt;
-    const radius = this.game.player().form === 'F12' ? 0.38 : this.game.player().form === 'F00' ? 0.22 : 0.3;
-    if (this.#blockedAt(nx, nz, radius)) {
-      if (!this.#blockedAt(nx, oldZ, radius)) nz = oldZ;
-      else if (!this.#blockedAt(oldX, nz, radius)) nx = oldX;
-      else return;
-    }
-    const area = areaAt(nx, nz);
-    const from = this.game.player().area;
-    if (!area || area !== from && (!this.#canCrossBoundary(from, area, nx, nz) || !this.game.moveToArea('local', area))) return;
-    if (area !== this.game.player().area) this.game.player().area = area;
-    this.playerPosition.x = nx; this.playerPosition.z = nz;
-    this.playerGroup.position.set(this.playerPosition.x, this.game.player().form === 'F00' ? this.jumpHeight : 0, this.playerPosition.z);
-    if (this.game.player().form !== 'F00') this.game.item(this.game.player().form).area = area;
   }
 
   updateCamera(now = performance.now()) {
     const dt = this.lastCameraUpdate ? Math.min(0.1, (now - this.lastCameraUpdate) / 1000) : 1 / 60;
     this.lastCameraUpdate = now;
-    const smooth = 1 - Math.exp(-10 * dt);
+    const smooth = this.snapCamera ? 1 : 1 - Math.exp(-10 * dt);
+    this.snapCamera = false;
     if (this.game.player().canSeeWholeMap) {
       this.cameraDesired.set(7, 50, -14);
       this.camera.position.lerp(this.cameraDesired, smooth);
       this.camera.lookAt(this.mapTarget);
       return;
     }
-    const distance = this.game.player().form === 'F12' ? 8.5 : this.game.player().form === 'F08' ? 6.2 : this.game.player().form === 'F00' ? 6.5 : 7.2;
+    const distance = this.game.player().form === 'F12' ? 8.5 : this.game.player().form === 'F08' ? 6.2 : this.game.player().form === 'F00' ? 3.8 : 7.2;
     // The camera orbits on a sphere around the player: pitch is its elevation angle and only the mouse changes it.
-    const targetY = 0.78 + this.jumpHeight * 0.35;
-    const reach = distance * Math.cos(this.pitch);
-    const height = Math.max(0.5, targetY + distance * Math.sin(this.pitch) - (this.game.player().form === 'F09' ? 0.4 : 0));
-    this.cameraDesired.set(this.playerPosition.x - Math.sin(this.yaw) * reach, height, this.playerPosition.z + Math.cos(this.yaw) * reach);
+    const targetY = (this.game.player().form === 'F00' ? 1.05 : 0.78) + this.jumpHeight * 0.35;
+    const pitch = this.game.player().form === 'F00' ? 0.45 : this.pitch;
+    const reach = distance * Math.cos(pitch);
+    const height = Math.max(0.5, targetY + distance * Math.sin(pitch) - (this.game.player().form === 'F09' ? 0.4 : 0));
+    const shoulder = this.game.player().form === 'F00' ? 1.1 : 0;
+    this.cameraDesired.set(this.playerPosition.x - Math.sin(this.yaw) * reach + Math.cos(this.yaw) * shoulder, height,
+      this.playerPosition.z + Math.cos(this.yaw) * reach + Math.sin(this.yaw) * shoulder);
     this.camera.position.lerp(this.cameraDesired, smooth);
     this.#pullCameraIn(this.playerPosition.x, targetY, this.playerPosition.z);
     this.cameraTarget.set(this.playerPosition.x, targetY, this.playerPosition.z);
@@ -1260,16 +1518,24 @@ export class AcademyScene {
     let t = 1;
     const rect = areaCameraRect(this.game.player().area);
     if (rect) t = Math.min(t, rayRectLimit(px, pz, dx, dz, rect));
-    if (this.occlusion) t = Math.min(t, this.occlusion.firstHit(px, py, pz, cam.x, cam.y, cam.z, Math.min(1, CAMERA_BODY_CLEARANCE / length)) - CAMERA_WALL_CLEARANCE / length);
+    if (this.occlusion && this.game.player().form !== 'F00') {
+      t = Math.min(t, this.occlusion.firstHit(px, py, pz, cam.x, cam.y, cam.z, Math.min(1, CAMERA_BODY_CLEARANCE / length)) - CAMERA_WALL_CLEARANCE / length);
+    }
     t = Math.max(t, Math.min(1, CAMERA_MIN_DISTANCE / length));
     cam.set(px + dx * t, py + dy * t, pz + dz * t);
   }
 
-  // Builds the camera occlusion grid from every static, visible mesh once the room models have loaded.
+  // Builds the camera occlusion grid and the walls the player bumps into from every static, visible mesh once the
+  // room models have loaded.
   #buildOcclusion() {
+    const loose = [this.playerGroup, this.humanGroup, ...this.itemGroups.values(), ...this.exitGroups.values(), ...this.doorwayBlocks.map(({ mesh }) => mesh), ...this.classroomExitDoors];
+    this.occlusion = this.#gridFrom(new Set([...loose, ...['S05', 'S09', 'S19'].map((id) => this.targetGroups.get(id))]));
+    // Targets collide through their own bounds (and interaction-only proxies not at all), so walls leave them out.
+    this.walls = this.#gridFrom(new Set([...loose, ...this.targetGroups.values()]));
+  }
+
+  #gridFrom(skip) {
     const grid = new OcclusionGrid({ minX: -30, minY: 0, minZ: -28, maxX: 46, maxY: 3, maxZ: 8 });
-    const skip = new Set([this.playerGroup, this.humanGroup, ...this.itemGroups.values(), ...this.exitGroups.values(),
-      ...['S05', 'S09', 'S19'].map((id) => this.targetGroups.get(id)), ...this.classroomExitDoors]);
     const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
     this.scene.updateMatrixWorld(true);
     const walk = (node) => {
@@ -1288,11 +1554,12 @@ export class AcademyScene {
       for (const child of node.children) walk(child);
     };
     walk(this.scene);
-    this.occlusion = grid;
+    return grid;
   }
 
   render() {
     this.updateCamera();
+    this.renderer.clippingPlanes = this.game.player().canSeeWholeMap ? [] : this.#clipPlanesFor(this.game.player().area);
     this.renderer.render(this.scene, this.camera);
   }
 

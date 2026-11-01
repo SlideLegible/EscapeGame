@@ -1,7 +1,7 @@
 // STEP 1–3 rules coverage → VERIFY STEP 1–3
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Game, ACHIEVEMENTS, achievementEntries } from '../src/core.mjs';
+import { Game, ACHIEVEMENTS, achievementEntries, LOCKED_DOOR_TEXT } from '../src/core.mjs';
 
 function enterCorridor(game, playerId = 'local') {
   game.transform(playerId, 'F12');
@@ -138,8 +138,8 @@ test('office and storage keys open their doors and spawn the exam and pole', () 
   game.moveToArea('local', 'Restroom');
   assert.equal(game.interact('local', 'S09').interactionId, 'X013');
   assert.equal(game.item('F07').exists, true);
-  assert.equal(game.item('F07').area, 'Storage');
-  assert.equal(game.transform('local', 'F07').rejected, true);
+  assert.equal(game.item('F07').area, 'Restroom');
+  assert.equal(game.transform('local', 'F07').transformed, true);
 });
 
 test('every item appears in the place the design table lists for it', () => {
@@ -241,9 +241,7 @@ test('the window route triggers E03 and the ending achievement', () => {
   game.moveToArea('local', 'Corridor');
   game.moveToArea('local', 'Restroom');
   game.interact('local', 'S09');
-  game.moveToArea('local', 'Storage');
   game.transform('local', 'F07');
-  game.moveToArea('local', 'Restroom');
   assert.equal(game.interact('local', 'S13').ending, 'E03');
   assert.equal(game.hasAchievement('local', 'E03'), true);
 });
@@ -647,4 +645,40 @@ test('a new round after the clock ending lets time run again and keeps the clock
   assert.equal(game.state.remainingSeconds, 1790);
   assert.equal(game.hasAchievement('local', 'E04'), true);
   assert.equal(game.hasAchievement('local', 'A06'), true);
+});
+
+test('there is no storage room: the restroom door opens in place and the pole appears in the restroom', () => {
+  const game = new Game();
+  assert.equal(game.moveToArea('local', 'Storage'), false);
+  enterCorridor(game);
+  game.returnToHuman('local');
+  game.moveToArea('local', 'Corridor');
+  game.moveToArea('local', 'Restroom');
+  assert.equal(game.moveToArea('local', 'Storage'), false);
+});
+
+test('touching the locked office door says it is locked, without hinting which key opens it', () => {
+  const game = corridorHuman();
+  const locked = game.interact('local', 'S05');
+  assert.equal(locked.interactionId, 'X041');
+  assert.equal(locked.text, LOCKED_DOOR_TEXT.S05);
+  assert.match(locked.text, /鎖/);
+  assert.doesNotMatch(locked.text, /花盆|鑰匙/);
+  game.interact('local', 'S10');
+  game.transform('local', 'F04');
+  assert.equal(game.interact('local', 'S05').interactionId, 'X005');
+});
+
+test('the keyring still gets its own answer at the locked office door', () => {
+  const game = corridorHuman();
+  game.moveToArea('local', 'GuardRoom');
+  game.transform('local', 'F11');
+  game.moveToArea('local', 'Corridor');
+  assert.equal(game.interact('local', 'S05').interactionId, 'X033');
+});
+
+test('both locked doors that lead out of a room have a locked message', () => {
+  const game = new Game();
+  assert.equal(game.interact('local', 'S19').text, LOCKED_DOOR_TEXT.S19);
+  assert.deepEqual(Object.keys(LOCKED_DOOR_TEXT).sort(), ['S05', 'S19']);
 });

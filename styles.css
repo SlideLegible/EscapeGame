@@ -91,6 +91,8 @@ h1 span { color: var(--lime); }
 .skip-button { border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 11px; cursor: pointer; }
 .skip-button:hover { color: var(--lime); }
 @keyframes story-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+.fade { position: absolute; inset: 0; z-index: 3; background: #000; opacity: 0; pointer-events: none; transition: opacity .25s ease; }
+.fade.visible { opacity: 1; }
 @keyframes toast-in { from { opacity: 0; transform: translateX(9px); } to { opacity: 1; transform: translateX(0); } }
 @media (max-width: 720px) {
   .hud { top: 12px; left: 12px; right: 12px; gap: 5px; flex-wrap: wrap; }

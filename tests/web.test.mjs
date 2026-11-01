@@ -77,3 +77,11 @@ test('nothing the player sees before an ending hints that the game is a dream', 
   assert.doesNotMatch(html, /夢|dream/i);
   assert.doesNotMatch(main, /夢/);
 });
+
+test('walking through a doorway fades to black and back while the player changes rooms', async () => {
+  const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+  const main = await readFile(new URL('../src/main.mjs', import.meta.url), 'utf8');
+  assert.match(html, /id=["']fade["']/);
+  assert.match(main, /pendingDoorway/);
+  assert.match(main, /completeDoorway\(\)/);
+});

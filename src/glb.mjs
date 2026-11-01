@@ -14,6 +14,26 @@ function samplerValue(value, fallback, choices) {
   return choices[value] ?? fallback;
 }
 
+function createAnimations(json, readAccessor, nodeByIndex) {
+  return (json.animations ?? []).map((animation) => {
+    const tracks = [];
+    for (const channel of animation.channels ?? []) {
+      const node = nodeByIndex[channel.target.node];
+      const sampler = animation.samplers[channel.sampler];
+      const property = { translation: 'position', rotation: 'quaternion', scale: 'scale' }[channel.target.path];
+      if (!node || !sampler || !property) continue;
+      if (sampler.interpolation === 'CUBICSPLINE') throw new Error('模型使用了不支援的動畫插值方式');
+
+      const times = readAccessor(sampler.input).array;
+      const values = readAccessor(sampler.output).array;
+      const Track = property === 'quaternion' ? THREE.QuaternionKeyframeTrack : THREE.VectorKeyframeTrack;
+      const interpolation = sampler.interpolation === 'STEP' ? THREE.InterpolateDiscrete : THREE.InterpolateLinear;
+      tracks.push(new Track(`${node.uuid}.${property}`, times, values, interpolation));
+    }
+    return new THREE.AnimationClip(animation.name ?? '動畫', -1, tracks);
+  });
+}
+
 function parseGlb(buffer) {
   const view = new DataView(buffer);
   if (view.getUint32(0, true) !== 0x46546c67 || view.getUint32(4, true) !== 2) {
@@ -226,6 +246,7 @@ function createModel(json, binary) {
       node.userData.gltfSkin = { joints: bones, skeleton };
       delete node.userData.gltfSkinIndex;
     });
+    scene.animations = createAnimations(json, readAccessor, nodeByIndex);
     return scene;
   });
 }

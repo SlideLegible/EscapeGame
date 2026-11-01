@@ -57,18 +57,25 @@ const ROOM_NAMES = Object.fromEntries(Object.entries(ROOM).map(([id, room]) => [
 const palette = { wall: 0xb3a789, trim: 0x51483b, wood: 0x8d704a, light: 0xe8d8b6, dark: 0x292720, lime: 0xc4ef80 };
 
 export function areaAt(x, z) {
-  if (Math.abs(x) <= 7.75 && z >= -5.75 && z <= 5.75) return 'Classroom';
-  if (x >= 6 && x <= 16 && z >= -26 && z <= -15.8) return 'Office';
-  if (x >= -16 && x <= -6 && z >= -26 && z <= -15.8) return 'Restroom';
-  if (x >= -27 && x <= -16 && z >= -26 && z <= -16) return 'Storage';
-  if (x >= 18 && x <= 28 && z >= -26 && z <= -15.8) return 'GuardRoom';
-  if (x >= -25 && x <= 25 && z >= -16.2 && z <= -5.75) return 'Corridor';
-  if (x >= 33 && x <= 43 && z >= -14 && z <= -5) return 'L01';
-  if (x >= 33 && x <= 43 && z >= -25 && z <= -16) return 'L02';
+  for (const [id, minX, maxX, minZ, maxZ] of AREA_RECTS) {
+    if (x >= minX && x <= maxX && z >= minZ && z <= maxZ) return id;
+  }
   return null;
 }
 
 export const SPECIAL_EXITS = {
+// Walkable rectangles per area, checked in order (the first match wins where they overlap).
+const AREA_RECTS = [
+  ['Classroom', -7.75, 7.75, -5.75, 5.75],
+  ['Office', 6, 16, -26, -15.8],
+  ['Restroom', -16, -6, -26, -15.8],
+  ['Storage', -27, -16, -26, -16],
+  ['GuardRoom', 18, 28, -26, -15.8],
+  ['Corridor', -25, 25, -16.2, -5.75],
+  ['L01', 33, 43, -14, -5],
+  ['L02', 33, 43, -25, -16],
+];
+
   L01: { at: [34.1, -11.8], to: [-14, -6.9], text: '你從飲料機的出貨口鑽了出來' },
   L02: { at: [34.1, -23.8], to: [-14, -12.2], text: '你從飲料機底下滾了出來' },
 };
@@ -81,6 +88,17 @@ export function nearestCandidate(x, z, yaw, candidates, maxDistance = 3.7) {
   for (const candidate of candidates) {
     const { bounds } = candidate;
     const nx = bounds ? Math.max(candidate.x + bounds.min.x, Math.min(x, candidate.x + bounds.max.x)) : candidate.x;
+// Keeps the orbit camera inside the room the player is in, so it never swings out through a wall.
+// The player's walkable rectangle is cut down to the room's real floor, then pulled in by `margin`.
+export function clampCameraToArea(area, x, z, margin = 0.3) {
+  const rect = AREA_RECTS.find(([id]) => id === area);
+  const room = ROOM[area];
+  if (!rect || !room) return { x, z };
+  const minX = Math.max(rect[1], room.x - room.w / 2) + margin, maxX = Math.min(rect[2], room.x + room.w / 2) - margin;
+  const minZ = Math.max(rect[3], room.z - room.d / 2) + margin, maxZ = Math.min(rect[4], room.z + room.d / 2) - margin;
+  return { x: Math.max(minX, Math.min(maxX, x)), z: Math.max(minZ, Math.min(maxZ, z)) };
+}
+
     const nz = bounds ? Math.max(candidate.z + bounds.min.z, Math.min(z, candidate.z + bounds.max.z)) : candidate.z;
     const distance = Math.hypot(nx - x, nz - z);
     if (distance >= maxDistance) continue;
@@ -122,7 +140,7 @@ export class AcademyScene {
     this.renderer.toneMappingExposure = 1.1;
     this.keys = new Set();
     this.yaw = 0;
-    this.pitch = 0.28;
+    this.pitch = 0.45;
     this.pointerDown = null;
     this.started = false;
     this.playerPosition = new THREE.Vector3(-5.2, 0, -4.5);
@@ -160,6 +178,7 @@ export class AcademyScene {
     window.addEventListener('resize', this.#onResize);
     this.resize();
     this.refresh();
+    this.cameraArea = null;
   }
 
   #buildLights() {
@@ -1087,12 +1106,24 @@ export class AcademyScene {
       return;
     }
     const distance = this.game.player().form === 'F12' ? 8.5 : this.game.player().form === 'F08' ? 6.2 : this.game.player().form === 'F00' ? 6.5 : 7.2;
-    const height = (this.game.player().form === 'F09' ? 3.4 : 3.8) + this.pitch * 1.5;
-    const dx = Math.sin(this.yaw) * distance;
-    const dz = Math.cos(this.yaw) * distance;
-    this.cameraDesired.set(this.playerPosition.x - dx, height, this.playerPosition.z + dz);
+    // The camera orbits on a sphere around the player: pitch is its elevation angle.
+    const targetY = 0.78 + this.jumpHeight * 0.35;
+    const reach = distance * Math.cos(this.pitch);
+    const height = Math.max(0.5, targetY + distance * Math.sin(this.pitch) - (this.game.player().form === 'F09' ? 0.4 : 0));
+    const dx = Math.sin(this.yaw) * reach;
+    const dz = Math.cos(this.yaw) * reach;
+    const area = this.game.player().area;
+    const wanted = clampCameraToArea(area, this.playerPosition.x - dx, this.playerPosition.z + dz);
+    // A camera squeezed against a wall rises so it looks down at the player instead of sitting in their face.
+    const squeezed = Math.max(0, 1 - Math.hypot(wanted.x - this.playerPosition.x, wanted.z - this.playerPosition.z) / reach);
+    this.cameraDesired.set(wanted.x, height + squeezed * 2.5, wanted.z);
     this.camera.position.lerp(this.cameraDesired, smooth);
-    this.cameraTarget.set(this.playerPosition.x, 0.78 + this.jumpHeight * 0.35, this.playerPosition.z);
+    // The lerp can still clip a wall while the player walks through a doorway; only clamp once the camera is inside this room.
+    const held = clampCameraToArea(area, this.camera.position.x, this.camera.position.z);
+    const inside = Math.hypot(held.x - this.camera.position.x, held.z - this.camera.position.z) < 1e-6;
+    if (inside) this.cameraArea = area;
+    else if (this.cameraArea === area) { this.camera.position.x = held.x; this.camera.position.z = held.z; }
+    this.cameraTarget.set(this.playerPosition.x, targetY, this.playerPosition.z);
     this.camera.lookAt(this.cameraTarget);
   }
 

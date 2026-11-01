@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { areaAt, dropPoint, entryPoint, nearestCandidate, SPECIAL_EXITS, OBJECT_POSITIONS, LECTERN_SIZE } from '../src/scene.mjs';
+import { areaAt, clampCameraToArea, dropPoint, entryPoint, nearestCandidate, SPECIAL_EXITS, OBJECT_POSITIONS, LECTERN_SIZE } from '../src/scene.mjs';
 
 test('walkable room areas touch across the classroom, corridor, office, restroom, and storage thresholds', () => {
   assert.equal(areaAt(7, -6.2), 'Corridor');
@@ -132,4 +132,15 @@ test('facing the drink machine from the front or the back still picks the machin
 test('nothing farther than the reach distance is picked', () => {
   assert.equal(nearestCandidate(0, 0, 0, [{ id: 'F08', x: 0, z: -5 }]), null);
   assert.equal(nearestCandidate(0, 0, 0, [{ id: 'F08', x: 0, z: -2 }]).id, 'F08');
+});
+
+test('orbit camera is kept inside the room the player is in', () => {
+  const office = clampCameraToArea('Office', 11, -30);
+  assert.ok(office.z >= -26 && office.z <= -15.8);
+  assert.deepEqual(clampCameraToArea('Office', 11, -20), { x: 11, z: -20 });
+  const classroom = clampCameraToArea('Classroom', 20, 20);
+  assert.ok(classroom.x <= 7.75 && classroom.z <= 5.75);
+  const corridor = clampCameraToArea('Corridor', 0, -3);
+  assert.ok(corridor.z <= -7 && corridor.z >= -15);
+  assert.deepEqual(clampCameraToArea(null, 99, 99), { x: 99, z: 99 });
 });

@@ -318,7 +318,7 @@ canvas.addEventListener('pointermove', (event) => {
   const dy = event.clientY - scene.pointerDown.y;
   scene.pointerDown.x = event.clientX; scene.pointerDown.y = event.clientY;
   scene.yaw -= dx * 0.005;
-  scene.pitch = Math.max(-0.1, Math.min(0.75, scene.pitch + dy * 0.002));
+  scene.pitch = Math.max(0.05, Math.min(1.25, scene.pitch + dy * 0.004));
 });
 canvas.addEventListener('pointerup', (event) => {
   if (!scene?.pointerDown || scene.pointerDown.id !== event.pointerId) return;

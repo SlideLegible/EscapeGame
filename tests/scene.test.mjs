@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { areaAt, dropPoint, entryPoint, SPECIAL_EXITS, OBJECT_POSITIONS } from '../src/scene.mjs';
+import { areaAt, dropPoint, entryPoint, nearestCandidate, SPECIAL_EXITS, OBJECT_POSITIONS, LECTERN_SIZE } from '../src/scene.mjs';
 
 test('walkable room areas touch across the classroom, corridor, office, restroom, and storage thresholds', () => {
   assert.equal(areaAt(7, -6.2), 'Corridor');
@@ -86,4 +86,50 @@ test('the storage door sits on the wall between the restroom and the storage roo
   const [x, z] = OBJECT_POSITIONS.S09;
   assert.equal(areaAt(x + 0.1, z), 'Restroom');
   assert.equal(areaAt(x - 0.1, z), 'Storage');
+});
+
+const box = (w, d) => ({ min: { x: -w / 2, z: -d / 2 }, max: { x: w / 2, z: d / 2 } });
+const classroomFront = () => [
+  { id: 'S14', x: OBJECT_POSITIONS.S14[0], z: OBJECT_POSITIONS.S14[1], bounds: box(0.16, 6) },
+  { id: 'S16', x: OBJECT_POSITIONS.S16[0], z: OBJECT_POSITIONS.S16[1], bounds: box(LECTERN_SIZE[0], LECTERN_SIZE[1]) },
+  { id: 'S20', x: OBJECT_POSITIONS.S20[0], z: OBJECT_POSITIONS.S20[1], bounds: box(0.9, 0.1) },
+];
+
+test('a dice between the lectern and the blackboard reaches the blackboard when facing it', () => {
+  const facingBlackboard = -Math.PI / 2;
+  for (const z of [-2.4, -1, 0, 1, 2.4]) {
+    assert.equal(nearestCandidate(-7.2, z, facingBlackboard, classroomFront()).id, 'S14', `z=${z}`);
+  }
+});
+
+test('the lectern target matches the lectern in the classroom model and leaves the walkway in front of the blackboard clear', () => {
+  const [x] = OBJECT_POSITIONS.S16;
+  assert.ok(Math.abs(x - -6.32) < 0.1);
+  assert.ok(LECTERN_SIZE[1] > LECTERN_SIZE[0]);
+  assert.ok(x - LECTERN_SIZE[0] / 2 > -7.0);
+});
+
+test('a dice pressed against the blackboard reaches it even without turning the camera toward it', () => {
+  for (const z of [-2, -1, 0, 1, 2]) {
+    assert.equal(nearestCandidate(-7.3, z, 0, classroomFront()).id, 'S14', `z=${z}`);
+  }
+});
+
+test('the same spot reaches the lectern when the player turns to face it', () => {
+  const facingLectern = Math.PI / 2;
+  assert.equal(nearestCandidate(-7.2, 0, facingLectern, classroomFront()).id, 'S16');
+});
+
+test('facing the drink machine from the front or the back still picks the machine or its underside', () => {
+  const machine = () => [
+    { id: 'S03', x: OBJECT_POSITIONS.S03[0], z: OBJECT_POSITIONS.S03[1], bounds: box(1.36, 0.78) },
+    { id: 'S04', x: OBJECT_POSITIONS.S04[0], z: OBJECT_POSITIONS.S04[1], bounds: { min: { x: -0.68, z: 0 }, max: { x: 0.68, z: 0.3 } } },
+  ];
+  assert.equal(nearestCandidate(-14, -9, 0, machine()).id, 'S03');
+  assert.equal(nearestCandidate(-14, -11.3, Math.PI, machine()).id, 'S04');
+});
+
+test('nothing farther than the reach distance is picked', () => {
+  assert.equal(nearestCandidate(0, 0, 0, [{ id: 'F08', x: 0, z: -5 }]), null);
+  assert.equal(nearestCandidate(0, 0, 0, [{ id: 'F08', x: 0, z: -2 }]).id, 'F08');
 });

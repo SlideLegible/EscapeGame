@@ -17,7 +17,7 @@ export const OBJECT_POSITIONS = {
   S01: [0, -14], S02: [-6, -10], S03: [-14, -10], S04: [-14, -10.7], S05: [11, -15],
   S06: [13, -20], S07: [9, -21], S08: [13, -24], S09: [-16, -21], S10: [4, -10],
   S11: [-12, -19], S12: [-8, -23], S13: [-9, -17], S14: [-7.65, 0], S15: [25, -22],
-  S16: [-6.2, 0], S17: [-3, -10], S18: [9, -24], S19: [-5.55, -5.45], S20: [-5.65, 0.35],
+  S16: [-6.32, 0], S17: [-3, -10], S18: [9, -24], S19: [-5.55, -5.45], S20: [-5.65, 0.35],
   S21: [22.5, -22],
 };
 
@@ -26,6 +26,9 @@ const ITEM_POSITIONS = {
   F06: [11.8, -24], F07: [-22, -21], F08: [-5.2, 0.9], F09: [-5, 2.2],
   F11: [20.5, -22], F12: [-5, -2.8],
 };
+
+// Footprint (x, z) of the teacher's lectern in the bundled classroom, parallel to the blackboard.
+export const LECTERN_SIZE = [0.9, 1.48];
 
 // Walkable collision rows measured from the bundled classroom's desk and chair layout.
 const CLASSROOM_DESK_COLUMNS = [-3.77, -1.67, 0.41, 2.43, 4.45, 6.5];
@@ -52,6 +55,26 @@ export const SPECIAL_EXITS = {
   L01: { at: [34.1, -11.8], to: [-14, -6.9], text: '你從飲料機的出貨口鑽了出來' },
   L02: { at: [34.1, -23.8], to: [-14, -12.2], text: '你從飲料機底下滾了出來' },
 };
+
+// Targets behind or beside the camera direction cost extra, so the one the player faces wins.
+export function nearestCandidate(x, z, yaw, candidates, maxDistance = 3.7) {
+  const fx = Math.sin(yaw), fz = -Math.cos(yaw);
+  let best = null;
+  let bestScore = Infinity;
+  for (const candidate of candidates) {
+    const { bounds } = candidate;
+    const nx = bounds ? Math.max(candidate.x + bounds.min.x, Math.min(x, candidate.x + bounds.max.x)) : candidate.x;
+    const nz = bounds ? Math.max(candidate.z + bounds.min.z, Math.min(z, candidate.z + bounds.max.z)) : candidate.z;
+    const distance = Math.hypot(nx - x, nz - z);
+    if (distance >= maxDistance) continue;
+    const [dx, dz] = distance > 1e-6 ? [nx - x, nz - z] : [candidate.x - x, candidate.z - z];
+    const length = Math.hypot(dx, dz);
+    const facing = length > 1e-6 ? (dx * fx + dz * fz) / length : 1;
+    const score = distance + 0.4 * (1 - facing);
+    if (score < bestScore) { bestScore = score; best = { ...candidate, distance }; }
+  }
+  return best;
+}
 
 export function entryPoint(area) {
   return area === 'L01' ? [35.5, -9] : [35.5, -21];
@@ -407,10 +430,7 @@ export class AcademyScene {
         break;
       }
       case 'S16': {
-        for (const x of [-0.72, 0.72]) for (const z of [-0.25, 0.25]) this.#box(group, x, 0.5, z, 0.14, 0.98, 0.14, this.#material(0x655740));
-        this.#box(group, 0, 0.72, 0, 1.95, 0.62, 0.76, wood);
-        this.#box(group, 0, 1.06, 0, 2.15, 0.14, 0.94, this.#material(0x918064));
-        this.#box(group, 0, 1.08, 0.49, 0.48, 0.08, 0.04, this.#material(0x4d5d53), false);
+        this.#box(group, 0, 0.56, 0, LECTERN_SIZE[0], 1.12, LECTERN_SIZE[1], wood);
         break;
       }
       case 'S17': {
@@ -685,25 +705,20 @@ export class AcademyScene {
   }
 
   nearestTarget(maxDistance = 3.7) {
-    let best = null;
-    let bestDistance = maxDistance;
+    const candidates = [];
     const exit = this.exitGroups.get(this.game.player().area);
-    if (exit) {
-      const distance = Math.hypot(exit.position.x - this.playerPosition.x, exit.position.z - this.playerPosition.z);
-      if (distance < bestDistance) { bestDistance = distance; best = { id: 'EXIT', name: '離開這裡', distance }; }
-    }
+    if (exit) candidates.push({ id: 'EXIT', name: '離開這裡', x: exit.position.x, z: exit.position.z });
     for (const [id, group] of this.targetGroups) {
       if (!group.visible) continue;
       if (OBJECT_AREAS[id] !== this.game.player().area) continue;
-      const distance = Math.hypot(group.position.x - this.playerPosition.x, group.position.z - this.playerPosition.z);
-      if (distance < bestDistance) { bestDistance = distance; best = { id, name: OBJECTS[id], distance }; }
+      candidates.push({ id, name: OBJECTS[id], x: group.position.x, z: group.position.z, bounds: group.userData.localBounds });
     }
     for (const [id, group] of this.itemGroups) {
       if (!group.visible) continue;
-      const distance = Math.hypot(group.position.x - this.playerPosition.x, group.position.z - this.playerPosition.z);
-      if (distance < bestDistance) { bestDistance = distance; best = { id, name: FORMS[id], distance }; }
+      candidates.push({ id, name: FORMS[id], x: group.position.x, z: group.position.z });
     }
-    return best;
+    const best = nearestCandidate(this.playerPosition.x, this.playerPosition.z, this.yaw, candidates, maxDistance);
+    return best && { id: best.id, name: best.name, distance: best.distance };
   }
 
   pickTarget(clientX, clientY) {

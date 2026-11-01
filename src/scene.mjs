@@ -1,15 +1,16 @@
 import * as THREE from '../vendor/three.module.js';
 import { FORMS, OBJECTS, OBJECT_AREAS } from './core.mjs';
+import { loadGlb } from './glb.mjs';
 
 const ROOM = {
-  Classroom: { label: '密碼學教室', x: 0, z: 0, w: 18, d: 12, color: 0x46564f },
-  Corridor: { label: '走廊', x: 0, z: -11, w: 50, d: 8, color: 0x394943 },
-  Office: { label: '辦公室', x: 11, z: -21, w: 10, d: 10, color: 0x4d5348 },
-  Restroom: { label: '廁所', x: -11, z: -21, w: 10, d: 10, color: 0x485958 },
-  Storage: { label: '儲物間', x: -22, z: -21, w: 9, d: 10, color: 0x333e3b },
-  GuardRoom: { label: '警衛室', x: 23, z: -21, w: 10, d: 10, color: 0x424e47 },
-  L01: { label: '飲料機內部', x: 38, z: -9, w: 9, d: 8, color: 0x365854 },
-  L02: { label: '飲料機底下', x: 38, z: -21, w: 9, d: 8, color: 0x3c4946 },
+  Classroom: { label: '密碼學教室', x: 0, z: 0, w: 18, d: 12, color: 0x8b7859 },
+  Corridor: { label: '走廊', x: 0, z: -11, w: 50, d: 8, color: 0x756b58 },
+  Office: { label: '辦公室', x: 11, z: -21, w: 10, d: 10, color: 0x766c58 },
+  Restroom: { label: '廁所', x: -11, z: -21, w: 10, d: 10, color: 0x626b66 },
+  Storage: { label: '儲物間', x: -22, z: -21, w: 9, d: 10, color: 0x5b5244 },
+  GuardRoom: { label: '警衛室', x: 23, z: -21, w: 10, d: 10, color: 0x696553 },
+  L01: { label: '飲料機內部', x: 38, z: -9, w: 9, d: 8, color: 0x515f58 },
+  L02: { label: '飲料機底下', x: 38, z: -21, w: 9, d: 8, color: 0x50564e },
 };
 
 const OBJECT_POSITIONS = {
@@ -26,7 +27,7 @@ const ITEM_POSITIONS = {
 };
 
 const ROOM_NAMES = Object.fromEntries(Object.entries(ROOM).map(([id, room]) => [id, room.label]));
-const palette = { wall: 0x8c9883, trim: 0x273a36, wood: 0x806e52, light: 0xc8d7bb, dark: 0x1a2928, lime: 0xc4ef80 };
+const palette = { wall: 0xb3a789, trim: 0x51483b, wood: 0x8d704a, light: 0xe8d8b6, dark: 0x292720, lime: 0xc4ef80 };
 
 export function areaAt(x, z) {
   if (Math.abs(x) <= 9 && z >= -6 && z <= 6) return 'Classroom';
@@ -67,6 +68,7 @@ export class AcademyScene {
     this.targetMeshes = [];
     this.targetGroups = new Map();
     this.itemGroups = new Map();
+    this.roomGroups = new Map();
     this.playerGroup = null;
     this.playerMaterials = new Map();
     this.cameraTarget = new THREE.Vector3();
@@ -77,6 +79,7 @@ export class AcademyScene {
     this.#buildRooms();
     this.#buildObjects();
     this.#buildPlayer();
+    this.classroomLoad = this.#loadClassroomModel();
     this.#onResize = () => this.resize();
     window.addEventListener('resize', this.#onResize);
     this.resize();
@@ -84,7 +87,7 @@ export class AcademyScene {
   }
 
   #buildLights() {
-    this.scene.add(new THREE.HemisphereLight(0xc4d9cc, 0x202924, 2.25));
+    this.scene.add(new THREE.HemisphereLight(0xf0dfc0, 0x39352e, 2.25));
     const key = new THREE.DirectionalLight(0xffedcf, 2.2);
     key.position.set(-12, 24, 15);
     key.castShadow = true;
@@ -132,17 +135,18 @@ export class AcademyScene {
 
   #buildRooms() {
     const concrete = this.#material(0x66736a);
-    const wallMaterial = this.#material(0x7c8978);
+    const wallMaterial = this.#material(palette.wall);
     for (const [id, room] of Object.entries(ROOM)) {
       const group = new THREE.Group();
       group.name = id;
       this.scene.add(group);
+      this.roomGroups.set(id, group);
       const floorMat = this.#material(room.color);
       const floor = new THREE.Mesh(new THREE.BoxGeometry(room.w, 0.28, room.d), floorMat);
       floor.position.set(room.x, -0.17, room.z);
       floor.receiveShadow = true;
       group.add(floor);
-      const border = this.#material(0x253431);
+      const border = this.#material(palette.trim);
       this.#box(group, room.x, -0.02, room.z - room.d / 2, room.w, 0.24, 0.18, border, false);
       this.#box(group, room.x, -0.02, room.z + room.d / 2, room.w, 0.24, 0.18, border, false);
       this.#box(group, room.x - room.w / 2, -0.02, room.z, 0.18, 0.24, room.d, border, false);
@@ -184,13 +188,36 @@ export class AcademyScene {
         this.#box(group, 0, 1.85, 5.58, 8.1, 1.85, 0.04, this.#material(0x36514b), false);
       }
     }
-    const hallwayMat = this.#material(0x7d836c);
+    const hallwayMat = this.#material(0x8a7c62);
     this.#box(this.scene, 0, -0.26, -11, 49, 0.08, 0.45, hallwayMat, false);
-    const lampMat = new THREE.MeshStandardMaterial({ color: 0xd7e2ba, emissive: 0x91a665, emissiveIntensity: 1.5 });
+    const lampMat = new THREE.MeshStandardMaterial({ color: 0xf4dfae, emissive: 0xa57e43, emissiveIntensity: 1.35 });
     for (const x of [-18, -8, 2, 12, 22]) {
       const lamp = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.08, 0.35), lampMat);
       lamp.position.set(x, 3.15, -11);
       this.scene.add(lamp);
+    }
+  }
+
+  async #loadClassroomModel() {
+    try {
+      const model = await loadGlb(new URL('../assets/models/japanese_classroom.glb', import.meta.url));
+      const room = ROOM.Classroom;
+      model.rotation.y = Math.PI;
+      const bounds = new THREE.Box3().setFromObject(model);
+      const size = bounds.getSize(new THREE.Vector3());
+      const scale = Math.min((room.w - 0.4) / size.x, (room.d - 0.4) / size.z);
+      model.scale.setScalar(scale);
+      model.updateMatrixWorld(true);
+      bounds.setFromObject(model);
+      const center = bounds.getCenter(new THREE.Vector3());
+      model.position.set(room.x - center.x, -bounds.min.y, room.z - center.z);
+      model.name = 'Japanese classroom (T I A N, CC BY)';
+      this.scene.add(model);
+      this.roomGroups.get('Classroom').visible = false;
+      this.classroomModel = model;
+      this.refresh();
+    } catch (error) {
+      console.error('教室模型載入失敗，使用簡化場景。', error);
     }
   }
 

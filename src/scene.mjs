@@ -869,7 +869,7 @@ export class AcademyScene {
     this.walking = Boolean(moving);
     if (this.game.player().form === 'F00') {
       const gait = moving ? Math.sin(this.playerAnimationTime * 10) : 0;
-      this.playerGroup.rotation.y = this.yaw + Math.PI;
+      this.playerGroup.rotation.y = Math.PI - this.yaw;
       if (this.playerRig) {
         if (this.playerRig.kind === 'skinned') this.#updatePlayerSkin();
         else {

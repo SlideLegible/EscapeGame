@@ -122,7 +122,8 @@ export class AcademyScene {
     this.renderer.toneMappingExposure = 1.1;
     this.keys = new Set();
     this.yaw = 0;
-    this.playerFacingAway = true;
+    this.playerFacingYaw = 0;
+    this.turningInPlace = false;
     this.pitch = 0.28;
     this.pointerDown = null;
     this.started = false;
@@ -1044,14 +1045,38 @@ export class AcademyScene {
       if (this.jumpHeight <= 0) { this.jumpHeight = 0; this.jumpVelocity = 0; }
     }
     this.playerGroup.position.y = this.game.player().form === 'F00' ? this.jumpHeight : 0;
-    const moving = this.keys.has('KeyW') || this.keys.has('KeyA') || this.keys.has('KeyS') || this.keys.has('KeyD') || this.keys.has('ArrowUp') || this.keys.has('ArrowDown') || this.keys.has('ArrowLeft') || this.keys.has('ArrowRight');
     let forward = Number(this.keys.has('KeyW') || this.keys.has('ArrowUp')) - Number(this.keys.has('KeyS') || this.keys.has('ArrowDown'));
     let right = Number(this.keys.has('KeyD') || this.keys.has('ArrowRight')) - Number(this.keys.has('KeyA') || this.keys.has('ArrowLeft'));
-    if (forward || right) this.playerFacingAway = forward > 0 && right === 0;
+    const hasMovementInput = Boolean(forward || right);
+    if (hasMovementInput) {
+      const inputLength = Math.hypot(forward, right);
+      forward /= inputLength;
+      right /= inputLength;
+      const fx = Math.sin(this.yaw), fz = -Math.cos(this.yaw);
+      const rx = Math.cos(this.yaw), rz = Math.sin(this.yaw);
+      const moveX = fx * forward + rx * right;
+      const moveZ = fz * forward + rz * right;
+      const targetYaw = Math.atan2(-moveX, -moveZ);
+      let turnDelta = (targetYaw - this.playerFacingYaw + Math.PI) % (Math.PI * 2);
+      if (turnDelta < 0) turnDelta += Math.PI * 2;
+      turnDelta -= Math.PI;
+      if (Math.abs(Math.abs(turnDelta) - Math.PI) < 1e-6) turnDelta = -Math.PI;
+      if (this.game.player().form === 'F00' && !this.turningInPlace && Math.abs(turnDelta) >= Math.PI * 0.75) {
+        this.turningInPlace = true;
+      }
+      if (this.game.player().form === 'F00') {
+        const turnStep = Math.sign(turnDelta) * Math.min(Math.abs(turnDelta), 7 * dt);
+        this.playerFacingYaw += turnStep;
+        this.playerGroup.rotation.y = this.playerFacingYaw;
+        if (this.turningInPlace && Math.abs(turnDelta - turnStep) <= 0.12) this.turningInPlace = false;
+      }
+    } else {
+      this.turningInPlace = false;
+    }
+    const moving = hasMovementInput && !(this.game.player().form === 'F00' && this.turningInPlace);
     this.walking = Boolean(moving);
     if (this.game.player().form === 'F00') {
       const gait = moving ? Math.sin(this.playerAnimationTime * 10) : 0;
-      this.playerGroup.rotation.y = -this.yaw + (this.playerFacingAway ? 0 : Math.PI);
       if (this.playerWalkAction) {
         if (moving) {
           if (this.playerWalkAction.paused) {
@@ -1082,7 +1107,7 @@ export class AcademyScene {
       this.playerWalkAction.paused = true;
     }
     if (!forward && !right) return;
-    const length = Math.hypot(forward, right); forward /= length; right /= length;
+    if (!moving) return;
     const speed = this.game.player().form === 'F08' ? 2.6 : this.game.player().form === 'F09' ? 1.8 : 4.4;
     const fx = Math.sin(this.yaw), fz = -Math.cos(this.yaw);
     const rx = Math.cos(this.yaw), rz = Math.sin(this.yaw);

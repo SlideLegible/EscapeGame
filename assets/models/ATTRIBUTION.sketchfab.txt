@@ -28,3 +28,4 @@ S18 | Calendar Wall - 3MB | Mehdi Shahsavan | CC Attribution | https://sketchfab
 S08 | Closed Cardboard Box (Free Download) | sharpened | CC Attribution | https://sketchfab.com/3d-models/closed-cardboard-box-free-download-c023cd16986445d880871174d7fe8623 | objects/s08.glb
 S12 | Trash Bin | cringecrimson | CC Attribution | https://sketchfab.com/3d-models/trash-bin-38d4771d62cd47cca50ac39deab0bf04 | objects/s12.glb
 S13 | Double-Hung White Window | sacapuntas | CC Attribution | https://sketchfab.com/3d-models/double-hung-white-window-58848fe0bc1b45bcb9779d93c5652289 | objects/s13.glb
+S09 | Metal Door 2 | tboiston | CC Attribution | https://sketchfab.com/3d-models/metal-door-2-4da6b538427244aaababe36d3e228a40 | objects/s09.glb

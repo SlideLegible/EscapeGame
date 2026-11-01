@@ -46,7 +46,7 @@ const ITEM_MODELS = {
 
 // Room models from Sketchfab (downloaded to assets/models/rooms/, see ATTRIBUTION.sketchfab.txt). `fitFootprint` scales to the room's
 // floor minus a margin; `scale` is used as-is (the desk and closet files are in centimetres); `fitMax` sets the largest dimension.
-// `x`/`z` default to the room centre and `y` to the floor. `replaces` lists the interaction targets whose procedural shapes are hidden; `alignMaxX` slides the model so its largest-x edge touches that x (wall mounting).
+// `x`/`z` default to the room centre and `y` to the floor. `replaces` lists the interaction targets whose procedural shapes are hidden; `doorOf` ties the model's visibility to that door's open state; `alignMaxX` slides the model so its largest-x edge touches that x (wall mounting).
 const ROOM_MODELS = [
   { room: 'Corridor', file: 'rooms/corridor.glb', rotateY: Math.PI / 2, fitFootprint: true },
   { room: 'Restroom', file: 'rooms/restroom.glb', fitFootprint: true },
@@ -65,6 +65,8 @@ const ROOM_MODELS = [
   { room: 'Office', file: 'objects/s06.glb', fitMax: 1.6, x: 13, z: -20, replaces: ['S06'] },
   { room: 'Office', file: 'objects/s07.glb', rotateY: -Math.PI / 2, fitMax: 0.7, y: 0.785, x: 12.5, z: -20, replaces: ['S07'] }, // on the S06 desk top
   { room: 'GuardRoom', file: 'objects/s15.glb', rotateY: -Math.PI / 2, fitMax: 1.2, y: 0.9, z: -22, alignMaxX: 27.89, replaces: ['S15'] },
+  // Storage door on the restroom model's west wall (its inner face is x = -15.36); the model hides while the door is open (`doorOf`).
+  { room: 'Restroom', file: 'objects/s09.glb', rotateY: Math.PI / 2, fitMax: 2.8, x: -15.26, z: -21, replaces: ['S09'], doorOf: 'S09' },
   { room: 'Office', file: 'objects/s08.glb', rotateY: Math.PI / 2, fitMax: 1.1, x: 13, z: -24, replaces: ['S08'] },
   { room: 'Restroom', file: 'objects/s12.glb', fitMax: 0.9, x: -8, z: -23, replaces: ['S12'] },
   // High window on the restroom's north wall (inner face z = -16.3), facing into the room.
@@ -236,6 +238,7 @@ export class AcademyScene {
     this.itemDrops = new Map();
     this.targetMeshes = [];
     this.targetGroups = new Map();
+    this.doorModels = new Map();
     this.itemGroups = new Map();
     this.exitGroups = new Map();
     this.roomGroups = new Map();
@@ -424,6 +427,7 @@ export class AcademyScene {
         this.#placeRoomModel(model, config);
         model.name = config.file;
         (this.roomGroups.get(config.room) ?? this.scene).add(model);
+        if (config.doorOf) this.doorModels.set(config.doorOf, model);
         for (const id of config.replaces ?? []) {
           for (const child of this.targetGroups.get(id).children) child.visible = false;
         }
@@ -1056,6 +1060,8 @@ export class AcademyScene {
     for (const doorId of ['S05', 'S09', 'S19']) {
       const door = this.targetGroups.get(doorId);
       if (door) door.visible = !this.game.isDoorOpen(doorId);
+      const doorModel = this.doorModels.get(doorId);
+      if (doorModel) doorModel.visible = !this.game.isDoorOpen(doorId);
     }
     const exitOpen = this.game.isDoorOpen('S19');
     for (const part of this.classroomExitDoors) part.visible = !exitOpen;

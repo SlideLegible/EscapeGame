@@ -22,6 +22,7 @@ CONFIG = {
     'S06': {'keep': [], 'faces': None, 'texture': 1024},
     'S07': {'keep': [], 'faces': None, 'texture': 512},
     'S08': {'keep': [], 'faces': None, 'texture': 512},
+    'S09': {'keep': [], 'faces': None, 'texture': 512},
     'S10': {'keep': [], 'faces': 3000, 'texture': 512},
     'S17': {'keep': ['BoardGeo.012_4'], 'faces': 4000, 'texture': 512},
     'S12': {'keep': [], 'faces': None, 'texture': 512},

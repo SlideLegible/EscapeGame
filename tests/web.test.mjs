@@ -52,3 +52,10 @@ test('players never see developer IDs in achievement or ending screens', async (
   assert.doesNotMatch(html, />[^<]*\b[EASFX]\d{2}\b[^<]*</);
   assert.doesNotMatch(main, /textContent = [^;]*(\$\{(id|ending)\}|entry\.id)/);
 });
+
+test('restarting after an ending starts a new round in the page instead of reloading it', async () => {
+  const main = await readFile(new URL('../src/main.mjs', import.meta.url), 'utf8');
+  assert.doesNotMatch(main, /location\.reload/);
+  assert.match(main, /game\.newRound\(\)/);
+  assert.match(main, /resetRound\(\)/);
+});

@@ -674,6 +674,15 @@ export class AcademyScene {
     this.refresh();
   }
 
+  resetRound() {
+    this.itemDrops.clear();
+    this.playerPosition.set(-5.2, 0, -4.5);
+    this.humanPosition.copy(this.playerPosition);
+    this.playerGroup.position.copy(this.playerPosition);
+    this.setForm(this.game.player().form);
+    this.refresh();
+  }
+
   refresh() {
     for (const [id, group] of this.itemGroups) {
       const item = this.game.item(id);

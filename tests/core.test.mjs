@@ -615,3 +615,36 @@ test('one-time events become available again after an E05 restart', () => {
   game.moveToArea('local', 'Corridor');
   assert.equal(game.interact('local', 'S02').interactionId, 'X001');
 });
+
+test('starting a new round after escaping keeps achievements and resets the round', () => {
+  const game = corridorHuman();
+  game.interact('local', 'S02');
+  game.transform('local', 'F01');
+  game.interact('local', 'S04');
+  game.transform('local', 'F03');
+  game.moveToArea('local', 'Corridor');
+  game.interact('local', 'S01');
+  assert.equal(game.player().ending, 'E01');
+  game.state.health = 7;
+  game.newRound();
+  assert.equal(game.player().ending, null);
+  assert.equal(game.player().form, 'F00');
+  assert.equal(game.player().area, 'Classroom');
+  assert.equal(game.state.health, 5);
+  assert.equal(game.state.remainingSeconds, 1800);
+  assert.equal(game.isDoorOpen('S19'), false);
+  assert.equal(game.item('F01').exists, false);
+  assert.equal(game.hasAchievement('local', 'E01'), true);
+});
+
+test('a new round after the clock ending lets time run again and keeps the clock achievements', () => {
+  const game = new Game();
+  game.transform('local', 'F09');
+  game.interact('local', 'SELF');
+  assert.equal(game.player().ending, 'E04');
+  game.newRound();
+  game.tick(10);
+  assert.equal(game.state.remainingSeconds, 1790);
+  assert.equal(game.hasAchievement('local', 'E04'), true);
+  assert.equal(game.hasAchievement('local', 'A06'), true);
+});

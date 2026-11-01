@@ -203,13 +203,17 @@ export class Game {
     this.state.health = Math.max(0, this.state.health - amount);
     if (this.state.health === 0) {
       this.#end('local', 'E05');
-      this.#restartRound();
+      this.#restartRound((player) => player.ending === 'E05');
       return { ending: 'E05', text };
     }
     return { text };
   }
 
-  #restartRound() {
+  newRound() {
+    this.#restartRound(() => true);
+  }
+
+  #restartRound(shouldReset) {
     this.state.health = 5;
     this.state.remainingSeconds = 1800;
     this.state.powerCut = false;
@@ -221,7 +225,7 @@ export class Game {
     this.state.items = freshItems();
     this.#password = this.#newPassword();
     for (const player of this.players.values()) {
-      if (player.ending !== 'E05') continue;
+      if (!shouldReset(player)) continue;
       player.ending = null;
       player.form = 'F00';
       player.area = 'Classroom';

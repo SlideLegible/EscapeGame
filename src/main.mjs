@@ -218,8 +218,14 @@ $('start-achievements').addEventListener('click', () => toggleAchievementBook(tr
 $('ending-achievements').addEventListener('click', () => toggleAchievementBook(true));
 $('submit-password').addEventListener('click', submitPassword);
 $('ending-button').addEventListener('click', () => {
-  if (game.player().ending && game.player().ending !== 'E05') window.location.reload();
-  else endingPanel.classList.add('hidden');
+  if (game.player().ending && game.player().ending !== 'E05') {
+    game.newRound();
+    scene?.resetRound();
+    lastShownEnding = null;
+  }
+  endingPanel.classList.add('hidden');
+  updateAchievements();
+  updateHud();
 });
 $('keypad').addEventListener('click', (event) => {
   const button = event.target.closest('button[data-key]');

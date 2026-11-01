@@ -152,6 +152,8 @@ export class AcademyScene {
     this.#buildObjects();
     this.#buildExits();
     this.#buildPlayer();
+    this.playerMixer = null;
+    this.playerWalkAction = null;
     this.playerModelLoad = this.#loadPlayerModel();
     this.classroomLoad = this.#loadClassroomModel();
     this.itemTemplates = new Map();
@@ -785,7 +787,15 @@ export class AcademyScene {
         node.frustumCulled = false;
       });
       this.humanModel = source;
-      this.humanRig = this.#createSkinnedPlayerRig(source);
+      const walkClip = source.animations?.find((clip) => clip.tracks.length > 0);
+      if (walkClip) {
+        this.playerMixer = new THREE.AnimationMixer(source);
+        this.playerWalkAction = this.playerMixer.clipAction(walkClip);
+        this.playerWalkAction.setLoop(THREE.LoopRepeat, Infinity);
+        this.humanRig = { kind: 'animated' };
+      } else {
+        this.humanRig = this.#createSkinnedPlayerRig(source);
+      }
       this.playerRig = this.humanRig;
       if (this.game.player().form === 'F00') this.#rebuildFormMesh(this.playerGroup, 'F00');
     } catch (error) {
@@ -1034,7 +1044,14 @@ export class AcademyScene {
     if (this.game.player().form === 'F00') {
       const gait = moving ? Math.sin(this.playerAnimationTime * 10) : 0;
       this.playerGroup.rotation.y = -this.yaw;
-      if (this.playerRig) {
+      if (this.playerWalkAction) {
+        if (moving) {
+          if (!this.playerWalkAction.isRunning()) this.playerWalkAction.reset().play();
+          this.playerMixer.update(dt);
+        } else if (this.playerWalkAction.isRunning()) {
+          this.playerWalkAction.stop();
+        }
+      } else if (this.playerRig) {
         if (this.playerRig.kind === 'skinned') this.#updatePlayerSkin();
         else {
           this.playerRig.torso.position.y = 0.68 + (moving ? Math.abs(gait) * 0.018 : Math.sin(this.playerAnimationTime * 2) * 0.006);
@@ -1050,6 +1067,8 @@ export class AcademyScene {
           }
         }
       }
+    } else if (this.playerWalkAction?.isRunning()) {
+      this.playerWalkAction.stop();
     }
     let forward = Number(this.keys.has('KeyW') || this.keys.has('ArrowUp')) - Number(this.keys.has('KeyS') || this.keys.has('ArrowDown'));
     let right = Number(this.keys.has('KeyD') || this.keys.has('ArrowRight')) - Number(this.keys.has('KeyA') || this.keys.has('ArrowLeft'));

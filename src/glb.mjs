@@ -118,6 +118,13 @@ function createModel(json, binary) {
       if (!info) return;
       const texture = textures[info.index];
       texture.channel = info.texCoord ?? 0;
+      const transform = info.extensions?.KHR_texture_transform;
+      if (transform) {
+        if (transform.offset) texture.offset.fromArray(transform.offset);
+        if (transform.scale) texture.repeat.fromArray(transform.scale);
+        texture.rotation = transform.rotation ?? 0;
+        texture.center.set(0, 0);
+      }
       texture.colorSpace = colorSpace;
       material[slot] = texture;
     };
@@ -227,7 +234,7 @@ export async function loadGlb(url) {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`教室模型載入失敗（${response.status}）`);
   const { json, binary } = parseGlb(await response.arrayBuffer());
-  const supportedExtensions = new Set(['KHR_materials_pbrSpecularGlossiness']);
+  const supportedExtensions = new Set(['KHR_materials_pbrSpecularGlossiness', 'KHR_texture_transform']);
   if (json.extensionsRequired?.some((extension) => !supportedExtensions.has(extension))) throw new Error('模型需要未支援的 GLB 擴充功能');
   return createModel(json, binary);
 }

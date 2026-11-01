@@ -631,7 +631,10 @@ export class AcademyScene {
       group.visible = Boolean(item?.exists && !item.occupiedBy && !isPlayer);
       if (group.visible && item.area) {
         let [x, z] = this.#itemPosition(id);
-        if (areaAt(x, z) !== item.area) [x, z] = dropPoint(x, z);
+        if (areaAt(x, z) !== item.area) {
+          [x, z] = dropPoint(x, z);
+          this.itemDrops.set(id, [x, z]);
+        }
         group.position.set(x, 0, z);
       }
     }

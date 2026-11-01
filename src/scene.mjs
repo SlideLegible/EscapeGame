@@ -699,8 +699,8 @@ export class AcademyScene {
       [-1, parts.leftArm, parts.leftForearm, parts.leftHand],
       [1, parts.rightArm, parts.rightForearm, parts.rightHand],
     ]) {
-      setBoneDirection(arm, forearm, new THREE.Vector3(-side * 0.1, -Math.cos(armSwing), Math.sin(armSwing)));
-      setBoneDirection(forearm, hand, new THREE.Vector3(-side * 0.06, -Math.cos(forearmSwing), Math.sin(forearmSwing)));
+      setBoneDirection(arm, forearm, new THREE.Vector3(-side * 0.28, -Math.cos(armSwing), Math.sin(armSwing)));
+      setBoneDirection(forearm, hand, new THREE.Vector3(-side * 0.14, -Math.cos(forearmSwing), Math.sin(forearmSwing)));
     }
     for (const [side, leg, knee] of [
       [-1, parts.leftLeg, parts.leftKnee],

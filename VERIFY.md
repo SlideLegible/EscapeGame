@@ -1,187 +1,48 @@
-# VERIFY — 逃離學院
+# VERIFY — 逃離學院（Three.js）
 
-> AI 起草（條目標「（AI 補充）」），2026-10-31 人確認。
-> 互動 ID（X…）、形態 ID（F…）、物件 ID（S…）、地點 ID（L…）都對到 `docs/design/item_interactions.md`。
+每條描述可重現的動作與預期結果。自動化規則測試使用 `node --test`；瀏覽器驗收用本機 HTTP 靜態主機。
 
-每一條都是「我做了什麼 → 應該看到什麼」。
-自己確認過對了，就把 `[ ]` 打勾成 `[x]`。
+## STEP 0 靜態網頁環境
+- [ ] `node --test` → 所有規則與靜態頁面檢查通過，結束碼 0。
+- [ ] 以 `python -m http.server 8000` 提供根目錄 → 開啟 `http://localhost:8000` 能載入遊戲。
+- [ ] 關閉網路後重新載入靜態網站 → Three.js 與遊戲仍能載入、開始單人遊戲。
+- [ ] **不可以** 單人遊戲呼叫伺服器、外部 CDN、帳號服務或遠端字型。
 
----
+## STEP 1 核心規則
+- [ ] 開始新局 → 生命值 5、時間 30:00、玩家為 F00 人類、密碼為四位數且不等於 1031。
+- [ ] 36 個互動列的有效形態、對象及前置條件 → 依設計表得到正確文字、物品、生命值、門狀態、成就或結局。
+- [ ] 未定義組合 → 顯示指定嘲諷；不改變生命值或形態。
+- [ ] 變成可變身物品 → 玩家形態改變、人類身體留在原地；Q 回人類後回到身體位置。
+- [ ] 直接由物品變成物品 → 舊物品留在放開位置，新形態生效；同一物品不能被兩個玩家占用（單機規則測試用兩位模擬玩家）。
+- [ ] 變成飲料罐垃圾再碰飲料機／底下 → 進入 L01／L02 並能取得飲料／學生證。
+- [ ] 物品在特殊地點內 → 只有身在該地點的玩家能互動。
+- [ ] **不可以** 未滿足前置條件、物品尚未出現或玩家已結束時觸發互動。
 
-## 第 0 批 環境
+## STEP 2 生命、時間與密碼
+- [ ] 第一次取得飲料 → +1 血；後續每次再變飲料 → -1 血；血量無上限且不低於 0。
+- [ ] 生命值歸零 → 觸發 E05、未逃出的玩家重啟，生命值 5；已解鎖成就在同一分頁保留。
+- [ ] 倒數每秒減一，30 分鐘歸零 → 對仍在遊戲的玩家觸發 E04。
+- [ ] 變成時鐘並與自己互動 → 觸發 E04 及 A06。
+- [ ] 錯誤密碼 → 只顯示「門紋絲不動，好像有點死了」；正確密碼 → E02；輸錯抽筋機率為 1/1000。
+- [ ] 輸入 1031 失敗後查看月曆 → 出現老師生日文字。
+- [ ] **不可以** 遊戲文字、HTML 文字內容、網路請求或一般日誌暴露當局密碼；輸入錯誤不提示相似度。
 
-### STEP 0 測試環境
-- [x] 在 repo 根目錄執行 `tools/run_tests.sh` → 跑完全部 Python 測試，最後一行顯示 `OK`，結束碼 0（AI 補充）
-- [x] 兩份設計文件 `docs/design/escape_room_script.md`、`docs/design/item_interactions.md` 都在 → 測試確認檔案存在且不是空的（AI 補充）
-- [x] 裝好 UE 5.8 後，`tools/run_tests.sh` 也跑 UE 自動化測試（headless、`-nullrhi`）→ 列出 `EscapeGame.` 開頭的測試，全部通過（AI 補充）
-- [ ] **不可以** 跑測試時需要網路、螢幕或 GPU（AI 補充）
-- [ ] **不可以** 需要另外安裝 Python 套件才能跑測試（只用內建 `unittest`）（AI 補充）
+## STEP 3 場景路線與成就
+- [ ] 椅子撞教室門、辦公室鑰匙開辦公室門、未知鑰匙開儲物間 → 對應門開啟。
+- [ ] 人類拉下電閘 → 學生證與密碼路線失效；該局不能復電。
+- [ ] 長竿子打開廁所高窗 → E03；學生證刷大門 → E01。
+- [ ] 各互動造成的傷害、物品出現、成就 A01～A07 與結局成就 E01～E05 → 符合設計表且成就不重複提示。
+- [ ] **不可以** 已逃出的玩家再收到 E04 或 E05；已逃出的玩家不影響其他玩家繼續玩。
 
-### STEP 0b 工具可行性（人工驗證）
-- [x] 開編輯器、在 Claude Code 執行 `/mcp` → 看到 `unreal-mcp` 已連線；請 Claude 列出目前關卡的 Actor → 列出的名稱和編輯器 Outliner 一致（AI 補充）
-- [x] 用 PixelStreaming2 範本開一個實例，用 Firefox 打開 signalling 網址 → 1 秒內看到畫面，鍵盤滑鼠可以操控角色（AI 補充）
-- [x] 實測單一 720p 實例 → 記下 VRAM、RAM、CPU 用量到 PLANS.md 調整紀錄（AI 補充）
-- [x] **不可以** MCP 伺服器監聽 `127.0.0.1` 以外的位址（`ss -ltnp` 確認）（AI 補充）
+## STEP 4 Three.js 遊玩畫面
+- [ ] 開啟靜態網頁 → 看到第三人稱 3D 教室、玩家形體、HUD 與控制說明；無 WebGL 時顯示可理解的錯誤訊息。
+- [ ] WASD → 玩家移動並受房間邊界限制；滑鼠拖曳 → 相機環繞；E → 與最近目標互動；Q → 變回人類。
+- [ ] 走出教室、走廊 → 可進辦公室、廁所、警衛室及特殊地點；能完成 E01、E02、E03 路線。
+- [ ] 變成骰子／時鐘 → E 鍵自身互動；變成監視器 → 可檢視整張地圖並能返回玩家視角。
+- [ ] 重新整理頁面 → 新單人局開始、成就與局內狀態清空。
+- [ ] **不可以** 靜態單機遊戲依賴 Unreal、服務端、外部網路資源或安裝步驟。
 
----
-
-## 第 1 批 資料管線
-
-### STEP 1 設計文件轉成資料表
-- [x] 執行 `python3 -I tools/design_to_csv.py` → 在 `Content/Data/` 產生 `DT_Forms.csv`、`DT_SceneObjects.csv`、`DT_Locations.csv`、`DT_Interactions.csv`（AI 補充）
-- [x] 設計文件中出現的 13 個形態（F00～F12）、20 個場景物件（S01～S20）、2 個特殊地點（L01、L02）、36 個互動（X001～X037，沒有 X019）→ 每個 ID 在對應的 CSV 裡剛好出現 1 次（AI 補充）
-- [x] 形態表裡混進的 X027、X032、X035 → 出現在 `DT_Interactions.csv`，**不在** `DT_Forms.csv`（AI 補充）
-- [x] 文字欄位裡的中文、全形標點、`🎂` → 原樣保留，CSV 用 UTF-8（AI 補充）
-- [x] 把設計文件的某一列改壞（欄位數不對）→ 腳本以非 0 結束碼結束，錯誤訊息寫出是哪一個 ID、哪一行（AI 補充）
-- [x] **不可以** 遺漏或重複任何 ID（AI 補充）
-- [x] **不可以** 修改 `docs/design/` 底下的檔案（AI 補充）
-
----
-
-## 第 2 批 核心邏輯
-
-### STEP 2 互動判定
-- [ ] 互動表的每一列 X（36 列）：用該列的形態、對象、前置條件去判定 → 得到該列的文字、生命值變化、出現物品、成就、結局（AI 補充）
-- [ ] 變成一大串鑰匙圈（F11）碰任何一扇門（S01、S05、S09、S19）→ 得到 X033「你試了每一支鑰匙……沒有一支插得進去」，即使該門有其他回應（AI 補充）
-- [ ] 變成椅子（F12）以外的形態碰教室門（S19），且教室門還沒撞開 → 得到 X037，不是預設回應（AI 補充）
-- [ ] 任何形態碰講桌抽屜（S20）→ 得到 X030（AI 補充）
-- [ ] 人類碰電腦（S07）→ 得到 X007「電腦需要密碼才能登入，打不開」（AI 補充）
-- [ ] 骰子（F08）碰月曆（S18）這種表上沒有的組合 → 得到「月曆紋絲不動，好像在嘲笑你：「就這？你是認真的嗎？」」，生命值、形態都不變（AI 補充）
-- [ ] **不可以** 前置條件沒滿足時觸發該互動（例：還沒觸發 X013，長竿子不存在，不可以觸發 X015）（AI 補充）
-
-### STEP 3 生命值
-- [ ] 開局 → 全隊生命值 5（AI 補充）
-- [ ] 第一次變成飲料（X004）→ 生命值 +1，可以超過 5（例：5 → 6）（AI 補充）
-- [ ] 第二次以後變成飲料（X026）→「喝太多，肚子痛」，生命值 -1（AI 補充）
-- [ ] 每次變成期中考考卷（X027）→ 生命值 -1，變幾次扣幾次（AI 補充）
-- [ ] 生命值從 1 再扣 1 → 變成 0，觸發 E05，所有還沒逃出的玩家都看到 E05，遊戲回到第一關、生命值回到 5（AI 補充）
-- [ ] **不可以** 生命值變成負數（AI 補充）
-- [ ] **不可以** E05 重啟後清掉已解鎖的成就（AI 補充）
-
-### STEP 4 時間
-- [x] 開局 → 剩餘時間 30:00，每過 1 秒少 1 秒（AI 補充）（AI 代理驗證 2026-10-31：`Step4_Clock.spec.cpp` 7 條 It 全綠（UE 60/60），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit 與實作；畫面上的顯示在 STEP 10 驗）
-- [x] 時間跑到 0 → 觸發 E04「天亮」，套用到所有還沒逃出的玩家（AI 補充）（AI 代理驗證 2026-10-31：`Step4_Clock.spec.cpp` 7 條 It 全綠（UE 60/60），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit 與實作；畫面上的顯示在 STEP 10 驗）
-- [x] 變成時鐘（F09）與自己互動（X021）→ 立刻觸發 E04，並解鎖 A06「時間管理大師」（AI 補充）（AI 代理驗證 2026-10-31：`Step4_Clock.spec.cpp` 7 條 It 全綠（UE 60/60），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit 與實作；畫面上的顯示在 STEP 10 驗）
-- [x] **不可以** 已經逃出的玩家再收到 E04（AI 補充）（AI 代理驗證 2026-10-31：`Step4_Clock.spec.cpp` 7 條 It 全綠（UE 60/60），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit 與實作；畫面上的顯示在 STEP 10 驗）
-
-### STEP 5 大門密碼
-- [x] 每局開始 → 產生一組 0000～9999 的四位數密碼（AI 補充）（AI 代理驗證 2026-10-31：`Step5_DoorPassword.spec.cpp` 13 條 It 全綠（UE 73/73、Python 41/41），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit 與實作）
-- [x] 用固定種子產生 10,000 局 → 沒有一局的密碼是 1031（AI 補充）（AI 代理驗證 2026-10-31：`Step5_DoorPassword.spec.cpp` 13 條 It 全綠（UE 73/73、Python 41/41），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit 與實作）
-- [x] 人類在大門輸入正確密碼（X016）→ 大門打開，該玩家觸發 E02（AI 補充）（AI 代理驗證 2026-10-31：`Step5_DoorPassword.spec.cpp` 13 條 It 全綠（UE 73/73、Python 41/41），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit 與實作）
-- [x] 輸入錯誤 →「門紋絲不動，好像有點死了」，不顯示大小、不顯示哪幾位對（AI 補充）（AI 代理驗證 2026-10-31：`Step5_DoorPassword.spec.cpp` 13 條 It 全綠（UE 73/73、Python 41/41），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit 與實作）
-- [x] 用固定種子連續輸錯 100,000 次 → 「手指抽筋了」扣血的次數在 70～130 之間（期望 100）（AI 補充）（AI 代理驗證 2026-10-31：`Step5_DoorPassword.spec.cpp` 13 條 It 全綠（UE 73/73、Python 41/41），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit 與實作；種子 20261031 擲中 117 次）
-- [x] 輸入 1031 失敗後再看月曆（X035）→ 顯示「旁邊多了一行小字：老師生日🎂」；沒試過 1031 時看月曆（X032）→ 沒有這行字（AI 補充）（AI 代理驗證 2026-10-31：`Step5_DoorPassword.spec.cpp` 13 條 It 全綠（UE 73/73、Python 41/41），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit 與實作）
-- [x] **不可以** 遊戲內任何文字、畫面、log（Shipping 版）出現當局密碼（AI 補充）（AI 代理驗證 2026-10-31：`Step5_DoorPassword.spec.cpp` 13 條 It 全綠（UE 73/73、Python 41/41），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit 與實作；另有 `tests/test_step5_password_secrecy.py` 靜態掃描輸出呼叫與 DevOnly 函式都在 `#if !UE_BUILD_SHIPPING`；實際 Shipping 版在 STEP 16 再確認）
-- [x] **不可以** 輸入次數有上限（AI 補充）（AI 代理驗證 2026-10-31：`Step5_DoorPassword.spec.cpp` 13 條 It 全綠（UE 73/73、Python 41/41），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit 與實作）
-
-### STEP 6 變身
-- [x] 人類與可變身的物品互動 → 玩家變成該物品；人類身體留在原地（AI 補充）（AI 代理驗證 2026-10-31：`Step6_Transform.spec.cpp` 15 條 It 全綠（UE 88/88、Python 41/41），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit 與 Interact／ReleasePlayerForm 實作；邏輯層驗證，畫面上的鏡頭與移動在 STEP 9～12 驗）
-- [x] 物品形態選「變回人類」→ 玩家回到人類身體的位置，變回人類（AI 補充）（AI 代理驗證 2026-10-31：`Step6_Transform.spec.cpp` 15 條 It 全綠（UE 88/88、Python 41/41），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit 與 Interact／ReleasePlayerForm 實作；邏輯層驗證，畫面上的鏡頭與移動在 STEP 9～12 驗）
-- [x] 從飲料罐垃圾直接變成學生證 → 飲料罐垃圾留在原地、維持當時的狀態（AI 補充）（AI 代理驗證 2026-10-31：`Step6_Transform.spec.cpp` 15 條 It 全綠（UE 88/88、Python 41/41），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit 與 Interact／ReleasePlayerForm 實作；邏輯層驗證，畫面上的鏡頭與移動在 STEP 9～12 驗；「狀態」解讀為仍存在、沒人占用、留在放開的位置，見 PLANS 待人確認）
-- [x] 變成飲料罐垃圾碰飲料機（X002）→ 進入飲料機內部（L01），看到飲料；碰飲料機底下（X003）→ 進入 L02，看到學生證（AI 補充）（AI 代理驗證 2026-10-31：`Step6_Transform.spec.cpp` 15 條 It 全綠（UE 88/88、Python 41/41），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit 與 Interact／ReleasePlayerForm 實作；邏輯層驗證，畫面上的鏡頭與移動在 STEP 9～12 驗）
-- [x] 監視器（X023）→ 變成監視器後看得到整張地圖（AI 補充）（AI 代理驗證 2026-10-31：`Step6_Transform.spec.cpp` 15 條 It 全綠（UE 88/88、Python 41/41），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit 與 Interact／ReleasePlayerForm 實作；邏輯層驗證，畫面上的鏡頭與移動在 STEP 9～12 驗；邏輯層 `CanSeeWholeMap` 為真，實際畫面在 STEP 11 驗）
-- [x] **不可以** 兩位玩家同時變成同一個物品：第二位玩家互動時，該物品的回應和「別人變成的物品」一樣不能互動（AI 補充）（AI 代理驗證 2026-10-31：`Step6_Transform.spec.cpp` 15 條 It 全綠（UE 88/88、Python 41/41），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit 與 Interact／ReleasePlayerForm 實作；邏輯層驗證，畫面上的鏡頭與移動在 STEP 9～12 驗）
-- [x] **不可以** 飲料罐垃圾以外的形態（包含人類）進入特殊地點（例：學生證碰飲料機 → 預設回應，不進入 L01）（AI 補充）（AI 代理驗證 2026-10-31：`Step6_Transform.spec.cpp` 15 條 It 全綠（UE 88/88、Python 41/41），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit 與 Interact／ReleasePlayerForm 實作；邏輯層驗證，畫面上的鏡頭與移動在 STEP 9～12 驗）
-
-### STEP 7 場景狀態
-- [x] 人類拉下總電閘（X022）→ 顯示「喀——整棟樓瞬間安靜了下來，門禁機的燈也熄了」（AI 補充）（AI 代理驗證 2026-10-31：`Step7_SceneState.spec.cpp` 11 條 It 全綠（UE 99/99、Python 41/41），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit 與實作；邏輯層驗證，實際走得過去在 STEP 9、12 驗）
-- [x] 拉下電閘後，學生證碰大門 → 大門不開，不觸發 E01；輸入正確密碼 → 大門不開，不觸發 E02（AI 補充）（AI 代理驗證 2026-10-31：`Step7_SceneState.spec.cpp` 11 條 It 全綠（UE 99/99、Python 41/41），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit 與實作；邏輯層驗證，實際走得過去在 STEP 9、12 驗；停電後任何密碼都當輸錯（走 X017），見 PLANS 待人確認）
-- [x] 非人類形態碰配電箱（X025）→「滋滋滋——你觸電了」，生命值 -1（AI 補充）（AI 代理驗證 2026-10-31：`Step7_SceneState.spec.cpp` 11 條 It 全綠（UE 99/99、Python 41/41），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit 與實作；邏輯層驗證，實際走得過去在 STEP 9、12 驗）
-- [x] 椅子撞開教室門（X036）之後 → 所有玩家都可以前往走廊；別的形態再碰教室門 → 不再顯示 X037（AI 補充）（AI 代理驗證 2026-10-31：`Step7_SceneState.spec.cpp` 11 條 It 全綠（UE 99/99、Python 41/41），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit 與實作；邏輯層驗證，實際走得過去在 STEP 9、12 驗）
-- [x] 辦公室鑰匙開過辦公室門（X005）→ 之後所有玩家都能進辦公室（AI 補充）（AI 代理驗證 2026-10-31：`Step7_SceneState.spec.cpp` 11 條 It 全綠（UE 99/99、Python 41/41），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit 與實作；邏輯層驗證，實際走得過去在 STEP 9、12 驗）
-- [x] **不可以** 電閘拉下後再推回去（任何形態碰配電箱都不會恢復）（AI 補充）（AI 代理驗證 2026-10-31：`Step7_SceneState.spec.cpp` 11 條 It 全綠（UE 99/99、Python 41/41），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit 與實作；邏輯層驗證，實際走得過去在 STEP 9、12 驗）
-
-### STEP 8 成就
-- [x] 觸發預設嘲諷回應第 10 次 → 解鎖 A01「被嘲笑專家」；第 9 次時還沒解鎖（AI 補充）（AI 代理驗證 2026-10-31：`Step8_Achievements.spec.cpp` 22 條 It 全綠（UE 121/121、Python 46/46），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit；成就是每位玩家各自的，見 PLANS 待人確認；提示畫面在 STEP 10 驗）
-- [x] 累計變身第 20 次 → 解鎖 A02「我是誰」（AI 補充）（AI 代理驗證 2026-10-31：`Step8_Achievements.spec.cpp` 22 條 It 全綠（UE 121/121、Python 46/46），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit；成就是每位玩家各自的，見 PLANS 待人確認；提示畫面在 STEP 10 驗）
-- [x] 人類身體連續離開（處於物品形態）超過 10 分鐘 → 解鎖 A03「魂不附體」；9 分 59 秒時還沒解鎖（AI 補充）（AI 代理驗證 2026-10-31：`Step8_Achievements.spec.cpp` 22 條 It 全綠（UE 121/121、Python 46/46），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit；成就是每位玩家各自的，見 PLANS 待人確認；提示畫面在 STEP 10 驗）
-- [x] 拆開牛皮紙包（X008）→ 解鎖 A04（AI 補充）（AI 代理驗證 2026-10-31：`Step8_Achievements.spec.cpp` 22 條 It 全綠（UE 121/121、Python 46/46），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit；成就是每位玩家各自的，見 PLANS 待人確認；提示畫面在 STEP 10 驗）
-- [x] 鑰匙圈碰過 S01、S05、S09、S19 四扇門 → 解鎖 A07；只碰過三扇 → 還沒解鎖（AI 補充）（AI 代理驗證 2026-10-31：`Step8_Achievements.spec.cpp` 22 條 It 全綠（UE 121/121、Python 46/46），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit；成就是每位玩家各自的，見 PLANS 待人確認；提示畫面在 STEP 10 驗）
-- [x] 觸發 E01～E05 任一結局 → 解鎖同名的結局成就（AI 補充）（AI 代理驗證 2026-10-31：`Step8_Achievements.spec.cpp` 22 條 It 全綠（UE 121/121、Python 46/46），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit；成就是每位玩家各自的，見 PLANS 待人確認；提示畫面在 STEP 10 驗）
-- [x] **不可以** 同一個成就解鎖兩次（不重複跳提示）（AI 補充）（AI 代理驗證 2026-10-31：`Step8_Achievements.spec.cpp` 22 條 It 全綠（UE 121/121、Python 46/46），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit；成就是每位玩家各自的，見 PLANS 待人確認；提示畫面在 STEP 10 驗）
-- [x] **不可以** 成就寫進磁碟或任何永久儲存（AI 補充）（AI 代理驗證 2026-10-31：`Step8_Achievements.spec.cpp` 22 條 It 全綠（UE 121/121、Python 46/46），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；看過紅綠兩個 commit；成就是每位玩家各自的，見 PLANS 待人確認；提示畫面在 STEP 10 驗；另有 `tests/test_step8_no_persistence.py` 掃描 Source 沒有存檔／寫檔 API）
-
----
-
-## 第 3 批 場景與單人通關
-
-### STEP 9 關卡
-- [x] 開啟主關卡 → 有密碼學教室、走廊、辦公室、廁所、儲物間、警衛室、飲料機內部、飲料機底下 8 個區域（AI 補充）（AI 代理驗證 2026-10-31：`Step9_Level.spec.cpp` 8 條 It 與 `tests/test_step9_layout.py` 全綠（UE 132/132、Python 56/56），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；地圖由 `tools/mcp_build_graybox.py` 經 MCP（只聽 127.0.0.1）從 `Level_Layout.csv` 蓋出；看過紅（3d62bd0）到綠（4fb07e0）之間沒有改測試）
-- [x] 自動化測試掃描主關卡 → F01～F12 每個可變身物品、S01～S20 每個場景物件都剛好放了 1 個（馬桶可以多個），而且放在設計文件寫的區域（AI 補充）（AI 代理驗證 2026-10-31：`Step9_Level.spec.cpp` 8 條 It 與 `tests/test_step9_layout.py` 全綠（UE 132/132、Python 56/56），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；地圖由 `tools/mcp_build_graybox.py` 經 MCP（只聽 127.0.0.1）從 `Level_Layout.csv` 蓋出；看過紅（3d62bd0）到綠（4fb07e0）之間沒有改測試）
-- [x] 開局玩家出生在密碼學教室（AI 補充）（AI 代理驗證 2026-10-31：`Step9_Level.spec.cpp` 8 條 It 與 `tests/test_step9_layout.py` 全綠（UE 132/132、Python 56/56），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；地圖由 `tools/mcp_build_graybox.py` 經 MCP（只聽 127.0.0.1）從 `Level_Layout.csv` 蓋出；看過紅（3d62bd0）到綠（4fb07e0）之間沒有改測試；PlayerStart 在教室，實際 PIE 出生在 STEP 12 再確認）
-- [x] **不可以** 教室門撞開前，人類能走出教室（AI 補充）（AI 代理驗證 2026-10-31：`Step9_Level.spec.cpp` 8 條 It 與 `tests/test_step9_layout.py` 全綠（UE 132/132、Python 56/56），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；地圖由 `tools/mcp_build_graybox.py` 經 MCP（只聽 127.0.0.1）從 `Level_Layout.csv` 蓋出；看過紅（3d62bd0）到綠（4fb07e0）之間沒有改測試）
-- [x] **不可以** 沒開辦公室門、儲物間門之前能走進去（AI 補充）（AI 代理驗證 2026-10-31：`Step9_Level.spec.cpp` 8 條 It 與 `tests/test_step9_layout.py` 全綠（UE 132/132、Python 56/56），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；地圖由 `tools/mcp_build_graybox.py` 經 MCP（只聽 127.0.0.1）從 `Level_Layout.csv` 蓋出；看過紅（3d62bd0）到綠（4fb07e0）之間沒有改測試）
-
-### STEP 10 介面
-- [x] 畫面上常駐顯示生命值、剩餘時間（mm:ss）、目前形態名稱，都是繁體中文、沒有方塊字（AI 補充）（AI 代理驗證 2026-10-31：`Step10_UI.spec.cpp` 21 條 It 與 `tests/test_step10_ui_data.py` 全綠（UE 153/153、Python 74/74），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；驗的是 presenter 與 widget 結構（-nullrhi），實際畫面需要人試玩看一次；字型涵蓋用 cmap 檢查所有 CSV 文字，🎂 走彩色 emoji 字型）
-- [x] 互動時 → 彈出文字框顯示事件文字，按任意鍵或 3 秒後關閉（AI 補充）（AI 代理驗證 2026-10-31：`Step10_UI.spec.cpp` 21 條 It 與 `tests/test_step10_ui_data.py` 全綠（UE 153/153、Python 74/74），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；驗的是 presenter 與 widget 結構（-nullrhi），實際畫面需要人試玩看一次）
-- [x] 人類碰大門 → 出現四位數密碼鍵盤，可以輸入 0～9、刪除、確認（AI 補充）（AI 代理驗證 2026-10-31：`Step10_UI.spec.cpp` 21 條 It 與 `tests/test_step10_ui_data.py` 全綠（UE 153/153、Python 74/74），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；驗的是 presenter 與 widget 結構（-nullrhi），實際畫面需要人試玩看一次）
-- [x] 觸發結局 → 顯示對應的結局畫面與結局劇情文字（AI 補充）（AI 代理驗證 2026-10-31：`Step10_UI.spec.cpp` 21 條 It 與 `tests/test_step10_ui_data.py` 全綠（UE 153/153、Python 74/74），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；驗的是 presenter 與 widget 結構（-nullrhi），實際畫面需要人試玩看一次）
-- [x] 解鎖成就 → 右上角跳出成就名稱，2～4 秒後消失（AI 補充）（AI 代理驗證 2026-10-31：`Step10_UI.spec.cpp` 21 條 It 與 `tests/test_step10_ui_data.py` 全綠（UE 153/153、Python 74/74），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；驗的是 presenter 與 widget 結構（-nullrhi），實際畫面需要人試玩看一次）
-- [x] **不可以** 任何文字超出文字框或被截斷（AI 補充）（AI 代理驗證 2026-10-31：`Step10_UI.spec.cpp` 21 條 It 與 `tests/test_step10_ui_data.py` 全綠（UE 153/153、Python 74/74），從 /tmp 重跑 `tools/run_tests.sh` 結束碼 0；驗的是 presenter 與 widget 結構（-nullrhi），實際畫面需要人試玩看一次）
-
-### STEP 11 操控
-- [ ] 人類形態：WASD 移動、滑鼠轉鏡頭、E 互動、Q 變回人類（AI 補充）
-- [ ] 每種物品形態的鏡頭距離依物品大小調整，看得到自己變成的物品（AI 補充）
-- [ ] 飲料罐垃圾可以滾動移動；時鐘、監視器不能移動，只能轉鏡頭（AI 補充）
-- [ ] 骰子、時鐘按 E 對著自己 → 觸發自身互動（AI 補充）
-- [ ] **不可以** 卡在牆裡或掉出地圖（AI 補充）
-
-### STEP 12 單人通關
-- [ ] 照路線：椅子撞門 → 垃圾桶 → 飲料罐垃圾 → 飲料機底下 → 學生證 → 大門 → 看到 E01，全程 5 分鐘內可以完成（AI 補充）
-- [ ] 照路線：花盆 → 辦公室鑰匙 → 辦公室 → 抽屜鑰匙 → 儲物間 → 長竿子 → 高窗 → 看到 E03（AI 補充）
-- [ ] 測試模式（只在開發版）讀出密碼後輸入 → 看到 E02（AI 補充）
-- [ ] 變成時鐘撥快 → E04；故意扣血到 0 → E05 並重啟（AI 補充）
-- [ ] **不可以** 拉下電閘後還有 E01、E02 的路可以走（AI 補充）
-
----
-
-## 第 4 批 多人
-
-### STEP 13 連線與伺服器權威
-- [ ] 一位玩家開房、另外 1～2 位加入 → 每個人各有一個人類身體，出生在教室（AI 補充）
-- [ ] 第 4 位玩家嘗試加入 → 被拒絕，顯示「房間已滿」（AI 補充）
-- [ ] 客戶端送出不存在的物件 ID、或超過互動距離的互動 → 伺服器丟掉，不改任何狀態（AI 補充）
-- [ ] **不可以** 客戶端讀得到大門密碼（密碼不在任何複製給客戶端的變數裡）（AI 補充）
-- [ ] **不可以** 客戶端直接改生命值、旗標、成就（只能透過伺服器的互動判定）（AI 補充）
-
-### STEP 14 多人規則
-- [ ] 玩家 A 扣 1 血 → 所有玩家看到的生命值都少 1（AI 補充）
-- [ ] 玩家 A 用學生證逃出（E01）→ 只有 A 看到結局；其他玩家繼續遊戲，學生證留在大門旁（AI 補充）
-- [ ] A 逃出後，玩家 B 用同一張學生證碰大門 → B 也逃出（AI 補充）
-- [ ] 時間到或生命值歸零 → 所有還沒逃出的玩家同時看到 E04／E05（AI 補充）
-- [ ] 變成監視器 → 看得到其他玩家的位置（AI 補充）
-- [ ] **不可以** 和別人的人類身體互動，或和別人已變身的物品互動（AI 補充）
-- [ ] **不可以** 兩位玩家同時變成同一個物品（在兩個客戶端同一幀按互動，也只有一位成功）（AI 補充）
-
----
-
-## 第 5 批 美術與手感
-
-### STEP 15 美術、音效、效能
-- [ ] 灰盒換成正式素材後 → 每個房間一眼看得出是教室、走廊、辦公室、廁所、警衛室（AI 補充）
-- [ ] 每次互動、變身、扣血、加血都有音效（AI 補充）
-- [ ] 本機編輯器外單獨執行，1080p → 平均 60 fps 以上（AI 補充）
-- [ ] 3 個串流實例同時跑（720p）→ 每個都在 30 fps 以上（AI 補充）
-- [ ] **不可以** 使用授權不明的素材（只用 Fab 免費／Megascans 或自製，來源記在 PLANS.md）（AI 補充）
-
----
-
-## 第 6 批 網頁遊玩（Pixel Streaming）
-
-### STEP 16 打包
-- [ ] 執行打包指令 → 產生 Linux Shipping 版，單獨執行可以玩到結局（AI 補充）
-- [ ] **不可以** Shipping 版包含測試模式（讀密碼）或 MCP plugin（AI 補充）
-
-### STEP 17 串流與實例管理
-- [ ] 用瀏覽器打開網址 → 被分配到一個空的實例，10 秒內看到遊戲畫面（AI 補充）
-- [ ] 重新整理網頁 → 原本的實例被回收重置；重新連進來時成就是空的（AI 補充）
-- [ ] 關掉分頁 → 30 秒內該實例被回收，可以給下一位玩家用（AI 補充）
-- [ ] 伺服器的某個實例當掉 → 配對頁顯示「連線中斷，請重新整理」，其他實例不受影響（AI 補充）
-- [ ] **不可以** 從外部連到 MCP 的連接埠或 UE 實例本身，只開放配對頁與 signalling 的連接埠（AI 補充）
-- [ ] **不可以** 收到超過 64 KB 的單則訊息還不斷線（AI 補充）
-
-### STEP 18 容量
-- [ ] 3 個瀏覽器（同一個 LAN）同時連進同一房間 → 3 人都能從頭玩到結局，畫面 30 fps 以上（AI 補充）
-- [ ] 3 人同時遊玩時 → 記下 `nvidia-smi`、`free -h` 數字到 PLANS.md 調整紀錄；RAM 沒用到 swap（AI 補充）
-- [ ] **不可以** 第 4 個瀏覽器把前面 3 人擠掉（AI 補充）
+## STEP 5 文件與清理
+- [ ] `BRIEF.md`、`VERIFY.md`、`PLANS.md`、`AGENTS.md`、`README.md` 與 `CLAUDE.md` → 描述 Three.js 靜態網頁方案及正確指令。
+- [ ] 專案追蹤檔案 → 沒有 Unreal 專案、C++ 遊戲實作、Pixel Streaming 設定或 UE 專屬測試。
+- [ ] **不可以** 文件把伺服器串流寫成單機遊玩必要條件。

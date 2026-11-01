@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { areaAt, dropPoint } from '../src/scene.mjs';
+import { areaAt, dropPoint, entryPoint } from '../src/scene.mjs';
 
 test('walkable room areas touch across the classroom, corridor, office, restroom, and storage thresholds', () => {
   assert.equal(areaAt(7, -6.2), 'Corridor');
@@ -27,3 +27,10 @@ test('an item released inside the vending machine lands in the corridor beside i
   assert.equal(areaAt(...dropPoint(38, -21)), 'Corridor');
 });
 
+test('entering the drink machine or its underside does not place the player on top of the item inside', () => {
+  for (const area of ['L01', 'L02']) {
+    const [x, z] = entryPoint(area);
+    assert.equal(areaAt(x, z), area);
+    assert.ok(Math.hypot(x - 38, z - (area === 'L01' ? -9 : -21)) >= 1.5);
+  }
+});

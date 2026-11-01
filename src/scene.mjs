@@ -47,9 +47,13 @@ export function areaAt(x, z) {
   return null;
 }
 
+export function entryPoint(area) {
+  return area === 'L01' ? [35.5, -9] : [35.5, -21];
+}
+
 export function dropPoint(x, z) {
-  if (areaAt(x, z) === 'L01') return [-14, -8];
-  if (areaAt(x, z) === 'L02') return [-18, -8];
+  if (areaAt(x, z) === 'L01') return [-14 + (x - 38) / 3, -8];
+  if (areaAt(x, z) === 'L02') return [-18 + (x - 38) / 3, -8];
   return [x, z];
 }
 
@@ -605,11 +609,12 @@ export class AcademyScene {
     const player = this.game.player();
     const changedForm = player.form !== previousForm;
     if (result.ending === 'E05') this.itemDrops.clear();
-    else if (changedForm && previousForm !== 'F00') this.itemDrops.set(previousForm, dropPoint(this.playerPosition.x, this.playerPosition.z));
+    else if (changedForm && previousForm !== 'F00') this.itemDrops.set(previousForm, [this.playerPosition.x, this.playerPosition.z]);
     if (previousForm === 'F00' && player.form !== 'F00') this.humanPosition.copy(this.playerPosition);
-    if (result.location === 'L01') this.playerPosition.set(38, 0, -9);
-    else if (result.location === 'L02') this.playerPosition.set(38, 0, -21);
-    else if (result.ending === 'E05') this.playerPosition.set(-5.2, 0, -4.5);
+    if (result.location) {
+      const [x, z] = entryPoint(result.location);
+      this.playerPosition.set(x, 0, z);
+    } else if (result.ending === 'E05') this.playerPosition.set(-5.2, 0, -4.5);
     else if (changedForm && player.form !== 'F00') {
       const [x, z] = this.#itemPosition(player.form);
       this.playerPosition.set(x, 0, z);
@@ -625,7 +630,8 @@ export class AcademyScene {
       const isPlayer = this.game.player().form === id;
       group.visible = Boolean(item?.exists && !item.occupiedBy && !isPlayer);
       if (group.visible && item.area) {
-        const [x, z] = this.#itemPosition(id);
+        let [x, z] = this.#itemPosition(id);
+        if (areaAt(x, z) !== item.area) [x, z] = dropPoint(x, z);
         group.position.set(x, 0, z);
       }
     }

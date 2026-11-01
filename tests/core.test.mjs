@@ -253,3 +253,25 @@ test('all object IDs and form IDs from the design table are represented', () => 
   for (let i = 1; i <= 20; i++) assert.ok(game.objectName(`S${String(i).padStart(2, '0')}`));
   for (let i = 0; i <= 12; i++) assert.ok(game.formName(`F${String(i).padStart(2, '0')}`));
 });
+
+test('switching forms inside the drink machine leaves the can inside, and leaving brings it back to the corridor', () => {
+  const game = new Game();
+  obtainCan(game);
+  game.interact('local', 'S03');
+  game.transform('local', 'F02');
+  assert.equal(game.item('F01').area, 'L01');
+  assert.equal(game.transform('local', 'F01').transformed, true);
+  game.transform('local', 'F02');
+  game.returnToHuman('local');
+  assert.equal(game.item('F01').area, 'Corridor');
+  assert.equal(game.item('F02').area, 'Corridor');
+});
+
+test('leaving the machine underside as the can leaves an untouched student ID inside', () => {
+  const game = new Game();
+  obtainCan(game);
+  game.interact('local', 'S04');
+  game.returnToHuman('local');
+  assert.equal(game.item('F01').area, 'Corridor');
+  assert.equal(game.item('F03').area, 'L02');
+});

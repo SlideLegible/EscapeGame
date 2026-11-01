@@ -95,7 +95,7 @@ export class Game {
     else {
       const old = this.item(player.form);
       old.occupiedBy = null;
-      old.area = player.area === 'L01' || player.area === 'L02' ? 'Corridor' : player.area;
+      old.area = player.area;
     }
     target.occupiedBy = playerId;
     target.area = null;
@@ -126,6 +126,7 @@ export class Game {
       item.area = player.area === 'L01' || player.area === 'L02' ? 'Corridor' : player.area;
       player.form = 'F00';
     }
+    if ((player.area === 'L01' || player.area === 'L02') && this.item('F01').area === player.area) this.item('F01').area = 'Corridor';
     player.area = player.humanArea;
     player.nonHumanSeconds = 0;
     return { transformed: true, form: 'F00' };

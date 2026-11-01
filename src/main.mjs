@@ -195,6 +195,11 @@ $('keypad').addEventListener('click', (event) => {
 window.addEventListener('keydown', (event) => {
   if (event.code === 'Escape' && !dialog.classList.contains('hidden')) { closeKeypad(); return; }
   if (!started || !dialog.classList.contains('hidden')) return;
+  if (event.code === 'Space') {
+    event.preventDefault();
+    if (!event.repeat) scene?.jump();
+    return;
+  }
   const code = movementCode(event);
   if (code) {
     scene?.keys.add(code);

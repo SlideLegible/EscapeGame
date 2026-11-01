@@ -634,7 +634,7 @@ export class AcademyScene {
       const bounds = new THREE.Box3().setFromObject(source);
       const size = bounds.getSize(new THREE.Vector3());
       if (!Number.isFinite(size.y) || size.y <= 0) throw new Error('玩家模型沒有有效高度');
-      source.scale.setScalar(1.3 / size.y);
+      source.scale.setScalar((1.3 * 1.3) / size.y);
       source.updateMatrixWorld(true);
       bounds.setFromObject(source);
       const center = bounds.getCenter(new THREE.Vector3());

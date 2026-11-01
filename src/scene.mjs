@@ -198,6 +198,15 @@ export function advancePlayerFacing(currentYaw, targetYaw, maxTurn) {
   return { yaw: currentYaw + Math.sign(delta) * maxTurn, turning: true };
 }
 
+export function removeRootTranslationTrack(clip, root) {
+  if (!clip?.tracks || !root?.uuid) return false;
+  const rootPosition = `${root.uuid}.position`;
+  const tracks = clip.tracks.filter((track) => track.name !== rootPosition);
+  const removed = tracks.length !== clip.tracks.length;
+  if (removed) clip.tracks = tracks;
+  return removed;
+}
+
 export const SPECIAL_EXITS = {
   L01: { at: [34.1, -11.8], to: [-14, -6.9], text: '你從飲料機的出貨口鑽了出來' },
   L02: { at: [34.1, -23.8], to: [-14, -12.2], text: '你從飲料機底下滾了出來' },
@@ -959,11 +968,12 @@ export class AcademyScene {
       this.humanModel = source;
       const walkClip = source.animations?.find((clip) => clip.tracks.length > 0);
       if (walkClip) {
+        removeRootTranslationTrack(walkClip, source.getObjectByName('mixamorig:Hips'));
         this.playerMixer = new THREE.AnimationMixer(source);
         this.playerWalkAction = this.playerMixer.clipAction(walkClip);
         this.playerWalkAction.setLoop(THREE.LoopRepeat, Infinity);
         this.playerWalkAction.reset().play();
-        this.playerMixer.update(Math.min(0.25, walkClip.duration * 0.3));
+        this.playerMixer.update(0);
         this.playerWalkAction.paused = true;
         this.humanRig = { kind: 'animated' };
       } else {
@@ -1229,10 +1239,16 @@ export class AcademyScene {
       const moveZ = fz * forward + rz * right;
       const targetYaw = Math.atan2(moveX, moveZ);
       if (this.game.player().form === 'F00') {
+        const wasTurningInPlace = this.turningInPlace;
         const turn = advancePlayerFacing(this.playerFacingYaw, targetYaw, 7 * dt);
         this.playerFacingYaw = turn.yaw;
         this.turningInPlace = turn.turning;
         this.playerGroup.rotation.y = this.playerFacingYaw;
+        if (turn.turning && !wasTurningInPlace && this.playerWalkAction) {
+          this.playerWalkAction.reset().play();
+          this.playerMixer.update(0);
+          this.playerWalkAction.paused = true;
+        }
       } else {
         this.turningInPlace = false;
       }

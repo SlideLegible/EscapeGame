@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { advancePlayerFacing, areaAt, areaCameraRect, bodyPathIntersectsGrid, bodyPathStepHeight, dropPoint, entryPoint, nearestCandidate, OcclusionGrid, rayRectLimit, SPECIAL_EXITS, OBJECT_POSITIONS, LECTERN_SIZE } from '../src/scene.mjs';
+import { advancePlayerFacing, areaAt, areaCameraRect, bodyPathIntersectsGrid, bodyPathStepHeight, dropPoint, entryPoint, nearestCandidate, OcclusionGrid, rayRectLimit, removeRootTranslationTrack, SPECIAL_EXITS, OBJECT_POSITIONS, LECTERN_SIZE } from '../src/scene.mjs';
 
 test('walkable room areas touch across the classroom, corridor, office, restroom, and storage thresholds', () => {
   assert.equal(areaAt(7, -6.2), 'Corridor');
@@ -207,4 +207,14 @@ test('human quarter and half turns both pivot in place before movement resumes',
     assert.ok(Math.abs(turn.yaw - target) < 1e-9);
     assert.equal(turn.turning, false);
   }
+});
+
+test('human walk animation drops root translation while keeping skeletal tracks', () => {
+  const root = { uuid: 'hips-node' };
+  const position = { name: 'hips-node.position' };
+  const rotation = { name: 'hips-node.quaternion' };
+  const clip = { tracks: [position, rotation] };
+  assert.equal(removeRootTranslationTrack(clip, root), true);
+  assert.deepEqual(clip.tracks, [rotation]);
+  assert.equal(removeRootTranslationTrack(clip, root), false);
 });

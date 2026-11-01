@@ -272,24 +272,24 @@ export class Game {
     if (targetId === 'S14' && form === 'F00') return this.#resolve(playerId, 'X018', '黑板上寫著一串奇怪的字：WKH SDVVZRUG LV QRW KHUH');
     if (targetId === 'S16' && form === 'F08') return this.#resolve(playerId, 'X029', '你從講桌滾下去，摔得頭暈眼花', { damage: 1 });
     if (targetId === 'S20') return this.#resolve(playerId, 'X030', '抽屜鎖得死死的，好像在說：「別白費力氣了，你永遠打不開我。」');
-    if (targetId === 'S02' && form === 'F00') return this.#spawn(playerId, 'X001', 'F01', '從垃圾桶裡翻出一個飲料罐垃圾');
+    if (targetId === 'S02' && form === 'F00' && !this.item('F01').exists) return this.#spawn(playerId, 'X001', 'F01', '從垃圾桶裡翻出一個飲料罐垃圾');
     if (targetId === 'S03' && form === 'F01') return this.#enterSpecial(playerId, 'X002', 'L01', 'F02', '鑽進飲料機裡，發現一罐飲料');
     if (targetId === 'S03' && form === 'F02') return this.#enterSpecial(playerId, 'X038', 'L01', 'F02', '你滾回了飲料機裡');
     if (targetId === 'S04' && (form === 'F01' || form === 'F02')) return this.#enterSpecial(playerId, 'X003', 'L02', 'F03', '滾進飲料機底下，發現一張學生證');
     if (targetId === 'S04' && form === 'F03') return this.#enterSpecial(playerId, 'X039', 'L02', 'F03', '你滑回了飲料機底下');
     if (targetId === 'S01' && form === 'F03' && !this.state.powerCut) return this.#resolve(playerId, 'X010', '刷學生證，大門打開了', { ending: 'E01' });
-    if (targetId === 'S10' && form === 'F00') {
+    if (targetId === 'S10' && form === 'F00' && !this.item('F04').exists) {
       this.#spawn(playerId, 'X009', 'F04', '花盆砸到了你的腳，土裡掉出一支鑰匙');
       return this.#resolve(playerId, 'X009', '花盆砸到了你的腳，土裡掉出一支鑰匙', { damage: 1, spawned: 'F04' });
     }
-    if (targetId === 'S05' && form === 'F04') { this.state.doors.add('S05'); return this.#resolve(playerId, 'X005', '打開辦公室門'); }
-    if (targetId === 'S06' && form === 'F00') return this.#spawn(playerId, 'X006', 'F05', '打開抽屜，裡面有一支不知道用來做什麼的鑰匙');
+    if (targetId === 'S05' && form === 'F04' && !this.isDoorOpen('S05')) { this.state.doors.add('S05'); return this.#resolve(playerId, 'X005', '打開辦公室門'); }
+    if (targetId === 'S06' && form === 'F00' && !this.item('F05').exists) return this.#spawn(playerId, 'X006', 'F05', '打開抽屜，裡面有一支不知道用來做什麼的鑰匙');
     if (targetId === 'S07' && form === 'F00') return this.#resolve(playerId, 'X007', '電腦需要密碼才能登入，打不開');
-    if (targetId === 'S08' && form === 'F00') { this.unlock(playerId, 'A04'); return this.#spawn(playerId, 'X008', 'F06', '拆開牛皮紙包，裡面竟然是期中考考卷'); }
+    if (targetId === 'S08' && form === 'F00' && !this.item('F06').exists) { this.unlock(playerId, 'A04'); return this.#spawn(playerId, 'X008', 'F06', '拆開牛皮紙包，裡面竟然是期中考考卷'); }
     if (targetId === 'S18' && form === 'F00') return this.#resolve(playerId, this.#tried1031 ? 'X035' : 'X032', this.#tried1031 ? '10 月 31 日被紅筆圈了起來，旁邊多了一行小字：老師生日🎂' : '10 月 31 日被紅筆圈了起來');
     if (targetId === 'S17' && form === 'F00') return this.#resolve(playerId, 'X031', '門禁密碼更改公告：即日起，新密碼為——後面被撕掉了，只剩一角');
-    if (targetId === 'S09' && form === 'F05') { this.state.doors.add('S09'); this.#spawn(playerId, 'X013', 'F07', '成功打開儲物間的門，裡面有一支很長的竿子'); return this.#resolve(playerId, 'X013', '成功打開儲物間的門，裡面有一支很長的竿子', { spawned: 'F07' }); }
-    if (targetId === 'S09') return this.#resolve(playerId, 'X014', '上鎖的門，應該是儲物間吧？');
+    if (targetId === 'S09' && form === 'F05' && !this.isDoorOpen('S09')) { this.state.doors.add('S09'); this.#spawn(playerId, 'X013', 'F07', '成功打開儲物間的門，裡面有一支很長的竿子'); return this.#resolve(playerId, 'X013', '成功打開儲物間的門，裡面有一支很長的竿子', { spawned: 'F07' }); }
+    if (targetId === 'S09' && !this.isDoorOpen('S09')) return this.#resolve(playerId, 'X014', '上鎖的門，應該是儲物間吧？');
     if (targetId === 'S13' && form === 'F07') return this.#resolve(playerId, 'X015', '用竿子頂開高窗，成功逃出', { ending: 'E03' });
     if (targetId === 'S11') return form === 'F00' ? this.#resolve(playerId, 'X011', '你舒服的上了個廁所') : this.#resolve(playerId, 'X024', '你被沖進了下水道……又爬了回來', { damage: 1 });
     if (targetId === 'S12' && form === 'F00') return this.#resolve(playerId, 'X012', '你為什麼會想在這裡翻到東西');
@@ -297,8 +297,8 @@ export class Game {
       player.canSeeWholeMap = !player.canSeeWholeMap;
       return this.#resolve(playerId, 'X023', player.canSeeWholeMap ? '你盯著監視器，看到了整張地圖' : '你把視線從監視器上移開');
     }
-    if (targetId === 'S15') return form === 'F00' ? this.#cutPower(playerId) : this.#resolve(playerId, 'X025', '滋滋滋——你觸電了', { damage: 1 });
-    if (targetId === 'S10' && form !== 'F00') return this.#default(playerId, name);
+    if (targetId === 'S15' && form !== 'F00') return this.#resolve(playerId, 'X025', '滋滋滋——你觸電了', { damage: 1 });
+    if (targetId === 'S15' && !this.state.powerCut) return this.#cutPower(playerId);
     return this.#default(playerId, name);
   }
 

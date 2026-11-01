@@ -545,3 +545,73 @@ test('before the power is cut, the gate does not mention power', () => {
   game.moveToArea('local', 'Corridor');
   assert.notEqual(game.interact('local', 'S01').interactionId, 'X040');
 });
+
+function corridorHuman() {
+  const game = new Game();
+  enterCorridor(game);
+  game.returnToHuman('local');
+  game.moveToArea('local', 'Corridor');
+  return game;
+}
+
+test('the trash can and the flowerpot only give their item once, then answer with the default response', () => {
+  const game = corridorHuman();
+  assert.equal(game.interact('local', 'S02').interactionId, 'X001');
+  const trash = game.interact('local', 'S02');
+  assert.equal(trash.interactionId, null);
+  assert.match(trash.text, /垃圾桶紋絲不動/);
+  assert.equal(game.interact('local', 'S10').interactionId, 'X009');
+  const health = game.state.health;
+  const pot = game.interact('local', 'S10');
+  assert.equal(pot.interactionId, null);
+  assert.match(pot.text, /花盆紋絲不動/);
+  assert.equal(game.state.health, health);
+});
+
+test('the office drawer and parcel only give their item once', () => {
+  const game = new Game();
+  unlockOffice(game);
+  game.returnToHuman('local');
+  game.moveToArea('local', 'Corridor');
+  game.moveToArea('local', 'Office');
+  assert.equal(game.interact('local', 'S06').interactionId, 'X006');
+  assert.equal(game.interact('local', 'S06').interactionId, null);
+  assert.equal(game.interact('local', 'S08').interactionId, 'X008');
+  assert.equal(game.interact('local', 'S08').interactionId, null);
+});
+
+test('the breaker only cuts the power once, then answers with the default response', () => {
+  const game = corridorHuman();
+  game.moveToArea('local', 'GuardRoom');
+  assert.equal(game.interact('local', 'S15').interactionId, 'X022');
+  const again = game.interact('local', 'S15');
+  assert.equal(again.interactionId, null);
+  assert.match(again.text, /配電箱紋絲不動/);
+});
+
+test('opened doors do not open again', () => {
+  const game = new Game();
+  unlockOffice(game);
+  game.moveToArea('local', 'Corridor');
+  assert.equal(game.interact('local', 'S05').interactionId, null);
+});
+
+test('clue, flavor, and refusal texts can still be read again and again', () => {
+  const game = new Game();
+  for (let i = 0; i < 2; i++) assert.equal(game.interact('local', 'S14').interactionId, 'X018');
+  for (let i = 0; i < 2; i++) assert.equal(game.interact('local', 'S20').interactionId, 'X030');
+  for (let i = 0; i < 2; i++) assert.equal(game.interact('local', 'S19').interactionId, 'X037');
+  const corridor = corridorHuman();
+  for (let i = 0; i < 2; i++) assert.equal(corridor.interact('local', 'S17').interactionId, 'X031');
+});
+
+test('one-time events become available again after an E05 restart', () => {
+  const game = corridorHuman();
+  game.interact('local', 'S02');
+  game.state.health = 1;
+  game.damage(1);
+  enterCorridor(game);
+  game.returnToHuman('local');
+  game.moveToArea('local', 'Corridor');
+  assert.equal(game.interact('local', 'S02').interactionId, 'X001');
+});

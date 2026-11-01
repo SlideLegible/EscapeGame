@@ -924,7 +924,7 @@ void FEscapeGameStep10Spec::Define()
 				++ToastCount;
 				ToastMax = FMath::Max(ToastMax, CountLines(Prefix + Pair.Value.FindRef(TEXT("Title")), UEscapeToastWidget::FontSize, UEscapeToastWidget::MaxTextWidth));
 			}
-			TestEqual(TEXT("成就 10 筆"), ToastCount, 10);
+			TestEqual(TEXT("成就 11 筆"), ToastCount, 11);
 			AddInfo(FString::Printf(TEXT("成就提示最長：%d 行（上限 %d）"), ToastMax, UEscapeToastWidget::MaxLines));
 			TestTrue(*FString::Printf(TEXT("成就提示最長 %d 行 ≤ %d 行"), ToastMax, UEscapeToastWidget::MaxLines), ToastMax >= 1 && ToastMax <= UEscapeToastWidget::MaxLines);
 		});

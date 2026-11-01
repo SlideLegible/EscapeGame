@@ -281,14 +281,14 @@ class EndingsToolTest(unittest.TestCase):
         self.assertIn("窗外透進清晨的陽光", story["E04"])
         self.assertEqual(story["E05"], "遊戲重啟，從第一關重新開始。")
 
-    def test_achievements_csv_ten_rows_without_a05(self):
-        """DT_Achievements.csv：E01～E05、A01～A04、A06、A07 共 10 列，沒有 A05；名稱與解鎖條件和 §8 一致"""
+    def test_achievements_csv_eleven_rows_without_a05(self):
+        """DT_Achievements.csv：E01～E05、A01～A04、A06、A07 共 11 列，沒有 A05；名稱與解鎖條件和 §8 一致"""
         r, out = self.generate()
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         rows = read_csv(out / "DT_Achievements.csv")
         self.assertEqual(rows[0], ACHIEVEMENTS_HEADER)
         self.assertEqual([x[0] for x in rows[1:]], ACHIEVEMENT_IDS)
-        self.assertEqual(len(rows) - 1, 10)
+        self.assertEqual(len(rows) - 1, 11)
         self.assertNotIn("A05", [x[0] for x in rows])
         self.assertEqual(rows[1:], expected_achievements())
         by_id = {x[0]: x[1] for x in rows[1:]}
@@ -389,7 +389,7 @@ class FontCoverageTest(unittest.TestCase):
         self.assertIn("Open Font License", OFL_LICENSE.read_text(encoding="utf-8", errors="replace"))
         attrs = (ROOT / ".gitattributes").read_text(encoding="utf-8")
         for ext in ("ttc", "ttf", "otf"):
-            self.assertRegex(attrs, rf"^\*\.{ext}\s+filter=lfs", f"*.{ext} 沒有走 LFS")
+            self.assertRegex(attrs, rf"(?m)^\*\.{ext}\s+filter=lfs", f"*.{ext} 沒有走 LFS")
 
     def test_cjk_font_is_tc_subface(self):
         """預設字型是 TTC 的第 3 個字型（Noto Sans CJK TC），不是方塊字重災區的別種字型"""

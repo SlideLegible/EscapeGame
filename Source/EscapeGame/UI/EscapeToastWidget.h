@@ -1,10 +1,12 @@
-// 步驟 10 介面：成就提示（右上角）。10a：空殼；10b 實作。
+// 步驟 10 介面：成就提示（右上角）。
 #pragma once
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "Widgets/Layout/Anchors.h"
 #include "EscapeToastWidget.generated.h"
+
+class UTextBlock;
 
 UCLASS()
 class UEscapeToastWidget : public UUserWidget
@@ -24,4 +26,8 @@ public:
 	virtual bool Initialize() override;
 	/** 顯示「成就解鎖：名稱」之類的一行（前綴來自 UiText ToastPrefix，由呼叫端組好） */
 	void SetToastText(const FString& Text);
+
+private:
+	UPROPERTY(Transient)
+	TObjectPtr<UTextBlock> TextBlock;
 };

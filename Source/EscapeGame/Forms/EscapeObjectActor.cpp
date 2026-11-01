@@ -27,3 +27,15 @@ bool AEscapeObjectActor::IsDoorOpen() const
 {
 	return bDoorOpen;
 }
+
+void AEscapeObjectActor::SetItemPresent(bool bPresent)
+{
+	bItemPresent = bPresent;
+	SetActorHiddenInGame(!bPresent);
+	Mesh->SetCollisionEnabled(bPresent ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
+}
+
+bool AEscapeObjectActor::IsItemPresent() const
+{
+	return bItemPresent;
+}

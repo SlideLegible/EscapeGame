@@ -1,6 +1,5 @@
 // 步驟 10 介面：把邏輯層的結果轉成「畫面該顯示什麼」。純 C++（只用 Core + Logic/ 標頭），不 include UMG／Slate。
 // Widget 只照著它畫；彈出框、成就提示的 3 秒計時、鍵盤輸入狀態都在這裡，所以不用開畫面就能測。
-// 10a：只有宣告與空殼（回傳預設值），10b 實作。
 #pragma once
 
 #include "CoreMinimal.h"
@@ -62,4 +61,39 @@ public:
 	// 成就提示（右上角）
 	bool IsToastVisible() const;
 	FString GetToastText() const;  // 成就名稱（DT_Achievements 的 Title）
+
+	/** DT_UiText 的固定文字（畫面上所有固定文字都從這裡來）；沒有這個 Name 回傳空字串 */
+	FString GetUiText(const FString& Name) const;
+
+private:
+	struct FEndingText
+	{
+		FString Title;
+		FString Story;
+	};
+
+	/** 目前這則彈出框顯示滿 PopupSeconds 或被按鍵關掉 → 換下一則（沒有了就關） */
+	void AdvancePopup();
+	void AdvanceToast();
+	void ShowEndingFor(const TArray<FTeamEvent>& Events, const FString& LocalPlayerId);
+	void QueueToasts(const TArray<FAchievementUnlock>& Unlocks, const FString& LocalPlayerId);
+
+	TMap<FString, FString> UiTexts;
+	TMap<FString, FEndingText> Endings;
+	TMap<FString, FString> AchievementTitles;
+
+	// 彈出框：第一則是正在顯示的。計時用 double，避免 float 累加誤差讓「剛好 3 秒」差一點點
+	TArray<FString> PopupQueue;
+	double PopupElapsed = 0.0;
+
+	bool bKeypadVisible = false;
+	FString KeypadEntry;
+
+	bool bEndingVisible = false;
+	FString EndingId;
+	FString EndingTitle;
+	FString EndingStory;
+
+	TArray<FString> ToastQueue;
+	double ToastElapsed = 0.0;
 };

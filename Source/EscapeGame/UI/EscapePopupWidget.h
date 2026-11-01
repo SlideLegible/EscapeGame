@@ -1,10 +1,12 @@
-// 步驟 10 介面：互動事件文字的彈出框（畫面中下）。10a：空殼；10b 實作。
+// 步驟 10 介面：互動事件文字的彈出框（畫面中下）。
 #pragma once
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "Widgets/Layout/Anchors.h"
 #include "EscapePopupWidget.generated.h"
+
+class UTextBlock;
 
 UCLASS()
 class UEscapePopupWidget : public UUserWidget
@@ -23,4 +25,8 @@ public:
 
 	virtual bool Initialize() override;
 	void SetPopupText(const FString& Text);
+
+private:
+	UPROPERTY(Transient)
+	TObjectPtr<UTextBlock> TextBlock;
 };

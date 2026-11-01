@@ -31,6 +31,11 @@ public:
 	void SetDoorOpen(bool bOpen);
 	bool IsDoorOpen() const;
 
+	/** 步驟 10 場景同步：可變身物品（F01～F12）還沒出現＝隱藏且沒有碰撞；出現＝顯示並恢復碰撞（BlockAll） */
+	void SetItemPresent(bool bPresent);
+	bool IsItemPresent() const;
+
 private:
 	bool bDoorOpen = false;
+	bool bItemPresent = true;
 };

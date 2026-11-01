@@ -1,9 +1,11 @@
-// 步驟 10 介面：結局畫面（全畫面：標題＋劇情）。10a：空殼；10b 實作。
+// 步驟 10 介面：結局畫面（全畫面：標題＋劇情）。
 #pragma once
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "EscapeEndingWidget.generated.h"
+
+class UTextBlock;
 
 UCLASS()
 class UEscapeEndingWidget : public UUserWidget
@@ -18,4 +20,10 @@ public:
 
 	virtual bool Initialize() override;
 	void SetEnding(const FString& Title, const FString& Story);
+
+private:
+	UPROPERTY(Transient)
+	TObjectPtr<UTextBlock> TitleBlock;
+	UPROPERTY(Transient)
+	TObjectPtr<UTextBlock> StoryBlock;
 };

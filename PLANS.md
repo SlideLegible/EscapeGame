@@ -26,7 +26,7 @@
 
 ### 第 3 批 場景與單人通關
 - [x] **9 灰盒關卡**：MCP 搭 8 個區域，擺放所有 F、S 物件；自動化測試掃描關卡 → STEP 9
-- [ ] **10 介面**：HUD（生命值、mm:ss、形態）、彈出文字框、四位數鍵盤、結局畫面、成就提示、Noto Sans TC → STEP 10
+- [x] **10 介面**：HUD（生命值、mm:ss、形態）、彈出文字框、四位數鍵盤、結局畫面、成就提示、Noto Sans TC → STEP 10
 - [ ] **11 操控**：Enhanced Input（WASD、滑鼠、E、Q）；各形態移動模式（Hop／Roll／Static）與鏡頭臂長度 → STEP 11
 - [ ] **12 單人全路線**：Functional Test 跑 E01、E03 路線；開發版測試模式讀密碼 → STEP 12
 
@@ -52,6 +52,7 @@ tools/
   run_ue_tests.py            編譯 EscapeGameEditor + headless（-nullrhi）跑 UE 自動化測試（0c）
   design_to_csv.py           設計文件 → Content/Data/DT_*.csv（步驟 1）；可用 --interactions／--script／--out 指定輸入輸出
   design_to_responses.py     設計文件 §5 → Content/Data/DT_Responses.csv（步驟 2）；--interactions／--out
+  design_to_endings.py       設計文件 §7、§8 → Content/Data/DT_Endings.csv、DT_Achievements.csv（步驟 10）；--script／--out
   mcp_build_graybox.py       （步驟 9）讀 Level_Layout.csv，經 MCP（127.0.0.1:8000）在開著的編輯器裡重蓋並存檔 /Game/Maps/Lvl_Academy；--print-script 只印腳本
 tests/                       Python 測試，test_stepN_名稱.py（test_step5_password_secrecy.py：掃 Source/ 的 log 與 DevOnly 函式；test_step8_no_persistence.py：掃 Source/ 不可有永久儲存 API）
 EscapeGame.uproject          （0c）UE 專案；.mcp.json 是 Claude Code 連 MCP 的設定（只指向 127.0.0.1:8000）
@@ -63,13 +64,18 @@ Source/EscapeGame/
     EscapeGameLogic.*        組合層（步驟 5 建立）：Resolver + TeamState，`Interact`／`SubmitPassword`／`ReturnToHuman`／`Tick`、`FInteractOutcome`；形態與位置（步驟 6）；場景狀態（步驟 7：`IsDoorOpen`／`GetOpenDoors`／`IsPowerCut`）；成就（步驟 8：`GetAchievements`／`PopNewAchievements`／`FInteractOutcome::NewAchievements`）
     AchievementTracker.*     成就計數與解鎖（步驟 8，每位玩家各自，只在記憶體）
   Core/                      組合層：GameMode、GameState、PlayerState（複製、伺服器權威）
+    EscapeGameMode.*／EscapeGameState.*／EscapePlayerState.*／EscapePlayerController.*  （步驟 10）GameMode 持有 FEscapeGameLogic；PlayerController 的三個 Server RPC＋結果送回本機 HUD
     EscapeAreaVolume.*       （步驟 9）區域盒子：AreaId、Box（Root，只 Overlap）、ContainsPoint
   Forms/                     畫面層：HumanCharacter、FormPawn 與各形態
     EscapeObjectActor.*      （步驟 9）場景物件／可變身物品的灰盒方塊：ObjectId、bIsDoor、SetDoorOpen／IsDoorOpen
     EscapeFormPawn.*         （步驟 9）人類身體／物品的 Pawn 空殼：FormId、Mesh（移動與鏡頭是步驟 11）
   UI/                        畫面層：HUD、文字框、密碼鍵盤、結局、成就提示
+    EscapeUiPresenter.*      （步驟 10）純 C++：logic 結果 → 畫面該顯示什麼（彈出框／成就 3 秒計時、鍵盤狀態、結局）
+    EscapeFonts.*            （步驟 10）FCompositeFont：TTC 的 TC 子字型＋彩色 emoji fallback
+    Escape{Hud,Popup,Keypad,Ending,Toast}Widget.*、EscapeUiBuild.h、EscapeHUD.*  （步驟 10）WidgetTree 建的 widget；HUD 建立並每格更新
   Tests/                     UE 自動化測試，StepN_名稱.spec.cpp（Step2_InteractionResolver.spec.cpp、Step3_TeamState.spec.cpp、Step4_Clock.spec.cpp、Step5_DoorPassword.spec.cpp、Step6_Transform.spec.cpp、Step7_SceneState.spec.cpp、Step8_Achievements.spec.cpp）
-Content/Data/                DT_*.csv 與匯入後的 DataTable；Level_Layout.csv（步驟 9，自己的資料：關卡尺寸與物件位置）
+Content/Data/                DT_*.csv 與匯入後的 DataTable（步驟 10 加 DT_Endings、DT_Achievements〔設計文件產生〕、DT_UiText〔手寫〕）；Level_Layout.csv（步驟 9，自己的資料：關卡尺寸與物件位置）
+Content/Fonts/               （步驟 10，LFS）NotoSansCJK-Regular.ttc、NotoColorEmoji.ttf、LICENSE-OFL.txt
 Content/Maps/                主關卡 Lvl_Academy.umap（步驟 9，由 tools/mcp_build_graybox.py 產生，LFS）
 deploy/                      Pixel Streaming：Wilbur 設定、配對頁、實例管理腳本（第 6 批）
 ```
@@ -150,7 +156,10 @@ deploy/                      Pixel Streaming：Wilbur 設定、配對頁、實�
 - **單人全路線（步驟 12）**：PIE 測試（`LatentIt` + `AutomationOpenMap` 或 `FStartPIECommand`，`-nullrhi`）載入 Lvl_Academy，用伺服器端函式（移到物件旁、呼叫互動）跑 E01、E03、E02（開發版測試模式 `EscapeGame.Dev.Password` 主控台指令讀密碼，`#if !UE_BUILD_SHIPPING`）、E04、E05；「5 分鐘內」用路線各段距離 ÷ 走路速度加每次互動的時間估算。測試明顯拖慢時分組，但 `tools/run_tests.sh` 仍一行跑全部。
 
 ### 素材來源
-（步驟 15 開始填：素材名稱、來源網址、授權。）
+（步驟 15 開始填美術與音效。）
+- **Noto Sans CJK**（`Content/Fonts/NotoSansCJK-Regular.ttc`，約 18.6 MB，LFS；用其中 SubFaceIndex 3 ＝ Noto Sans CJK TC）：Google／Adobe；來源是本機系統 `/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc`（Arch 套件 noto-fonts-cjk）。授權 SIL Open Font License 1.1。
+- **Noto Color Emoji**（`Content/Fonts/NotoColorEmoji.ttf`，約 7.4 MB，LFS）：Google；來源是引擎 `Engine/Content/Editor/Slate/Fonts/NotoColorEmoji.ttf`（引擎的 `NotoFonts.tps` 記載為 Noto fonts）。授權 SIL Open Font License 1.1。
+- 授權全文 `Content/Fonts/LICENSE-OFL.txt`，複製自 `/usr/share/licenses/noto-fonts-cjk/LICENSE` 與 `/usr/share/licenses/noto-fonts-emoji/LICENSE`。
 
 ## 審查紀錄（對照 PLANS.v1.md，問三件事）
 
@@ -237,6 +246,17 @@ deploy/                      Pixel Streaming：Wilbur 設定、配對頁、實�
   - **物件都是方塊**：F／S 全部是 `AEscapeObjectActor`（BlockAll 方塊，大小是估的），沒有 `AEscapeFormPawn`（F00 人類身體在步驟 11 才放，spec 查詢本來就忽略它）。F01～F07 目前一開始就放在關卡裡，「還沒出現、隱藏、沒有碰撞」的規則（PLANS 架構）是步驟 10 組合層同步場景時做，不在這一步。
   - **配置是我估的**：尺寸不是設計文件給的；人想改就改 `Level_Layout.csv`、重跑 `tools/mcp_build_graybox.py`。
 - 形態表（`item_interactions.md` §1）裡混進了 X027、X032、X035 三列 → `design_to_csv.py` 依 ID 前綴歸類即可，不需改文件。
+- **步驟 10 的詮釋（待人確認，選了最保守的做法）**：
+  - **成就是 11 個，不是 10 個**：E01～E05、A01～A04、A06、A07（沒有 A05）。約定與 10a 的測試一開始寫成 10，人同意後改成 11（見調整紀錄）。
+  - **UiText 的用字**（我自己寫的，`DT_UiText.csv`）：「生命值：{0}」「形態：{0}」「請輸入四位數密碼」「刪除」「確認」「按任意鍵繼續」「成就解鎖：」。想改直接改 CSV，不用重編。
+  - **「按任意鍵」的定義**：`OnAnyKey` 只關目前的彈出框（下一則接著顯示）；鍵盤開著時不作用；不影響成就提示與結局畫面。實際把哪些按鍵接到 `OnAnyKey` 是步驟 11。
+  - **結局畫面不會自己關**：出現後一直在，`OnAnyKey` 也不關它；`EndingContinue`（「按任意鍵繼續」）目前沒有畫在畫面上，等步驟 11／12 決定結局之後「繼續」做什麼（E05 重啟、E01～E04 留在場景或回主畫面）再用。已經在看結局時，後來的結局不會蓋掉它。
+  - **彈出框、結局、鍵盤、成就同時出現時的優先序**：疊放由上到下是成就提示、結局畫面、鍵盤、彈出框、HUD。結局畫面（深色不透明底）會蓋住彈出框與鍵盤；成就提示在最上面。彈出框的 3 秒計時與佇列照常走，不因為被蓋住而暫停。
+  - **別人造成的結局與成就**：GameMode 把 logic 的結果依玩家分送：行動的玩家拿到全部（文字、鍵盤、結局、成就），其他玩家只拿影響自己的結局與自己的成就（沒有文字）。
+  - **時鐘**：還沒有任何玩家登入時 `Tick` 不推 logic（時鐘不走）。
+  - **場景同步只做兩件**：F01～F12 的出現／隱藏（隱藏＝無碰撞）與三扇門的開關；被玩家占用的物品、玩家位置回寫（`SetPlayerLocation`）留給步驟 11。
+  - **暫時沒有 WASD**：`GlobalDefaultGameMode` 改成 C++ 的 `AEscapeGameMode` 後，PlayerController 是沒有 mapping context 的 `AEscapePlayerController`，Lvl_Academy 裡暫時不能用 ThirdPerson 範本的移動輸入；輸入（WASD、滑鼠、E、Q）與滑鼠游標／輸入模式都是步驟 11。鍵盤按鈕目前只有 widget 與 `KeypadKey` 的接線，還不能點。
+  - **鍵盤 widget 的預設字**：「請輸入四位數密碼」「刪除」「確認」在 widget 建立時先寫死一份（測試要求只靠 `Initialize()` 就要有「刪除」「確認」），HUD 載入 UiText 後用 `SetLabels` 覆寫，所以 UiText 才是準的。
 - ~~成就沒有 A05~~ → **刻意跳過**（2026-10-31 人確認）。
 - ~~互動沒有 X019~~ → **刻意跳過**（2026-10-31 人確認）。
 - ~~人數上限~~ → **3 人**（2026-10-31 人決定），已寫進 BRIEF；VERIFY STEP 13、18 已改成 3 人（`ba140d4`）。
@@ -372,3 +392,12 @@ deploy/                      Pixel Streaming：Wilbur 設定、配對頁、實�
   - **MCP**：實際跑了 3 次 `mcp_build_graybox.py`（第 1 次因 Graybox 資料夾不存在失敗，沒有放任何 Actor；第 2 次蓋成功；第 3 次重跑驗證相同）＋ 約 10 次探索用的小呼叫（`describe_toolset`、複製／載入／放 Actor／`set_properties` 試用）。headless 開編輯器（`-nullrhi`），約 15 秒後 `127.0.0.1:8000` 可連；`ss -ltn` 只看到 `127.0.0.1:8000`（另有 `0.0.0.0:1985` 是 UE Trace 控制埠，已知，編輯器關掉後約 20 秒消失；不是 MCP）。編輯器 RSS 約 3.1 GB。每次 MCP 任務前都先 commit（`970efb2`、`3380df8`、`a3478c5` 三個存檔點）。一次完整重蓋約 2.6 秒。
   - **`DefaultEngine.ini`**：`GameDefaultMap`、`EditorStartupMap` 改成 `/Game/Maps/Lvl_Academy.Lvl_Academy`；`GlobalDefaultGameMode` 仍是 `BP_ThirdPersonGameMode`。
   - **時間／測試**：實作＋MCP 約 40 分鐘。整個 `tools/run_tests.sh` 約 22 秒（含增量編譯與 UE 測試）。最後 Python 56/56（新增 10 條）；UE 132/132（新增 8 條：VERIFY 5 + PLANS 詮釋 3）。紅的時候 `Lvl_Academy` 不存在，spec 8 條都因「找不到地圖」失敗；實作第一次就全綠，沒有改過測試與 spec。
+- **2026-11-01 步驟 10 介面**：10a（紅，`ee8fb16`）寫測試與空殼；10b（這次）實作到全綠。
+  - **資料**：`tools/design_to_endings.py` 讀設計文件 §7、§8 → `DT_Endings.csv`（5 列）、`DT_Achievements.csv`（**11 列**）；`DT_UiText.csv` 手寫。`.gitattributes` 先加 `*.ttc`／`*.ttf`／`*.otf` 的 LFS，再放字型；`DefaultGame.ini` 加 `DirectoriesToAlwaysStageAsNonUFS`（Fonts、Data，打包時用，步驟 16 驗）；`DefaultEngine.ini` 的 `GlobalDefaultGameMode` 改成 `/Script/EscapeGame.EscapeGameMode`。
+  - **字型**：`FEscapeFonts::GetFont(Size)` 用 `FStandaloneCompositeFont`：`DefaultTypeface` 放 TTC 的 SubFaceIndex 3，`FallbackTypeface` 放 NotoColorEmoji.ttf；每個大小一份 `FSlateFontInfo`（放 `TSharedRef`，TMap 長大時參考不失效），composite 刻意不釋放（`FGCObject` 在結束的靜態解構時 GC 可能已不在）。Slate 在 `-nullrhi` 下字型量測可用，🎂 有量到（不是方塊）。
+  - **Presenter**：純 C++。計時用 double 並留 1e-4 容差，每一則彈出框／成就提示只算自己的時間（多出來的時間不帶到下一則），所以 `Tick(2.9)+Tick(0.1)`、`Tick(1.9)+Tick(1.2)` 都對。`LoadTexts` 缺必要 Name 時錯誤訊息含該 Name。
+  - **Widget**：全部在 `Initialize()` 用 `WidgetTree` 建（`Super::Initialize()` 回 false 就不再建）。TextBlock 一律自動換行、用 `FEscapeFonts`；`USizeBox` 只限最大寬度。鍵盤的按鈕用 `UEscapeKeypadButtonProxy` 轉接點擊（`UButton::OnClicked` 只能綁 UFUNCTION）。HUD 用 `SetAnchorsInViewport`／`SetAlignmentInViewport`／`SetPositionInViewport` 放位置（彈出框中下、成就右上、鍵盤正中、結局全畫面）。`AEscapeHUD` 空殼宣告的 `DrawHUD` 改成 `Tick`（推 presenter 並更新 widget）。
+  - **組合層 / controller 回傳結果的做法**：三個 Server RPC 呼叫 `AEscapeGameMode::HandleInteract`／`HandleSubmitPassword`／`HandleReturnToHuman` → 動 logic、`SyncSceneActors`、同步 GameState／PlayerState、`Dispatch` 依玩家分送 → `AEscapePlayerController::ReceiveResult`：本機 controller（單機、listen server 主機）直接餵自己 HUD 的 presenter；遠端 controller 走 Client RPC `ClientReceiveOutcome(FEscapeOutcomeNet)`（Kind、Messages、EndingIds、AchievementIds）。`InitGame` 呼叫 `LoadLogic`；`BeginPlay` 註冊關卡物件位置；`PostLogin` 用 pawn（或 PlayerStart）位置 `AddPlayer`；`Tick` 推 logic，結局／成就分送。互動後立刻 `PopNewAchievements()`，免得下一個 Tick 重複送。`AEscapeObjectActor` 加 `SetItemPresent`／`IsItemPresent`。
+  - **Build.cs**：10a 關掉 unity build（`bUseUnity = false`），原因是 Logic 各檔匿名 namespace 的同名常數在新增檔案後被併進同一個編譯單元而撞名；關掉後增量編譯仍很快，整個 `tools/run_tests.sh` 約 32 秒。
+  - **測試修正（人同意）**：實作完才發現 10a 的測試有 3 處自己的錯，我停下來回報，人明確同意修正後才改（`fae0219`，斷言沒有放寬）：(1) `tests/test_step10_ui_data.py` 成就列數 10→11（同一個測試已要求 id 清單等於 11 個的 `ACHIEVEMENT_IDS`，兩個斷言互相矛盾；方法名改 `eleven_rows`）；(2) `Step10_UI.spec.cpp` 的 `ToastCount` 10→11（同一原因）；(3) `test_font_files_and_license_exist` 的 `assertRegex` 沒有 `re.MULTILINE`，`^` 只能對到整個檔案開頭，三個副檔名不可能同時成立，加 `(?m)`。根本原因是共用約定把成就數寫成 10。
+  - **時間／測試**：10b 約 1 小時。最後 Python 74/74；UE 153/153。實作第一次編譯就過，除上述 3 處之外沒有改過測試。

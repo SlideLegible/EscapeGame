@@ -9,10 +9,12 @@
 import sys
 import os
 import bpy
+import numpy as np
 
 # keep：只保留「自己或父節點名稱」符合的網格物件（子字串比對；空白代表全部）。
 # faces：減面後的目標三角面數（None 代表不減）。
 # texture：貼圖最長邊上限。
+# mark：在底色貼圖上畫一個紅圈，(x, y) 是從左上角算起的像素座標（縮圖之前的原始尺寸）。
 CONFIG = {
     'S01': {'keep': [], 'faces': 12000, 'texture': 1024},
     'S02': {'keep': ['TrashCan_Grey'], 'faces': None, 'texture': 512},
@@ -22,12 +24,39 @@ CONFIG = {
     'S10': {'keep': [], 'faces': 3000, 'texture': 512},
     'S17': {'keep': ['BoardGeo.012_4'], 'faces': 4000, 'texture': 512},
     'S15': {'keep': [], 'faces': None, 'texture': 512},
-    'S18': {'keep': [], 'faces': None, 'texture': 512},
+    # 貼圖是轉 90° 並鏡像存放的；10 月那塊的 31 號在 (113, 471)。
+    'S18': {'keep': [], 'faces': None, 'texture': 1024, 'mark': {'x': 113, 'y': 471, 'radius': 9, 'width': 2.2}},
 }
 
 
 def tri_count(obj):
     return sum(len(p.vertices) - 2 for p in obj.data.polygons)
+
+
+def base_color_image(meshes):
+    for obj in meshes:
+        for slot in obj.material_slots:
+            tree = slot.material.node_tree if slot.material else None
+            if not tree:
+                continue
+            for node in tree.nodes:
+                if node.type == 'BSDF_PRINCIPLED':
+                    link = node.inputs['Base Color'].links
+                    if link and link[0].from_node.type == 'TEX_IMAGE':
+                        return link[0].from_node.image
+    return None
+
+
+def draw_ring(image, x, y, radius, width, color=(0.86, 0.08, 0.08)):
+    w, h = image.size
+    px = np.array(image.pixels[:], dtype=np.float32).reshape(h, w, 4)
+    row = h - 1 - y  # Blender 的像素列由下往上
+    yy, xx = np.mgrid[0:h, 0:w]
+    dist = np.hypot(xx - x, yy - row)
+    cover = np.clip(width / 2 + 0.5 - np.abs(dist - radius), 0, 1)[..., None]
+    px[..., :3] = px[..., :3] * (1 - cover) + np.array(color, dtype=np.float32) * cover
+    image.pixels = px.reshape(-1).tolist()
+    image.update()
 
 
 def pack(sid, src, dest):
@@ -56,6 +85,13 @@ def pack(sid, src, dest):
             mod.use_collapse_triangulate = True
     deps = bpy.context.evaluated_depsgraph_get()
     after = sum(len(o.evaluated_get(deps).data.polygons) for o in meshes)
+
+    mark = cfg.get('mark')
+    if mark:
+        image = base_color_image(meshes)
+        if image is None:
+            raise SystemExit(f'{sid}：找不到底色貼圖，無法畫圈')
+        draw_ring(image, mark['x'], mark['y'], mark['radius'], mark['width'])
 
     limit = cfg['texture']
     for image in bpy.data.images:

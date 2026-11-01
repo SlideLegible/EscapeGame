@@ -16,3 +16,12 @@ f7775fea6fc34f518424ef9cad55c926 | The Japanese School Corridor | volvor | CC At
 646ed84ecd9d40089c31d94f79334ca5 | Low Poly Computer Desk | Nyangire | CC Attribution | https://sketchfab.com/3d-models/low-poly-computer-desk-646ed84ecd9d40089c31d94f79334ca5 | rooms/computer_desk.glb
 7fd56cd3917443a99966352beefd8304 | Surveillance room | wa_rouk | Free Standard | https://sketchfab.com/3d-models/surveillance-room-7fd56cd3917443a99966352beefd8304 | rooms/guard_room.glb
 5ce8d22eecdc44adbdb84cb6fa010860 | Janitors Closet | KahmarO | CC Attribution | https://sketchfab.com/3d-models/janitors-closet-5ce8d22eecdc44adbdb84cb6fa010860 | rooms/janitor_closet.glb
+S01 | modern laboratory building entrance doors | oscarpedrero | CC Attribution | https://sketchfab.com/3d-models/modern-laboratory-building-entrance-doors-3f8d274dfee147aa8fc031f965010692 | objects/s01.glb
+S02 | Trash Can | Lyskilde | CC Attribution | https://sketchfab.com/3d-models/trash-can-f61aeec14ff441abb0f6add5485a2e90 | objects/s02.glb
+S03 | Vending Machine | ¡Jacques | CC Attribution | https://sketchfab.com/3d-models/vending-machine-f537e142a592428d85ca7a940be221d3 | objects/s03.glb
+S06 | Simple Office Desk (FREE) | Brandon Westlake | Free Standard | https://sketchfab.com/3d-models/simple-office-desk-free-958136efb5bc48c6b1bf20dd444a4b84 | objects/s06.glb
+S07 | Retro CRT Computer (1990s Desktop PC) | MadeByYeshe | CC Attribution | https://sketchfab.com/3d-models/retro-crt-computer-1990s-desktop-pc-ea9faf1298d24497b916c27a4ea38636 | objects/s07.glb
+S10 | Flower pot with succulent plants | fuinur | CC Attribution | https://sketchfab.com/3d-models/flower-pot-with-succulent-plants-acce0c2e1e5b4986b4ff18198eb90e3e | objects/s10.glb
+S15 | Electric Distribution Box | Avadhoot | CC Attribution-ShareAlike | https://sketchfab.com/3d-models/electric-distribution-box-b5e233fbe3bf49b2a21fd186b07b190b | objects/s15.glb
+S17 | Bulletin Boards + Geometry Node System | Unreal Designer | CC Attribution | https://sketchfab.com/3d-models/bulletin-boards-geometry-node-system-4e2609119dfa478d8b0337b049050d7c | objects/s17.glb
+S18 | Calendar Wall - 3MB | Mehdi Shahsavan | CC Attribution | https://sketchfab.com/3d-models/calendar-wall-3mb-03df12d6917a406da7a2b3ee333faba6 | objects/s18.glb

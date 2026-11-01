@@ -16,7 +16,7 @@ const ROOM = {
 export const OBJECT_POSITIONS = {
   S01: [0, -14], S02: [-6, -10], S03: [-14, -10], S04: [-14, -10.7], S05: [11, -15],
   S06: [13, -20], S07: [9, -21], S08: [13, -24], S09: [-16, -21], S10: [4, -10],
-  S11: [-12, -19], S12: [-8, -23], S13: [-9, -17], S14: [-7.65, 0], S15: [25, -22],
+  S11: [-12, -19], S12: [-8, -23], S13: [-9, -17], S14: [-7.65, 0], S15: [27.68, -22],
   S16: [-6.32, 0], S17: [-3, -10], S18: [9, -24], S19: [-5.55, -5.45], S20: [-5.65, 0.35],
   S21: [22.5, -22],
 };
@@ -46,7 +46,7 @@ const ITEM_MODELS = {
 
 // Room models from Sketchfab (downloaded to assets/models/rooms/, see ATTRIBUTION.sketchfab.txt). `fitFootprint` scales to the room's
 // floor minus a margin; `scale` is used as-is (the desk and closet files are in centimetres); `fitMax` sets the largest dimension.
-// `x`/`z` default to the room centre and `y` to the floor. `replaces` hides the procedural shape of that interaction target.
+// `x`/`z` default to the room centre and `y` to the floor. `replaces` lists the interaction targets whose procedural shapes are hidden; `alignMaxX` slides the model so its largest-x edge touches that x (wall mounting).
 const ROOM_MODELS = [
   { room: 'Corridor', file: 'rooms/corridor.glb', rotateY: Math.PI / 2, fitFootprint: true },
   { room: 'Restroom', file: 'rooms/restroom.glb', fitFootprint: true },
@@ -54,7 +54,18 @@ const ROOM_MODELS = [
   { room: 'Office', file: 'rooms/bulletin_board.glb', rotateY: Math.PI / 2, x: 6.25, y: 1.2, z: -21 },
   { room: 'GuardRoom', file: 'rooms/guard_room.glb', fitFootprint: true },
   { room: 'Storage', file: 'rooms/janitor_closet.glb', scale: 0.01, x: -21.5, z: -24.5 },
-  { room: 'GuardRoom', file: 'items/f10.glb', fitMax: 1.0, x: 22.5, z: -22, replaces: 'S21' },
+  { room: 'GuardRoom', file: 'items/f10.glb', rotateY: -Math.PI / 2, fitMax: 1.0, x: 22.5, z: -22, replaces: ['S21'] },
+  // Interaction-object models (assets/models/objects/sNN.glb, packed by scripts/pack-scene-objects.py). Sizes follow the old procedural shapes
+  // because interaction range and collision still use their bounds. S04 (under the vending machine) reuses the S03 model.
+  { room: 'Corridor', file: 'objects/s01.glb', fitMax: 2.9, x: 0, z: -14, replaces: ['S01'] },
+  { room: 'Corridor', file: 'objects/s02.glb', fitMax: 1.0, x: -6, z: -10, replaces: ['S02'] },
+  { room: 'Corridor', file: 'objects/s03.glb', fitMax: 2.76, x: -14, z: -10, replaces: ['S03', 'S04'] },
+  { room: 'Corridor', file: 'objects/s10.glb', fitMax: 1.1, x: 4, z: -10, replaces: ['S10'] },
+  { room: 'Corridor', file: 'objects/s17.glb', fitMax: 2.4, y: 0.85, x: -3, z: -10, replaces: ['S17'] },
+  { room: 'Office', file: 'objects/s06.glb', fitMax: 1.6, x: 13, z: -20, replaces: ['S06'] },
+  { room: 'Office', file: 'objects/s07.glb', fitMax: 1.1, x: 9, z: -21, replaces: ['S07'] },
+  { room: 'GuardRoom', file: 'objects/s15.glb', rotateY: -Math.PI / 2, fitMax: 1.2, y: 0.9, z: -22, alignMaxX: 27.89, replaces: ['S15'] },
+  { room: 'Office', file: 'objects/s18.glb', fitMax: 1.8, y: 0.5, x: 9, z: -24, replaces: ['S18'] },
 ];
 
 // Footprint (x, z) of the teacher's lectern in the bundled classroom, parallel to the blackboard.
@@ -409,8 +420,8 @@ export class AcademyScene {
         this.#placeRoomModel(model, config);
         model.name = config.file;
         (this.roomGroups.get(config.room) ?? this.scene).add(model);
-        if (config.replaces) {
-          for (const child of this.targetGroups.get(config.replaces).children) child.visible = false;
+        for (const id of config.replaces ?? []) {
+          for (const child of this.targetGroups.get(id).children) child.visible = false;
         }
       } catch (error) {
         console.error(`${config.file} 房間模型載入失敗，使用簡化場景。`, error);
@@ -419,7 +430,7 @@ export class AcademyScene {
     this.refresh();
   }
 
-  #placeRoomModel(model, { room, rotateY = 0, scale = 1, fitFootprint, fitMax, x, y = 0, z }) {
+  #placeRoomModel(model, { room, rotateY = 0, scale = 1, fitFootprint, fitMax, x, y = 0, z, alignMaxX }) {
     const area = ROOM[room];
     model.rotation.y = rotateY;
     model.updateMatrixWorld(true);
@@ -432,6 +443,10 @@ export class AcademyScene {
     const bounds = new THREE.Box3().setFromObject(model);
     const center = bounds.getCenter(new THREE.Vector3());
     model.position.set((x ?? area.x) - center.x, y - bounds.min.y, (z ?? area.z) - center.z);
+    if (alignMaxX !== undefined) {
+      model.updateMatrixWorld(true);
+      model.position.x += alignMaxX - new THREE.Box3().setFromObject(model).max.x;
+    }
   }
 
   async #loadItemModels() {
@@ -663,6 +678,7 @@ export class AcademyScene {
       const [x, z] = OBJECT_POSITIONS[id];
       group.position.set(x, 0, z);
       if (id === 'S09') group.rotation.y = Math.PI / 2;
+      if (id === 'S15') group.rotation.y = -Math.PI / 2; // wall-mounted on the east wall, front toward -x
       group.userData.targetId = id;
       group.userData.interactionOnly = MODEL_TARGETS.has(id);
       group.name = `${id} ${label}`;

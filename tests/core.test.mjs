@@ -374,14 +374,30 @@ test('the student ID cannot get into the drink machine itself', () => {
   assert.equal(game.player().area, 'Corridor');
 });
 
-test('the drink cannot squeeze under the drink machine', () => {
+test('the drink can roll under the drink machine just like the can, finding the student ID', () => {
   const game = new Game();
   obtainCan(game);
   game.interact('local', 'S03');
   game.transform('local', 'F02');
   game.moveToArea('local', 'Corridor');
-  assert.match(game.interact('local', 'S04').text, /飲料機底下紋絲不動/);
-  assert.equal(game.player().area, 'Corridor');
+  const result = game.interact('local', 'S04');
+  assert.equal(result.interactionId, 'X003');
+  assert.equal(result.location, 'L02');
+  assert.equal(result.spawned, 'F03');
+  assert.equal(game.player().area, 'L02');
+  assert.equal(game.transform('local', 'F03').transformed, true);
+  assert.equal(game.item('F02').area, 'L02');
+});
+
+test('the drink can do everything the can does at the drink machine', () => {
+  for (const [target, location] of [['S03', 'L01'], ['S04', 'L02']]) {
+    const game = new Game();
+    obtainCan(game);
+    game.interact('local', 'S03');
+    game.transform('local', 'F02');
+    game.moveToArea('local', 'Corridor');
+    assert.equal(game.interact('local', target).location, location, target);
+  }
 });
 
 test('leaving the machine underside as the can leaves an untouched student ID inside', () => {

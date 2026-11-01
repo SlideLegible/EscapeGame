@@ -25,3 +25,6 @@ S10 | Flower pot with succulent plants | fuinur | CC Attribution | https://sketc
 S15 | Electric Distribution Box | Avadhoot | CC Attribution-ShareAlike | https://sketchfab.com/3d-models/electric-distribution-box-b5e233fbe3bf49b2a21fd186b07b190b | objects/s15.glb
 S17 | Bulletin Boards + Geometry Node System | Unreal Designer | CC Attribution | https://sketchfab.com/3d-models/bulletin-boards-geometry-node-system-4e2609119dfa478d8b0337b049050d7c | objects/s17.glb
 S18 | Calendar Wall - 3MB | Mehdi Shahsavan | CC Attribution | https://sketchfab.com/3d-models/calendar-wall-3mb-03df12d6917a406da7a2b3ee333faba6 | objects/s18.glb
+S08 | Closed Cardboard Box (Free Download) | sharpened | CC Attribution | https://sketchfab.com/3d-models/closed-cardboard-box-free-download-c023cd16986445d880871174d7fe8623 | objects/s08.glb
+S12 | Trash Bin | cringecrimson | CC Attribution | https://sketchfab.com/3d-models/trash-bin-38d4771d62cd47cca50ac39deab0bf04 | objects/s12.glb
+S13 | Double-Hung White Window | sacapuntas | CC Attribution | https://sketchfab.com/3d-models/double-hung-white-window-58848fe0bc1b45bcb9779d93c5652289 | objects/s13.glb

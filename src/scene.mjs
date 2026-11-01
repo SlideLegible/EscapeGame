@@ -65,6 +65,10 @@ const ROOM_MODELS = [
   { room: 'Office', file: 'objects/s06.glb', fitMax: 1.6, x: 13, z: -20, replaces: ['S06'] },
   { room: 'Office', file: 'objects/s07.glb', rotateY: -Math.PI / 2, fitMax: 0.7, y: 0.785, x: 12.5, z: -20, replaces: ['S07'] }, // on the S06 desk top
   { room: 'GuardRoom', file: 'objects/s15.glb', rotateY: -Math.PI / 2, fitMax: 1.2, y: 0.9, z: -22, alignMaxX: 27.89, replaces: ['S15'] },
+  { room: 'Office', file: 'objects/s08.glb', rotateY: Math.PI / 2, fitMax: 1.1, x: 13, z: -24, replaces: ['S08'] },
+  { room: 'Restroom', file: 'objects/s12.glb', fitMax: 0.9, x: -8, z: -23, replaces: ['S12'] },
+  // High window on the restroom's north wall (inner face z = -16.3), facing into the room.
+  { room: 'Restroom', file: 'objects/s13.glb', rotateY: Math.PI, fitMax: 1.5, y: 2.1, x: -9, z: -16.4, replaces: ['S13'] },
   { room: 'Office', file: 'objects/s18.glb', fitMax: 1.8, y: 0.5, x: 9, z: -24, replaces: ['S18'] },
 ];
 

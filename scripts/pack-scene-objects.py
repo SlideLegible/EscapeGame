@@ -21,8 +21,11 @@ CONFIG = {
     'S03': {'keep': ['Vending Machine_5'], 'faces': 8000, 'texture': 1024},
     'S06': {'keep': [], 'faces': None, 'texture': 1024},
     'S07': {'keep': [], 'faces': None, 'texture': 512},
+    'S08': {'keep': [], 'faces': None, 'texture': 512},
     'S10': {'keep': [], 'faces': 3000, 'texture': 512},
     'S17': {'keep': ['BoardGeo.012_4'], 'faces': 4000, 'texture': 512},
+    'S12': {'keep': [], 'faces': None, 'texture': 512},
+    'S13': {'keep': [], 'faces': None, 'texture': 512},
     'S15': {'keep': [], 'faces': None, 'texture': 512},
     # 貼圖是轉 90° 並鏡像存放的；10 月那塊的 31 號在 (113, 471)。
     'S18': {'keep': [], 'faces': None, 'texture': 1024, 'mark': {'x': 113, 'y': 471, 'radius': 9, 'width': 2.2}},

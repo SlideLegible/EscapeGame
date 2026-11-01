@@ -33,8 +33,13 @@ test('classroom interaction rows resolve as designed', () => {
   assert.equal(game.interact('local', 'S14').interactionId, 'X018');
   game.transform('local', 'F08');
   assert.equal(game.interact('local', 'SELF').interactionId, 'X020');
-  assert.equal(game.interact('local', 'S14').interactionId, 'X028');
+  const health = game.state.health;
+  const blackboard = game.interact('local', 'S14');
+  assert.equal(blackboard.interactionId, null);
+  assert.match(blackboard.text, /黑板紋絲不動/);
+  assert.equal(game.state.health, health);
   assert.equal(game.interact('local', 'S16').interactionId, 'X029');
+  assert.equal(game.state.health, health - 1);
   assert.equal(game.interact('local', 'S20').interactionId, 'X030');
   assert.equal(game.interact('local', 'S19').interactionId, 'X037');
   game.transform('local', 'F12');

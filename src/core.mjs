@@ -268,7 +268,7 @@ export class Game {
       if (!this.isDoorOpen('S19')) return this.#resolve(playerId, 'X037', '門被鎖住了，也許可以找個夠重的東西把它撞開');
     }
     if (targetId === 'S14' && form === 'F00') return this.#resolve(playerId, 'X018', '黑板上寫著一串奇怪的字：WKH SDVVZRUG LV QRW KHUH');
-    if ((targetId === 'S14' || targetId === 'S16') && form === 'F08') return this.#resolve(playerId, targetId === 'S14' ? 'X028' : 'X029', '你從講桌滾下去，摔得頭暈眼花', { damage: 1 });
+    if (targetId === 'S16' && form === 'F08') return this.#resolve(playerId, 'X029', '你從講桌滾下去，摔得頭暈眼花', { damage: 1 });
     if (targetId === 'S20') return this.#resolve(playerId, 'X030', '抽屜鎖得死死的，好像在說：「別白費力氣了，你永遠打不開我。」');
     if (targetId === 'S02' && form === 'F00') return this.#spawn(playerId, 'X001', 'F01', '從垃圾桶裡翻出一個飲料罐垃圾');
     if (targetId === 'S03' && form === 'F01') return this.#enterSpecial(playerId, 'X002', 'L01', 'F02', '鑽進飲料機裡，發現一罐飲料');

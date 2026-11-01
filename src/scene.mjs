@@ -47,6 +47,12 @@ export function areaAt(x, z) {
   return null;
 }
 
+export function dropPoint(x, z) {
+  if (areaAt(x, z) === 'L01') return [-14, -8];
+  if (areaAt(x, z) === 'L02') return [-18, -8];
+  return [x, z];
+}
+
 export class AcademyScene {
   #onResize;
 
@@ -71,6 +77,7 @@ export class AcademyScene {
     this.started = false;
     this.playerPosition = new THREE.Vector3(-5.2, 0, -4.5);
     this.humanPosition = this.playerPosition.clone();
+    this.itemDrops = new Map();
     this.targetMeshes = [];
     this.targetGroups = new Map();
     this.itemGroups = new Map();
@@ -579,6 +586,15 @@ export class AcademyScene {
     this.playerGroup.position.copy(this.playerPosition);
     this.scene.add(this.playerGroup);
     this.#rebuildFormMesh(this.playerGroup, 'F00');
+    this.humanGroup = new THREE.Group();
+    this.humanGroup.name = '人類身體';
+    this.humanGroup.visible = false;
+    this.scene.add(this.humanGroup);
+    this.#rebuildFormMesh(this.humanGroup, 'F00');
+  }
+
+  #itemPosition(id) {
+    return this.itemDrops.get(id) ?? ITEM_POSITIONS[id];
   }
 
   setForm(formId) {
@@ -587,11 +603,17 @@ export class AcademyScene {
 
   syncAfterAction(previousForm, result) {
     const player = this.game.player();
+    const changedForm = player.form !== previousForm;
+    if (result.ending === 'E05') this.itemDrops.clear();
+    else if (changedForm && previousForm !== 'F00') this.itemDrops.set(previousForm, dropPoint(this.playerPosition.x, this.playerPosition.z));
     if (previousForm === 'F00' && player.form !== 'F00') this.humanPosition.copy(this.playerPosition);
     if (result.location === 'L01') this.playerPosition.set(38, 0, -9);
     else if (result.location === 'L02') this.playerPosition.set(38, 0, -21);
     else if (result.ending === 'E05') this.playerPosition.set(-5.2, 0, -4.5);
-    else if (!result.ending && player.form === 'F00' && previousForm !== 'F00') this.playerPosition.copy(this.humanPosition);
+    else if (changedForm && player.form !== 'F00') {
+      const [x, z] = this.#itemPosition(player.form);
+      this.playerPosition.set(x, 0, z);
+    } else if (!result.ending && player.form === 'F00' && previousForm !== 'F00') this.playerPosition.copy(this.humanPosition);
     this.playerGroup.position.copy(this.playerPosition);
     this.setForm(player.form);
     this.refresh();
@@ -603,13 +625,12 @@ export class AcademyScene {
       const isPlayer = this.game.player().form === id;
       group.visible = Boolean(item?.exists && !item.occupiedBy && !isPlayer);
       if (group.visible && item.area) {
-        const pos = ITEM_POSITIONS[id];
-        const room = ROOM[item.area];
-        if (room && ['F05', 'F06', 'F07'].includes(id) && item.area !== (id === 'F05' || id === 'F06' ? 'Office' : 'Storage')) {
-          group.position.set(room.x, 0, room.z);
-        } else if (pos) group.position.set(pos[0], 0, pos[1]);
+        const [x, z] = this.#itemPosition(id);
+        group.position.set(x, 0, z);
       }
     }
+    this.humanGroup.visible = this.game.player().form !== 'F00';
+    this.humanGroup.position.copy(this.humanPosition);
     for (const doorId of ['S05', 'S09', 'S19']) {
       const door = this.targetGroups.get(doorId);
       if (door) door.visible = !this.game.isDoorOpen(doorId);

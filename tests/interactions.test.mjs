@@ -1,4 +1,4 @@
-// Design interaction IDs X001–X037 → VERIFY STEP 1–3
+// Design interaction IDs X001–X040 → VERIFY STEP 1–3
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../src/core.mjs';
@@ -33,8 +33,13 @@ test('classroom interaction rows resolve as designed', () => {
   assert.equal(game.interact('local', 'S14').interactionId, 'X018');
   game.transform('local', 'F08');
   assert.equal(game.interact('local', 'SELF').interactionId, 'X020');
-  assert.equal(game.interact('local', 'S14').interactionId, 'X028');
+  const health = game.state.health;
+  const blackboard = game.interact('local', 'S14');
+  assert.equal(blackboard.interactionId, null);
+  assert.match(blackboard.text, /黑板紋絲不動/);
+  assert.equal(game.state.health, health);
   assert.equal(game.interact('local', 'S16').interactionId, 'X029');
+  assert.equal(game.state.health, health - 1);
   assert.equal(game.interact('local', 'S20').interactionId, 'X030');
   assert.equal(game.interact('local', 'S19').interactionId, 'X037');
   game.transform('local', 'F12');
@@ -58,6 +63,7 @@ test('corridor rows cover trash, both machine locations, drink, student card, fl
   game.transform('local', 'F01');
   assert.equal(game.interact('local', 'S03').interactionId, 'X002');
   assert.equal(game.interact('local', 'F02').interactionId, 'X004');
+  game.transform('local', 'F01');
   game.returnToHuman('local');
   game.moveToArea('local', 'Corridor');
   game.transform('local', 'F01');
@@ -131,8 +137,10 @@ test('restroom rows implement toilet, bin, storage key, alternate response, and 
   game.moveToArea('local', 'Restroom');
   assert.equal(game.interact('local', 'S12').interactionId, 'X012');
   game.transform('local', 'F05');
-  assert.equal(game.interact('local', 'S09').interactionId, 'X013');
+  assert.equal(game.interact('local', 'S09').interactionId, null);
+  game.moveToArea('local', 'Storage');
   game.transform('local', 'F07');
+  game.moveToArea('local', 'Restroom');
   assert.equal(game.interact('local', 'S13').interactionId, 'X015');
   assert.equal(game.player().ending, 'E03');
 
@@ -142,28 +150,28 @@ test('restroom rows implement toilet, bin, storage key, alternate response, and 
   assert.equal(wrongKey.interact('local', 'S11').interactionId, 'X011');
 });
 
-test('power, monitor, and keyring rows implement X022, X023, X025, X033, and A07', () => {
+test('power, monitor, and keyring rows implement X022, X023, X025, X033, and X040', () => {
   const game = new Game();
   enterCorridor(game);
   game.moveToArea('local', 'GuardRoom');
   assert.equal(game.interact('local', 'S15').interactionId, 'X022');
   assert.equal(game.state.powerCut, true);
-  assert.equal(game.transform('local', 'F10').interactionId, 'X023');
+  assert.equal(game.interact('local', 'S21').interactionId, 'X023');
   assert.equal(game.player().canSeeWholeMap, true);
   game.transform('local', 'F11');
   game.moveToArea('local', 'Corridor');
-  assert.equal(game.interact('local', 'S01').interactionId, 'X033');
+  assert.equal(game.interact('local', 'S01').interactionId, 'X040');
   assert.equal(game.interact('local', 'S05').interactionId, 'X033');
   game.moveToArea('local', 'Restroom');
   assert.equal(game.interact('local', 'S09').interactionId, 'X033');
   game.moveToArea('local', 'Corridor');
   game.moveToArea('local', 'Classroom');
   assert.equal(game.interact('local', 'S19').interactionId, 'X033');
-  assert.equal(game.hasAchievement('local', 'A07'), true);
+  assert.equal(game.hasAchievement('local', 'A07'), false);
 
   const electric = new Game();
   enterCorridor(electric);
   electric.moveToArea('local', 'GuardRoom');
-  electric.transform('local', 'F10');
+  electric.transform('local', 'F11');
   assert.equal(electric.interact('local', 'S15').interactionId, 'X025');
 });

@@ -779,6 +779,7 @@ export class AcademyScene {
       const center = bounds.getCenter(new THREE.Vector3());
       source.position.set(-center.x, -bounds.min.y, -center.z);
       source.name = 'Vivi manga student';
+      source.rotation.y = Math.PI;
       source.updateMatrixWorld(true);
       source.traverse((node) => {
         if (!node.isMesh) return;
@@ -792,6 +793,9 @@ export class AcademyScene {
         this.playerMixer = new THREE.AnimationMixer(source);
         this.playerWalkAction = this.playerMixer.clipAction(walkClip);
         this.playerWalkAction.setLoop(THREE.LoopRepeat, Infinity);
+        this.playerWalkAction.reset().play();
+        this.playerMixer.update(Math.min(0.25, walkClip.duration * 0.3));
+        this.playerWalkAction.paused = true;
         this.humanRig = { kind: 'animated' };
       } else {
         this.humanRig = this.#createSkinnedPlayerRig(source);
@@ -1046,10 +1050,13 @@ export class AcademyScene {
       this.playerGroup.rotation.y = -this.yaw;
       if (this.playerWalkAction) {
         if (moving) {
-          if (!this.playerWalkAction.isRunning()) this.playerWalkAction.reset().play();
+          if (this.playerWalkAction.paused) {
+            this.playerWalkAction.paused = false;
+            this.playerWalkAction.play();
+          }
           this.playerMixer.update(dt);
-        } else if (this.playerWalkAction.isRunning()) {
-          this.playerWalkAction.stop();
+        } else if (!this.playerWalkAction.paused) {
+          this.playerWalkAction.paused = true;
         }
       } else if (this.playerRig) {
         if (this.playerRig.kind === 'skinned') this.#updatePlayerSkin();
@@ -1067,8 +1074,8 @@ export class AcademyScene {
           }
         }
       }
-    } else if (this.playerWalkAction?.isRunning()) {
-      this.playerWalkAction.stop();
+    } else if (this.playerWalkAction && !this.playerWalkAction.paused) {
+      this.playerWalkAction.paused = true;
     }
     let forward = Number(this.keys.has('KeyW') || this.keys.has('ArrowUp')) - Number(this.keys.has('KeyS') || this.keys.has('ArrowDown'));
     let right = Number(this.keys.has('KeyD') || this.keys.has('ArrowRight')) - Number(this.keys.has('KeyA') || this.keys.has('ArrowLeft'));

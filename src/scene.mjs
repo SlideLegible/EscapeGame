@@ -694,10 +694,9 @@ export class AcademyScene {
     const setOffset = (bone, x, y, z) => {
       if (bone) jointOffsets.set(bone, new THREE.Vector3(x, y, z));
     };
-    const armY = jump ? 0.0009 : -0.0005;
-    const upperArmY = armY;
-    const forearmY = armY;
-    const handY = armY;
+    const upperArmY = jump ? 0.0004 : 0;
+    const forearmY = jump ? 0.0008 : -0.0008;
+    const handY = jump ? 0.0012 : -0.0016;
     setOffset(parts.leftArm, 0, upperArmY, gait * 0.00022);
     setOffset(parts.rightArm, 0, upperArmY, -gait * 0.00022);
     setOffset(parts.leftForearm, 0, forearmY, gait * 0.00017);

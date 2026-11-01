@@ -28,13 +28,13 @@ const ITEM_POSITIONS = {
 const ROOM_NAMES = Object.fromEntries(Object.entries(ROOM).map(([id, room]) => [id, room.label]));
 const palette = { wall: 0x8c9883, trim: 0x273a36, wood: 0x806e52, light: 0xc8d7bb, dark: 0x1a2928, lime: 0xc4ef80 };
 
-function areaAt(x, z) {
+export function areaAt(x, z) {
   if (Math.abs(x) <= 9 && z >= -6 && z <= 6) return 'Classroom';
-  if (x >= -25 && x <= 25 && z >= -15 && z <= -7) return 'Corridor';
-  if (x >= 6 && x <= 16 && z >= -26 && z <= -16) return 'Office';
-  if (x >= -16 && x <= -6 && z >= -26 && z <= -16) return 'Restroom';
-  if (x >= -27 && x <= -17 && z >= -26 && z <= -16) return 'Storage';
-  if (x >= 18 && x <= 28 && z >= -26 && z <= -16) return 'GuardRoom';
+  if (x >= 6 && x <= 16 && z >= -26 && z <= -15.8) return 'Office';
+  if (x >= -16 && x <= -6 && z >= -26 && z <= -15.8) return 'Restroom';
+  if (x >= -27 && x <= -16.2 && z >= -26 && z <= -16) return 'Storage';
+  if (x >= 18 && x <= 28 && z >= -26 && z <= -15.8) return 'GuardRoom';
+  if (x >= -25 && x <= 25 && z >= -16.2 && z <= -5.8) return 'Corridor';
   if (x >= 33 && x <= 43 && z >= -14 && z <= -5) return 'L01';
   if (x >= 33 && x <= 43 && z >= -25 && z <= -16) return 'L02';
   return null;

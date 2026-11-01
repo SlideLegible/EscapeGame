@@ -1,4 +1,4 @@
-// Design interaction IDs X001–X039 → VERIFY STEP 1–3
+// Design interaction IDs X001–X040 → VERIFY STEP 1–3
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../src/core.mjs';
@@ -150,7 +150,7 @@ test('restroom rows implement toilet, bin, storage key, alternate response, and 
   assert.equal(wrongKey.interact('local', 'S11').interactionId, 'X011');
 });
 
-test('power, monitor, and keyring rows implement X022, X023, X025, X033, and A07', () => {
+test('power, monitor, and keyring rows implement X022, X023, X025, X033, X040, and A07', () => {
   const game = new Game();
   enterCorridor(game);
   game.moveToArea('local', 'GuardRoom');
@@ -160,7 +160,7 @@ test('power, monitor, and keyring rows implement X022, X023, X025, X033, and A07
   assert.equal(game.player().canSeeWholeMap, true);
   game.transform('local', 'F11');
   game.moveToArea('local', 'Corridor');
-  assert.equal(game.interact('local', 'S01').interactionId, 'X033');
+  assert.equal(game.interact('local', 'S01').interactionId, 'X040');
   assert.equal(game.interact('local', 'S05').interactionId, 'X033');
   game.moveToArea('local', 'Restroom');
   assert.equal(game.interact('local', 'S09').interactionId, 'X033');

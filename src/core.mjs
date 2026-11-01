@@ -259,8 +259,9 @@ export class Game {
     if (player.form === 'F11' && DOORS.includes(targetId)) {
       this.#doorTouches.get(playerId).add(targetId);
       if (DOORS.every((id) => this.#doorTouches.get(playerId).has(id))) this.unlock(playerId, 'A07');
-      return this.#resolve(playerId, 'X033', '你試了每一支鑰匙……沒有一支插得進去');
     }
+    if (targetId === 'S01' && this.state.powerCut) return this.#resolve(playerId, 'X040', '門禁機的燈全熄了，大門沒電，怎麼碰都沒有反應');
+    if (player.form === 'F11' && DOORS.includes(targetId)) return this.#resolve(playerId, 'X033', '你試了每一支鑰匙……沒有一支插得進去');
 
     const form = player.form;
     if (targetId === 'S19') {

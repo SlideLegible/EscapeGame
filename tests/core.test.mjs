@@ -452,3 +452,61 @@ test('achievements unlocked by play appear as unlocked entries and survive an E0
   const unlocked = achievementEntries(game.player().achievementIds).filter((entry) => entry.unlocked).map((entry) => entry.id);
   assert.deepEqual(unlocked, ['E05', 'A01']);
 });
+
+function cutPower(game) {
+  enterCorridor(game);
+  game.returnToHuman('local');
+  game.moveToArea('local', 'Corridor');
+  game.moveToArea('local', 'GuardRoom');
+  game.interact('local', 'S15');
+  game.moveToArea('local', 'Corridor');
+}
+
+test('after the power is cut, touching the academy gate in any form says it has no power', () => {
+  const game = new Game();
+  cutPower(game);
+  const health = game.state.health;
+  const human = game.interact('local', 'S01');
+  assert.equal(human.interactionId, 'X040');
+  assert.match(human.text, /沒電/);
+  game.interact('local', 'S02');
+  game.transform('local', 'F01');
+  game.interact('local', 'S04');
+  game.transform('local', 'F03');
+  game.moveToArea('local', 'Corridor');
+  const card = game.interact('local', 'S01');
+  assert.equal(card.interactionId, 'X040');
+  assert.equal(card.ending, null);
+  assert.equal(game.state.health, health);
+});
+
+test('the no-power gate message is not a default response and does not count toward A01', () => {
+  const game = new Game();
+  cutPower(game);
+  for (let i = 0; i < 10; i++) game.interact('local', 'S01');
+  assert.equal(game.hasAchievement('local', 'A01'), false);
+});
+
+test('the keyring at the unpowered gate gets the no-power message but the gate still counts toward A07', () => {
+  const game = new Game();
+  cutPower(game);
+  game.moveToArea('local', 'GuardRoom');
+  game.transform('local', 'F11');
+  game.moveToArea('local', 'Corridor');
+  assert.equal(game.interact('local', 'S01').interactionId, 'X040');
+  game.interact('local', 'S05');
+  game.moveToArea('local', 'Restroom');
+  game.interact('local', 'S09');
+  game.moveToArea('local', 'Corridor');
+  game.moveToArea('local', 'Classroom');
+  game.interact('local', 'S19');
+  assert.equal(game.hasAchievement('local', 'A07'), true);
+});
+
+test('before the power is cut, the gate does not mention power', () => {
+  const game = new Game();
+  enterCorridor(game);
+  game.returnToHuman('local');
+  game.moveToArea('local', 'Corridor');
+  assert.notEqual(game.interact('local', 'S01').interactionId, 'X040');
+});

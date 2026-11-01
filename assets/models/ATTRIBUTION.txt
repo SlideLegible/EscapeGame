@@ -4,5 +4,6 @@ Source: https://sketchfab.com/3d-models/japanese-classroom-2a1e3b294c1e4e91bed79
 License: Creative Commons Attribution (CC BY), as listed on the Sketchfab model page.
 
 Changes made for EscapeGame: removed the roof so the third-person camera can see
-inside the classroom, and merged meshes by material to reduce draw calls. The
-original model and textures are otherwise unchanged.
+inside, merged static meshes by material to reduce draw calls, and kept the two
+exit-door leaves separate so game state can open them. The original model and
+textures are otherwise unchanged; the blackboard clue is a game-added overlay.

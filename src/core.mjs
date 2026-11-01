@@ -103,14 +103,18 @@ export class Game {
     player.transformCount += 1;
     if (player.transformCount >= 20) this.unlock(playerId, 'A02');
     if (formId === 'F10') player.canSeeWholeMap = true;
-    let interactionId = null;
-    let text = '';
-    if (formId === 'F06') { interactionId = 'X027'; text = '你看到了考題，受到精神傷害'; this.damage(1, text); }
+    let interactionId = formId === 'F10' ? 'X023' : null;
+    let text = formId === 'F10' ? '變成監視器，可以看到整張地圖' : '';
+    let ending = null;
+    if (formId === 'F06') {
+      interactionId = 'X027'; text = '你看到了考題，受到精神傷害';
+      ending = this.damage(1, text).ending ?? null;
+    }
     if (formId === 'F02') {
       if (!this.#drinkClaimed) { this.#drinkClaimed = true; this.state.health += 1; interactionId = 'X004'; }
-      else { interactionId = 'X026'; text = '喝太多，肚子痛'; this.damage(1, text); }
+      else { interactionId = 'X026'; text = '喝太多，肚子痛'; ending = this.damage(1, text).ending ?? null; }
     }
-    return { transformed: true, form: formId, interactionId, text };
+    return { transformed: true, form: formId, interactionId, text, ending };
   }
 
   returnToHuman(playerId = 'local') {
@@ -251,7 +255,7 @@ export class Game {
     if (targetId === 'S06' && form === 'F00') return this.#spawn(playerId, 'X006', 'F05', '打開抽屜，裡面有一支不知道用來做甚麼的鑰匙');
     if (targetId === 'S07' && form === 'F00') return this.#resolve(playerId, 'X007', '電腦需要密碼才能登入，打不開');
     if (targetId === 'S08' && form === 'F00') { this.unlock(playerId, 'A04'); return this.#spawn(playerId, 'X008', 'F06', '拆開牛皮紙包，裡面竟然是期中考考卷'); }
-    if (targetId === 'S18' && form === 'F00') return this.#resolve(playerId, 'X035', this.#tried1031 ? '10 月 31 日被紅筆圈了起來，旁邊多了一行小字：老師生日🎂' : '10 月 31 日被紅筆圈了起來');
+    if (targetId === 'S18' && form === 'F00') return this.#resolve(playerId, this.#tried1031 ? 'X035' : 'X032', this.#tried1031 ? '10 月 31 日被紅筆圈了起來，旁邊多了一行小字：老師生日🎂' : '10 月 31 日被紅筆圈了起來');
     if (targetId === 'S17' && form === 'F00') return this.#resolve(playerId, 'X031', '門禁密碼更改公告：即日起，新密碼為——後面被撕掉了，只剩一角');
     if (targetId === 'S09' && form === 'F05') { this.state.doors.add('S09'); this.#spawn(playerId, 'X013', 'F07', '成功打開儲物間的門，裡面有一支很長的竿子'); return this.#resolve(playerId, 'X013', '成功打開儲物間的門，裡面有一支很長的竿子', { spawned: 'F07' }); }
     if (targetId === 'S09') return this.#resolve(playerId, 'X014', '上鎖的門，應該是儲物間吧？');

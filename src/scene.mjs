@@ -159,7 +159,7 @@ export class OcclusionGrid {
   }
 }
 
-export function bodyPathIntersectsGrid(grid, fromX, fromZ, toX, toZ, radius = 0.3, height = 1.3) {
+export function bodyPathIntersectsGrid(grid, fromX, fromZ, toX, toZ, radius = 0.3, height = 1.3, baseY = 0) {
   const cell = grid?.cell ?? 0.2;
   const verticalSteps = Math.max(1, Math.ceil(height / cell));
   const pathLength = Math.hypot(toX - fromX, toZ - fromZ);
@@ -169,7 +169,7 @@ export function bodyPathIntersectsGrid(grid, fromX, fromZ, toX, toZ, radius = 0.
     const x = fromX + (toX - fromX) * fraction;
     const z = fromZ + (toZ - fromZ) * fraction;
     for (let level = 0; level <= verticalSteps; level++) {
-      const y = Math.max(0.1, Math.min(height, level * height / verticalSteps));
+      const y = baseY + Math.max(0.1, Math.min(height, level * height / verticalSteps));
       if (grid.isBlocked(x, y, z)) return true;
       for (let around = 0; around < 8; around++) {
         const angle = around * Math.PI / 4;
@@ -178,6 +178,15 @@ export function bodyPathIntersectsGrid(grid, fromX, fromZ, toX, toZ, radius = 0.
     }
   }
   return false;
+}
+
+export function bodyPathStepHeight(grid, fromX, fromZ, toX, toZ, radius = 0.3, height = 1.3, baseY = 0, maxStep = 0.25) {
+  if (!bodyPathIntersectsGrid(grid, fromX, fromZ, toX, toZ, radius, height, baseY)) return baseY;
+  const increment = grid.cell * 0.25;
+  for (let lift = increment; lift <= maxStep + 1e-6; lift += increment) {
+    if (!bodyPathIntersectsGrid(grid, fromX, fromZ, toX, toZ, radius, height, baseY + lift)) return baseY + lift;
+  }
+  return null;
 }
 
 export function advancePlayerFacing(currentYaw, targetYaw, maxTurn) {
@@ -249,6 +258,8 @@ export class AcademyScene {
     this.pointerDown = null;
     this.started = false;
     this.playerPosition = new THREE.Vector3(-5.2, 0, -4.5);
+    this.stepHeight = 0;
+    this.stepHeightTimer = 0;
     this.humanPosition = this.playerPosition.clone();
     this.itemDrops = new Map();
     this.targetMeshes = [];
@@ -1024,6 +1035,7 @@ export class AcademyScene {
   }
 
   setForm(formId) {
+    if (formId !== 'F00') { this.stepHeight = 0; this.stepHeightTimer = 0; }
     // The single character model moves to the body left behind while the player is an item.
     if (formId !== 'F00' && this.humanModel?.parent === this.playerGroup) {
       this.humanGroup.rotation.y = this.playerGroup.rotation.y;
@@ -1056,6 +1068,8 @@ export class AcademyScene {
 
   resetRound() {
     this.itemDrops.clear();
+    this.stepHeight = 0;
+    this.stepHeightTimer = 0;
     this.playerPosition.set(-5.2, 0, -4.5);
     this.humanPosition.copy(this.playerPosition);
     this.playerGroup.position.copy(this.playerPosition);
@@ -1200,7 +1214,8 @@ export class AcademyScene {
       this.jumpHeight += this.jumpVelocity * dt;
       if (this.jumpHeight <= 0) { this.jumpHeight = 0; this.jumpVelocity = 0; }
     }
-    this.playerGroup.position.y = this.game.player().form === 'F00' ? this.jumpHeight : 0;
+    const human = this.game.player().form === 'F00';
+    this.playerGroup.position.y = human ? this.jumpHeight + this.stepHeight : 0;
     let forward = Number(this.keys.has('KeyW') || this.keys.has('ArrowUp')) - Number(this.keys.has('KeyS') || this.keys.has('ArrowDown'));
     let right = Number(this.keys.has('KeyD') || this.keys.has('ArrowRight')) - Number(this.keys.has('KeyA') || this.keys.has('ArrowLeft'));
     const hasMovementInput = Boolean(forward || right);
@@ -1224,9 +1239,54 @@ export class AcademyScene {
     } else {
       this.turningInPlace = false;
     }
-    const moving = hasMovementInput && !(this.game.player().form === 'F00' && this.turningInPlace);
-    this.walking = Boolean(moving);
-    if (this.game.player().form === 'F00') {
+    let moving = false;
+    if (hasMovementInput && !(human && this.turningInPlace)) {
+      const speed = this.game.player().form === 'F08' ? 2.6 : this.game.player().form === 'F09' ? 1.8 : 4.4;
+      const fx = Math.sin(this.yaw), fz = -Math.cos(this.yaw);
+      const rx = Math.cos(this.yaw), rz = Math.sin(this.yaw);
+      const oldX = this.playerPosition.x, oldZ = this.playerPosition.z;
+      let nx = oldX + (fx * forward + rx * right) * speed * dt;
+      let nz = oldZ + (fz * forward + rz * right) * speed * dt;
+      const radius = this.game.player().form === 'F12' ? 0.38 : 0.3;
+      const assessPath = (x, z) => {
+        if (this.#blockedAt(x, z, radius)) return null;
+        if (!human || !this.occlusion) return this.stepHeight;
+        return bodyPathStepHeight(this.occlusion, oldX, oldZ, x, z, radius, 1.3, this.stepHeight);
+      };
+      let nextStepHeight = assessPath(nx, nz);
+      if (nextStepHeight === null) {
+        const xStepHeight = assessPath(nx, oldZ);
+        if (xStepHeight !== null) { nz = oldZ; nextStepHeight = xStepHeight; }
+        else {
+          const zStepHeight = assessPath(oldX, nz);
+          if (zStepHeight !== null) { nx = oldX; nextStepHeight = zStepHeight; }
+        }
+      }
+      if (nextStepHeight !== null) {
+        const area = areaAt(nx, nz);
+        const from = this.game.player().area;
+        if (area && (area === from || this.#canCrossBoundary(from, area, nx, nz) && this.game.moveToArea('local', area))) {
+          if (area !== this.game.player().area) this.game.player().area = area;
+          this.playerPosition.x = nx; this.playerPosition.z = nz;
+          if (human && nextStepHeight > this.stepHeight + 1e-6) this.stepHeightTimer = 0.35;
+          else if (human && this.stepHeight > 0) {
+            const lowerPathBlocked = bodyPathIntersectsGrid(this.occlusion, oldX, oldZ, nx, nz, radius, 1.3, 0);
+            if (lowerPathBlocked) this.stepHeightTimer = 0.12;
+            else if (this.stepHeightTimer > 0) {
+              this.stepHeightTimer = Math.max(0, this.stepHeightTimer - dt);
+              nextStepHeight = this.stepHeight;
+            } else nextStepHeight = Math.max(0, this.stepHeight - Math.min(0.08, dt * 2));
+          }
+          this.stepHeight = human ? nextStepHeight : 0;
+          if (!human) this.stepHeightTimer = 0;
+          this.playerGroup.position.set(nx, human ? this.jumpHeight + this.stepHeight : 0, nz);
+          if (!human) this.game.item(this.game.player().form).area = area;
+          moving = Math.hypot(nx - oldX, nz - oldZ) > 1e-6;
+        }
+      }
+    }
+    this.walking = moving;
+    if (human) {
       const gait = moving ? Math.sin(this.playerAnimationTime * 10) : 0;
       if (this.playerWalkAction) {
         if (moving) {
@@ -1257,30 +1317,6 @@ export class AcademyScene {
     } else if (this.playerWalkAction && !this.playerWalkAction.paused) {
       this.playerWalkAction.paused = true;
     }
-    if (!forward && !right) return;
-    if (!moving) return;
-    const speed = this.game.player().form === 'F08' ? 2.6 : this.game.player().form === 'F09' ? 1.8 : 4.4;
-    const fx = Math.sin(this.yaw), fz = -Math.cos(this.yaw);
-    const rx = Math.cos(this.yaw), rz = Math.sin(this.yaw);
-    const oldX = this.playerPosition.x, oldZ = this.playerPosition.z;
-    let nx = oldX + (fx * forward + rx * right) * speed * dt;
-    let nz = oldZ + (fz * forward + rz * right) * speed * dt;
-    const human = this.game.player().form === 'F00';
-    const radius = this.game.player().form === 'F12' ? 0.38 : 0.3;
-    const blocked = (x, z) => this.#blockedAt(x, z, radius)
-      || human && this.occlusion && bodyPathIntersectsGrid(this.occlusion, oldX, oldZ, x, z, radius, 1.3);
-    if (blocked(nx, nz)) {
-      if (!blocked(nx, oldZ)) nz = oldZ;
-      else if (!blocked(oldX, nz)) nx = oldX;
-      else return;
-    }
-    const area = areaAt(nx, nz);
-    const from = this.game.player().area;
-    if (!area || area !== from && (!this.#canCrossBoundary(from, area, nx, nz) || !this.game.moveToArea('local', area))) return;
-    if (area !== this.game.player().area) this.game.player().area = area;
-    this.playerPosition.x = nx; this.playerPosition.z = nz;
-    this.playerGroup.position.set(this.playerPosition.x, this.game.player().form === 'F00' ? this.jumpHeight : 0, this.playerPosition.z);
-    if (this.game.player().form !== 'F00') this.game.item(this.game.player().form).area = area;
   }
 
   updateCamera(now = performance.now()) {

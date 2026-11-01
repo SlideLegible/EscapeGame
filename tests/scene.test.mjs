@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { advancePlayerFacing, areaAt, areaCameraRect, bodyPathIntersectsGrid, dropPoint, entryPoint, nearestCandidate, OcclusionGrid, rayRectLimit, SPECIAL_EXITS, OBJECT_POSITIONS, LECTERN_SIZE } from '../src/scene.mjs';
+import { advancePlayerFacing, areaAt, areaCameraRect, bodyPathIntersectsGrid, bodyPathStepHeight, dropPoint, entryPoint, nearestCandidate, OcclusionGrid, rayRectLimit, SPECIAL_EXITS, OBJECT_POSITIONS, LECTERN_SIZE } from '../src/scene.mjs';
 
 test('walkable room areas touch across the classroom, corridor, office, restroom, and storage thresholds', () => {
   assert.equal(areaAt(7, -6.2), 'Corridor');
@@ -179,6 +179,20 @@ test('human movement checks the full body path against room geometry', () => {
   grid.addTriangle(6, 3, 0, 6, 3, 10, 6, 0, 10);
   assert.equal(bodyPathIntersectsGrid(grid, 4.5, 5, 6.5, 5), true);
   assert.equal(bodyPathIntersectsGrid(grid, 4.5, 8, 5.5, 8), false);
+});
+
+test('human movement can step over a low obstacle but not a wall', () => {
+  const low = new OcclusionGrid({ minX: 0, minY: 0, minZ: 0, maxX: 10, maxY: 3, maxZ: 10 });
+  low.addTriangle(6, 0, 0, 6, 0.15, 0, 6, 0, 10);
+  low.addTriangle(6, 0.15, 0, 6, 0.15, 10, 6, 0, 10);
+  const stepHeight = bodyPathStepHeight(low, 4.5, 5, 6.5, 5);
+  assert.ok(stepHeight > 0 && stepHeight <= 0.25);
+  assert.equal(bodyPathIntersectsGrid(low, 4.5, 5, 6.5, 5, 0.3, 1.3, stepHeight), false);
+
+  const wall = new OcclusionGrid({ minX: 0, minY: 0, minZ: 0, maxX: 10, maxY: 3, maxZ: 10 });
+  wall.addTriangle(6, 0, 0, 6, 1, 0, 6, 0, 10);
+  wall.addTriangle(6, 1, 0, 6, 1, 10, 6, 0, 10);
+  assert.equal(bodyPathStepHeight(wall, 4.5, 5, 6.5, 5), null);
 });
 
 test('human quarter and half turns both pivot in place before movement resumes', () => {

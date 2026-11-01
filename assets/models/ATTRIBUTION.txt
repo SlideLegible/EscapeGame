@@ -7,3 +7,12 @@ Changes made for EscapeGame: removed the roof so the third-person camera can see
 inside, merged static meshes by material to reduce draw calls, and kept the two
 exit-door leaves separate so game state can open them. The original model and
 textures are otherwise unchanged; the blackboard clue is a game-added overlay.
+
+Vivi manga student style
+Creator: daydev
+Source: https://sketchfab.com/3d-models/vivi-manga-student-girl-style-7d7be197a76b42548d8964fee79e31b9
+License: Creative Commons Attribution-NonCommercial-ShareAlike (CC BY-NC-SA),
+as listed in the model's embedded GLB metadata.
+
+The original model and textures are bundled unchanged. The project scales the
+model to fit the classroom and uses it as the human player character.

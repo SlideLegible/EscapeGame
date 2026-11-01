@@ -280,6 +280,11 @@ window.addEventListener('keydown', (event) => {
     return;
   }
   if (!started || overlayOpen()) return;
+  if (event.code === 'Space') {
+    event.preventDefault();
+    if (!event.repeat) scene?.jump();
+    return;
+  }
   const code = movementCode(event);
   if (code) {
     scene?.keys.add(code);

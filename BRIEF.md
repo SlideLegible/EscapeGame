@@ -1,6 +1,6 @@
 # BRIEF — 逃離學院（Three.js）
 
-> `threejs-dev` 以瀏覽器原生 Three.js 取代 Unreal Engine。玩法依 `docs/design/escape_room_script.md` 與 `docs/design/item_interactions.md`。
+> `threejs-dev` 使用瀏覽器原生 Three.js。玩法依 `docs/design/escape_room_script.md` 與 `docs/design/item_interactions.md`。
 
 ## 目的
 

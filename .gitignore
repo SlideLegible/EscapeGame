@@ -1,22 +1,13 @@
-# Unreal Engine 產生的檔案
-Binaries/
-Intermediate/
-Saved/
-DerivedDataCache/
-Plugins/*/Binaries/
-Plugins/*/Intermediate/
-.vs/
-.vscode/
-*.sln
-*.code-workspace
-Makefile
-CMakeLists.txt
-.kdev4/
-*.kdev4
+# Node
+node_modules/
+.npm/
 
-# Python
+# Python tooling caches
 __pycache__/
-*.pyc
+*.py[cod]
 
-# 其他
+# Local editor and OS files
+.vscode/
+.idea/
 .DS_Store
+Thumbs.db

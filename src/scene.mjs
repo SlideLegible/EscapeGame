@@ -643,63 +643,90 @@ export class AcademyScene {
         node.castShadow = true;
         node.receiveShadow = true;
         node.frustumCulled = false;
-        const relative = inverseSource.clone().multiply(node.matrixWorld);
-        const inverseRelative = relative.clone().invert();
+        const joints = node.userData.gltfSkin?.joints;
         const positions = node.geometry.getAttribute('position');
-        const modelPositions = new Float32Array(positions.count * 3);
-        const point = new THREE.Vector3();
-        for (let i = 0; i < positions.count; i++) {
-          point.fromBufferAttribute(positions, i).applyMatrix4(relative);
-          modelPositions.set([point.x, point.y, point.z], i * 3);
+        const skinIndex = node.geometry.getAttribute('skinIndex');
+        const skinWeight = node.geometry.getAttribute('skinWeight');
+        if (joints && skinIndex && skinWeight) {
+          const meshToModel = inverseSource.clone().multiply(node.matrixWorld);
+          const modelToMesh = meshToModel.clone().invert();
+          node.userData.playerSkin = {
+            joints,
+            skinIndex,
+            skinWeight,
+            originalPositions: positions.array.slice(),
+            modelOffsetToMesh: new THREE.Matrix3().setFromMatrix4(modelToMesh),
+          };
         }
-        node.userData.playerPose = { modelPositions, relative, inverseRelative };
       });
       this.humanModel = source;
-      this.playerRig = { kind: 'vertex', meshes: [] };
-      source.traverse((node) => { if (node.isMesh) this.playerRig.meshes.push(node); });
+      this.playerRig = this.#createSkinnedPlayerRig(source);
       if (this.game.player().form === 'F00') this.#rebuildFormMesh(this.playerGroup, 'F00');
     } catch (error) {
       console.error('玩家模型載入失敗，使用簡化角色。', error);
     }
   }
 
+  #createSkinnedPlayerRig(model) {
+    const find = (part) => model.getObjectByName(`mixamorig:${part}_Armature`);
+    const parts = {
+      leftArm: find('LeftArm'), rightArm: find('RightArm'),
+      leftForearm: find('LeftForeArm'), rightForearm: find('RightForeArm'),
+      leftLeg: find('LeftUpLeg'), rightLeg: find('RightUpLeg'),
+      leftKnee: find('LeftLeg'), rightKnee: find('RightLeg'),
+      leftFoot: find('LeftFoot'), rightFoot: find('RightFoot'),
+    };
+    const meshes = [];
+    model.traverse((node) => { if (node.isMesh && node.userData.playerSkin) meshes.push(node); });
+    return {
+      kind: 'weighted', parts, meshes,
+    };
+  }
+
   #updatePlayerSkin() {
-    if (!this.humanModel) return;
-    const gait = this.walking ? Math.sin(this.playerAnimationTime * 10) : 0;
-    this.humanModel.rotation.z = this.walking ? Math.sin(this.playerAnimationTime * 5) * 0.018 : 0;
-    this.humanModel.rotation.x = this.jumpHeight > 0.02 ? -0.04 : gait * 0.015;
-    for (const mesh of this.playerRig?.meshes ?? []) {
-      const pose = mesh.userData.playerPose;
-      const attribute = mesh.geometry.getAttribute('position');
-      const { modelPositions, inverseRelative } = pose;
-      const point = new THREE.Vector3();
-      for (let i = 0; i < attribute.count; i++) {
-        const offset = i * 3;
-        point.set(modelPositions[offset], modelPositions[offset + 1], modelPositions[offset + 2]);
-        const side = Math.sign(point.x);
-        const armWeight = side && point.y > 0.68 && point.y < 1.08
-          ? THREE.MathUtils.smoothstep(Math.abs(point.x), 0.13, 0.23) : 0;
-        if (armWeight) {
-          const armPose = this.jumpHeight > 0.02 ? -0.25 : 1.02 + gait * 0.14;
-          const angle = -side * armPose * armWeight;
-          const x = point.x - side * 0.145;
-          const y = point.y - 0.91;
-          point.x = side * 0.145 + (x * Math.cos(angle) - y * Math.sin(angle));
-          point.y = 0.91 + (x * Math.sin(angle) + y * Math.cos(angle));
+    const rig = this.playerRig;
+    if (!rig || rig.kind !== 'weighted') return;
+    const gait = this.walking ? Math.sin(this.playerAnimationTime * 8) : 0;
+    const { parts } = rig;
+    const jump = this.jumpHeight > 0.02;
+    const jointOffsets = new Map();
+    const setOffset = (bone, x, y, z) => {
+      if (bone) jointOffsets.set(bone, new THREE.Vector3(x, y, z));
+    };
+    setOffset(parts.leftArm, 0, jump ? 0.0014 : -0.001, gait * 0.00022);
+    setOffset(parts.rightArm, 0, jump ? 0.0014 : -0.001, -gait * 0.00022);
+    setOffset(parts.leftForearm, 0, jump ? 0.0008 : -0.0007, gait * 0.00017);
+    setOffset(parts.rightForearm, 0, jump ? 0.0008 : -0.0007, -gait * 0.00017);
+    setOffset(parts.leftLeg, 0, 0, jump ? 0 : -gait * 0.00028);
+    setOffset(parts.rightLeg, 0, 0, jump ? 0 : gait * 0.00028);
+    setOffset(parts.leftKnee, 0, jump ? -0.0001 : 0, jump ? -0.00012 : Math.max(0, -gait) * 0.00014);
+    setOffset(parts.rightKnee, 0, jump ? -0.0001 : 0, jump ? -0.00012 : Math.max(0, gait) * 0.00014);
+    setOffset(parts.leftFoot, 0, jump ? -0.00008 : 0, jump ? -0.00008 : -Math.max(0, gait) * 0.00008);
+    setOffset(parts.rightFoot, 0, jump ? -0.00008 : 0, jump ? -0.00008 : -Math.max(0, -gait) * 0.00008);
+
+    const offset = new THREE.Vector3();
+    const localOffset = new THREE.Vector3();
+    for (const mesh of rig.meshes) {
+      const skin = mesh.userData.playerSkin;
+      const position = mesh.geometry.getAttribute('position');
+      for (let vertex = 0; vertex < position.count; vertex++) {
+        offset.set(0, 0, 0);
+        for (let influence = 0; influence < 4; influence++) {
+          const jointIndex = skin.skinIndex.getComponent(vertex, influence);
+          const weight = skin.skinWeight.getComponent(vertex, influence);
+          const jointOffset = jointOffsets.get(skin.joints[jointIndex]);
+          if (jointOffset && weight) offset.addScaledVector(jointOffset, weight);
         }
-        const legWeight = side && point.y > 0.05 && point.y < 0.52
-          ? THREE.MathUtils.smoothstep(Math.abs(point.x), 0.035, 0.105) : 0;
-        if (legWeight && (gait || this.jumpHeight > 0.02)) {
-          const angle = (this.jumpHeight > 0.02 ? 0.35 : side * gait * 0.22) * legWeight;
-          const y = point.y - 0.43;
-          const z = point.z;
-          point.y = 0.43 + y * Math.cos(angle) - z * Math.sin(angle);
-          point.z = y * Math.sin(angle) + z * Math.cos(angle);
-        }
-        point.applyMatrix4(inverseRelative);
-        attribute.setXYZ(i, point.x, point.y, point.z);
+        localOffset.copy(offset).applyMatrix3(skin.modelOffsetToMesh);
+        const start = vertex * 3;
+        position.setXYZ(
+          vertex,
+          skin.originalPositions[start] + localOffset.x,
+          skin.originalPositions[start + 1] + localOffset.y,
+          skin.originalPositions[start + 2] + localOffset.z,
+        );
       }
-      attribute.needsUpdate = true;
+      position.needsUpdate = true;
       mesh.geometry.computeVertexNormals();
     }
   }
@@ -864,7 +891,7 @@ export class AcademyScene {
       const gait = moving ? Math.sin(this.playerAnimationTime * 10) : 0;
       this.playerGroup.rotation.y = this.yaw + Math.PI;
       if (this.playerRig) {
-        if (this.playerRig.kind === 'vertex') this.#updatePlayerSkin();
+        if (this.playerRig.kind === 'weighted') this.#updatePlayerSkin();
         else {
           this.playerRig.torso.position.y = 0.68 + (moving ? Math.abs(gait) * 0.018 : Math.sin(this.playerAnimationTime * 2) * 0.006);
           this.playerRig.head.rotation.z = moving ? Math.sin(this.playerAnimationTime * 5) * 0.025 : 0;

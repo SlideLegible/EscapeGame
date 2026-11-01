@@ -176,7 +176,10 @@ function createModel(json, binary) {
       if (source.scale) node.scale.fromArray(source.scale);
     }
     if (source.mesh !== undefined) {
-      for (const mesh of meshes[source.mesh]) node.add(mesh);
+      for (const mesh of meshes[source.mesh]) {
+        if (source.skin !== undefined) mesh.userData.gltfSkinIndex = source.skin;
+        node.add(mesh);
+      }
     }
     for (const child of source.children ?? []) node.add(makeNode(child));
     return node;
@@ -193,6 +196,13 @@ function createModel(json, binary) {
     scene.name = 'Japanese Classroom';
     for (const index of json.scenes?.[json.scene ?? 0]?.nodes ?? []) scene.add(makeNode(index));
     scene.updateMatrixWorld(true);
+    scene.traverse((node) => {
+      if (!node.isMesh || node.userData.gltfSkinIndex === undefined) return;
+      const skin = json.skins[node.userData.gltfSkinIndex];
+      const bones = skin.joints.map((index) => nodeByIndex[index]);
+      node.userData.gltfSkin = { joints: bones };
+      delete node.userData.gltfSkinIndex;
+    });
     return scene;
   });
 }

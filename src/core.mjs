@@ -27,6 +27,26 @@ const ITEM_HOMES = {
 
 const INITIAL_ITEMS = ['F08', 'F09', 'F11', 'F12'];
 const DOORS = ['S01', 'S05', 'S09', 'S19'];
+
+const ACHIEVEMENTS = {
+  E01: { name: '撿到就是我的', condition: '用撿到的學生證逃出' },
+  E02: { name: '密室逃脫大神', condition: '用密碼逃出' },
+  E03: { name: '誰說一定要走正門', condition: '跳窗逃出' },
+  E04: { name: '跟無數個趕作業的日子一樣，又看到了清晨的太陽', condition: '天亮' },
+  E05: { name: '上課睡覺的代價', condition: '血量歸零' },
+  A01: { name: '被嘲笑專家', condition: '觸發預設嘲諷回應 10 次' },
+  A02: { name: '我是誰', condition: '累計變身 20 次' },
+  A03: { name: '魂不附體', condition: '人類身體離開超過 10 分鐘' },
+  A04: { name: '這是夢，對吧？', condition: '拆開辦公室的牛皮紙包，拿到期中考考卷' },
+  A06: { name: '時間管理大師', condition: '變成教室時鐘，把指針撥快' },
+  A07: { name: '鑰匙收藏家', condition: '變成鑰匙圈，碰過所有的門' },
+};
+
+export function achievementEntries(unlockedIds) {
+  return Object.entries(ACHIEVEMENTS).map(([id, { name, condition }]) => unlockedIds.has(id)
+    ? { id, unlocked: true, name, condition }
+    : { id, unlocked: false, name: '？？？', condition: '' });
+}
 const DEFAULT_TEXT = (name) => `${name}紋絲不動，好像在嘲笑你：「就這？你是認真的嗎？」`;
 
 function seededRandom(seed) {
@@ -331,4 +351,4 @@ export class Game {
   }
 }
 
-export { FORMS, OBJECTS, OBJECT_AREAS, DEFAULT_TEXT };
+export { FORMS, OBJECTS, OBJECT_AREAS, DEFAULT_TEXT, ACHIEVEMENTS };

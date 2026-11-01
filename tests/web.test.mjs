@@ -33,3 +33,22 @@ test('game UI uses text nodes for messages and does not persist round state', as
   assert.match(main, /textContent/);
   assert.doesNotMatch(main, /innerHTML|localStorage|sessionStorage/);
 });
+
+test('the page has an achievement book that can be opened from the HUD or with Tab', async () => {
+  const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+  const main = await readFile(new URL('../src/main.mjs', import.meta.url), 'utf8');
+  for (const id of ['achievement-button', 'start-achievements', 'ending-achievements', 'achievement-book', 'achievement-entries', 'achievement-count', 'close-achievements']) {
+    assert.match(html, new RegExp(`id=["']${id}["']`), `missing ${id}`);
+  }
+  assert.match(html, /<kbd>Tab<\/kbd>/);
+  assert.match(main, /achievementEntries/);
+  assert.match(main, /'Tab'/);
+  for (const id of ['start-achievements', 'ending-achievements']) assert.match(main, new RegExp(`\\$\\('${id}'\\)\\.addEventListener`));
+});
+
+test('players never see developer IDs in achievement or ending screens', async () => {
+  const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+  const main = await readFile(new URL('../src/main.mjs', import.meta.url), 'utf8');
+  assert.doesNotMatch(html, />[^<]*\b[EASFX]\d{2}\b[^<]*</);
+  assert.doesNotMatch(main, /textContent = [^;]*(\$\{(id|ending)\}|entry\.id)/);
+});

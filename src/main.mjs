@@ -1,4 +1,4 @@
-import { Game, FORMS } from './core.mjs';
+import { Game, FORMS, ACHIEVEMENTS, achievementEntries } from './core.mjs';
 import { AcademyScene } from './scene.mjs';
 
 const game = new Game();
@@ -10,12 +10,8 @@ const endingPanel = $('ending');
 const messages = $('toast');
 const prompt = $('prompt');
 const achievementPanel = $('achievements');
-
-const achievementNames = {
-  E01: '撿到就是我的', E02: '密室逃脫大神', E03: '誰說一定要走正門',
-  E04: '又看到了清晨的太陽', E05: '上課睡覺的代價', A01: '被嘲笑專家',
-  A02: '我是誰', A03: '魂不附體', A04: '這是夢，對吧？', A06: '時間管理大師', A07: '鑰匙收藏家',
-};
+const achievementBook = $('achievement-book');
+const overlayOpen = () => !dialog.classList.contains('hidden') || !achievementBook.classList.contains('hidden');
 const movementCodes = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
 function movementCode(event) {
   if (movementCodes.has(event.code)) return event.code;
@@ -54,7 +50,7 @@ function updateHud() {
   const target = scene?.nearestTarget();
   const form = game.player().form;
   const selfHint = form === 'F08' ? 'E　讓骰子滾一圈' : form === 'F09' ? 'E　把時鐘指針撥快' : '';
-  if (target && started && !dialog.classList.contains('hidden')) prompt.classList.remove('visible');
+  if (target && started && overlayOpen()) prompt.classList.remove('visible');
   else if (target && started) {
     prompt.textContent = `E　${target.name}`;
     prompt.classList.add('visible');
@@ -80,19 +76,47 @@ function updateAchievements() {
     const item = document.createElement('div');
     item.className = 'achievement';
     const code = document.createElement('small');
-    code.textContent = `ACHIEVEMENT · ${id}`;
+    code.textContent = '解鎖成就';
     const name = document.createElement('strong');
-    name.textContent = achievementNames[id] ?? id;
+    name.textContent = ACHIEVEMENTS[id]?.name ?? id;
     item.append(code, name);
     achievementPanel.append(item);
     setTimeout(() => item.remove(), 4200);
   }
+  $('achievement-count').textContent = `${current.size} / ${Object.keys(ACHIEVEMENTS).length}`;
+  if (!achievementBook.classList.contains('hidden')) renderAchievementBook();
+}
+
+function renderAchievementBook() {
+  const entries = achievementEntries(game.player().achievementIds);
+  $('achievement-summary').textContent = `已解鎖 ${entries.filter((entry) => entry.unlocked).length} / ${entries.length}。重新整理網頁後會清空。`;
+  const list = $('achievement-entries');
+  list.replaceChildren();
+  for (const entry of entries) {
+    const item = document.createElement('div');
+    item.className = entry.unlocked ? 'book-entry unlocked' : 'book-entry';
+    const name = document.createElement('strong');
+    name.textContent = entry.name;
+    const condition = document.createElement('span');
+    condition.textContent = entry.condition;
+    item.append(name, condition);
+    list.append(item);
+  }
+}
+
+function toggleAchievementBook(open = achievementBook.classList.contains('hidden')) {
+  if (open && !dialog.classList.contains('hidden')) return;
+  if (open) {
+    renderAchievementBook();
+    scene?.keys.clear();
+  }
+  achievementBook.classList.toggle('hidden', !open);
+  updateHud();
 }
 
 function showEnding(ending) {
   if (!ending || !endingCopy[ending] || ending !== 'E05' && lastShownEnding === ending) return;
   lastShownEnding = ending;
-  $('ending-id').textContent = `ENDING · ${ending}`;
   $('ending-title').textContent = endingCopy[ending][0];
   $('ending-copy').textContent = endingCopy[ending][1];
   $('ending-button').textContent = ending === 'E05' ? '回到夢境 →' : '重新開始 →';
@@ -108,7 +132,7 @@ function sync(previousForm, result) {
 }
 
 function performInteraction(targetId) {
-  if (!targetId || !started || !dialog.classList.contains('hidden')) return;
+  if (!targetId || !started || overlayOpen()) return;
   if (targetId === 'S01' && game.player().form === 'F00' && !game.state.powerCut) {
     openKeypad();
     return;
@@ -173,7 +197,7 @@ function frame(now) {
   const dt = Math.min(0.05, Math.max(0, (now - lastFrame) / 1000 || 0));
   lastFrame = now;
   if (started) {
-    if (dialog.classList.contains('hidden') && !game.player().ending) scene?.move(dt);
+    if (!overlayOpen() && !game.player().ending) scene?.move(dt);
     if (!game.player().ending) game.tick(dt);
     if (now - lastHud > 150) {
       lastHud = now;
@@ -188,6 +212,10 @@ function frame(now) {
 
 $('start-button').addEventListener('click', startGame);
 $('close-dialog').addEventListener('click', closeKeypad);
+$('achievement-button').addEventListener('click', () => toggleAchievementBook());
+$('close-achievements').addEventListener('click', () => toggleAchievementBook(false));
+$('start-achievements').addEventListener('click', () => toggleAchievementBook(true));
+$('ending-achievements').addEventListener('click', () => toggleAchievementBook(true));
 $('submit-password').addEventListener('click', submitPassword);
 $('ending-button').addEventListener('click', () => {
   if (game.player().ending && game.player().ending !== 'E05') window.location.reload();
@@ -200,7 +228,13 @@ $('keypad').addEventListener('click', (event) => {
 
 window.addEventListener('keydown', (event) => {
   if (event.code === 'Escape' && !dialog.classList.contains('hidden')) { closeKeypad(); return; }
-  if (!started || !dialog.classList.contains('hidden')) return;
+  if (event.code === 'Escape' && !achievementBook.classList.contains('hidden')) { toggleAchievementBook(false); return; }
+  if (event.code === 'Tab') {
+    event.preventDefault();
+    if (!event.repeat) toggleAchievementBook();
+    return;
+  }
+  if (!started || overlayOpen()) return;
   const code = movementCode(event);
   if (code) {
     scene?.keys.add(code);
@@ -224,7 +258,7 @@ window.addEventListener('blur', () => scene?.keys.clear());
 document.addEventListener('contextmenu', (event) => event.preventDefault(), true);
 
 canvas.addEventListener('pointerdown', (event) => {
-  if (!started || !dialog.classList.contains('hidden')) return;
+  if (!started || overlayOpen()) return;
   scene.pointerDown = { x: event.clientX, y: event.clientY, originX: event.clientX, originY: event.clientY, id: event.pointerId };
   canvas.setPointerCapture(event.pointerId);
 });

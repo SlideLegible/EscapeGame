@@ -1,7 +1,7 @@
 // STEP 1–3 rules coverage → VERIFY STEP 1–3
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Game } from '../src/core.mjs';
+import { Game, ACHIEVEMENTS, achievementEntries } from '../src/core.mjs';
 
 function enterCorridor(game, playerId = 'local') {
   game.transform(playerId, 'F12');
@@ -410,4 +410,29 @@ test('both keys share a name that does not hint which door they open', () => {
   assert.equal(game.formName('F04'), '不知道用來做什麼的鑰匙');
   assert.equal(game.formName('F05'), game.formName('F04'));
   for (const id of ['F04', 'F05']) assert.doesNotMatch(game.formName(id), /辦公室|儲物間/);
+});
+
+test('the achievement list matches the design table names and conditions', () => {
+  assert.deepEqual(Object.keys(ACHIEVEMENTS), ['E01', 'E02', 'E03', 'E04', 'E05', 'A01', 'A02', 'A03', 'A04', 'A06', 'A07']);
+  assert.equal(ACHIEVEMENTS.E04.name, '跟無數個趕作業的日子一樣，又看到了清晨的太陽');
+  assert.equal(ACHIEVEMENTS.A07.condition, '變成鑰匙圈，碰過所有的門');
+  for (const { name, condition } of Object.values(ACHIEVEMENTS)) assert.ok(name && condition);
+});
+
+test('locked achievements show no name or condition, unlocked ones show both', () => {
+  const entries = achievementEntries(new Set(['E01', 'A01']));
+  assert.equal(entries.length, 11);
+  const e01 = entries.find((entry) => entry.id === 'E01');
+  assert.deepEqual(e01, { id: 'E01', unlocked: true, name: '撿到就是我的', condition: '用撿到的學生證逃出' });
+  const a06 = entries.find((entry) => entry.id === 'A06');
+  assert.deepEqual(a06, { id: 'A06', unlocked: false, name: '？？？', condition: '' });
+});
+
+test('achievements unlocked by play appear as unlocked entries and survive an E05 restart', () => {
+  const game = new Game();
+  for (let i = 0; i < 10; i++) game.interact('local', 'S16');
+  game.state.health = 1;
+  game.damage(1);
+  const unlocked = achievementEntries(game.player().achievementIds).filter((entry) => entry.unlocked).map((entry) => entry.id);
+  assert.deepEqual(unlocked, ['E05', 'A01']);
 });

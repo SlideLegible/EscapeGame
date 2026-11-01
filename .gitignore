@@ -11,3 +11,7 @@ __pycache__/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Raw Sketchfab downloads; the game only ships assets/models/items/*.glb
+assets/models/raw/
+assets/models/f[0-9][0-9]/

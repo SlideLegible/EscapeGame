@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { areaAt, clampCameraToArea, dropPoint, entryPoint, nearestCandidate, SPECIAL_EXITS, OBJECT_POSITIONS, LECTERN_SIZE } from '../src/scene.mjs';
+import { areaAt, areaCameraRect, dropPoint, entryPoint, nearestCandidate, OcclusionGrid, rayRectLimit, SPECIAL_EXITS, OBJECT_POSITIONS, LECTERN_SIZE } from '../src/scene.mjs';
 
 test('walkable room areas touch across the classroom, corridor, office, restroom, and storage thresholds', () => {
   assert.equal(areaAt(7, -6.2), 'Corridor');
@@ -134,13 +134,41 @@ test('nothing farther than the reach distance is picked', () => {
   assert.equal(nearestCandidate(0, 0, 0, [{ id: 'F08', x: 0, z: -2 }]).id, 'F08');
 });
 
-test('orbit camera is kept inside the room the player is in', () => {
-  const office = clampCameraToArea('Office', 11, -30);
-  assert.ok(office.z >= -26 && office.z <= -15.8);
-  assert.deepEqual(clampCameraToArea('Office', 11, -20), { x: 11, z: -20 });
-  const classroom = clampCameraToArea('Classroom', 20, 20);
-  assert.ok(classroom.x <= 7.75 && classroom.z <= 5.75);
-  const corridor = clampCameraToArea('Corridor', 0, -3);
-  assert.ok(corridor.z <= -7 && corridor.z >= -15);
-  assert.deepEqual(clampCameraToArea(null, 99, 99), { x: 99, z: 99 });
+test('orbit camera rectangle follows the floor of the room the player is in', () => {
+  const office = areaCameraRect('Office');
+  assert.ok(office.minZ >= -26 && office.maxZ <= -15.8 && office.minX >= 6 && office.maxX <= 16);
+  const classroom = areaCameraRect('Classroom');
+  assert.ok(classroom.maxX <= 7.75 && classroom.maxZ <= 5.75);
+  const corridor = areaCameraRect('Corridor');
+  assert.ok(corridor.maxZ <= -7 && corridor.minZ >= -15);
+  assert.equal(areaCameraRect(null), null);
+});
+
+test('camera ray is shortened to stay inside the rectangle without changing direction', () => {
+  const rect = { minX: 0, maxX: 10, minZ: 0, maxZ: 10 };
+  assert.equal(rayRectLimit(5, 5, 2, 0, rect), 1);
+  assert.equal(rayRectLimit(5, 5, 10, 0, rect), 0.5);
+  assert.equal(rayRectLimit(5, 5, 0, -20, rect), 0.25);
+  assert.equal(rayRectLimit(5, 5, 0, 0, rect), 1);
+  assert.equal(rayRectLimit(-3, 5, 10, 0, rect), 1);
+});
+
+test('occlusion grid stops the camera ray at walls but ignores floors and ceilings', () => {
+  const grid = new OcclusionGrid({ minX: 0, minY: 0, minZ: 0, maxX: 10, maxY: 4, maxZ: 10 });
+  // A vertical wall at x = 6 spanning z 0..10 and y 0..3.
+  grid.addTriangle(6, 0, 0, 6, 3, 0, 6, 0, 10);
+  grid.addTriangle(6, 3, 0, 6, 3, 10, 6, 0, 10);
+  // A horizontal floor and a ceiling.
+  grid.addTriangle(0, 0, 0, 10, 0, 0, 0, 0, 10);
+  grid.addTriangle(0, 3.5, 0, 10, 3.5, 0, 0, 3.5, 10);
+  assert.equal(grid.isBlocked(6.05, 1.5, 5), true);
+  assert.equal(grid.isBlocked(5, 0.1, 5), false);
+  assert.equal(grid.isBlocked(5, 3.5, 5), false);
+  const hit = grid.firstHit(2, 1, 5, 9, 1, 5);
+  assert.ok(hit > 0.5 && hit < 0.65, `hit at ${hit}`);
+  assert.equal(grid.firstHit(2, 1, 5, 5, 1, 5), 1);
+  assert.equal(grid.firstHit(2, 3.6, 5, 9, 3.6, 5), 1);
+  assert.ok(grid.firstHit(5.9, 1, 5, 9, 1, 5, 0.5) === 1, 'ignores the start of the path');
+  assert.equal(grid.firstHit(2, 1, 5, Infinity, 1, 5), 1, 'a runaway endpoint cannot hang the search');
+  assert.equal(grid.firstHit(2, 1, 5, NaN, 1, 5), 1);
 });

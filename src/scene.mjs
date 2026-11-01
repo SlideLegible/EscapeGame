@@ -67,6 +67,8 @@ const CLASSROOM_EXIT_DOOR_PARTS = ['PUERTA_1_StingrayPBS9_0', 'PUERTA_3_Stingray
 const MODEL_TARGETS = new Set(['S04', 'S14', 'S16', 'S19', 'S20']);
 
 const ROOM_NAMES = Object.fromEntries(Object.entries(ROOM).map(([id, room]) => [id, room.label]));
+// Orbit camera collision: how far into the ray the player's own body is ignored, how far to stay off a wall, and the closest it may get.
+const CAMERA_BODY_CLEARANCE = 0.6, CAMERA_WALL_CLEARANCE = 0.3, CAMERA_MIN_DISTANCE = 0.45;
 const palette = { wall: 0xb3a789, trim: 0x51483b, wood: 0x8d704a, light: 0xe8d8b6, dark: 0x292720, lime: 0xc4ef80 };
 
 // Walkable rectangles per area, checked in order (the first match wins where they overlap).
@@ -88,15 +90,73 @@ export function areaAt(x, z) {
   return null;
 }
 
-// Keeps the orbit camera inside the room the player is in, so it never swings out through a wall.
-// The player's walkable rectangle is cut down to the room's real floor, then pulled in by `margin`.
-export function clampCameraToArea(area, x, z, margin = 0.3) {
+// The floor rectangle the orbit camera may occupy while the player is in `area`: the walkable rectangle cut down to
+// the room's real floor, pulled in by `margin` so the camera stays clear of the walls.
+export function areaCameraRect(area, margin = 0.3) {
   const rect = AREA_RECTS.find(([id]) => id === area);
   const room = ROOM[area];
-  if (!rect || !room) return { x, z };
-  const minX = Math.max(rect[1], room.x - room.w / 2) + margin, maxX = Math.min(rect[2], room.x + room.w / 2) - margin;
-  const minZ = Math.max(rect[3], room.z - room.d / 2) + margin, maxZ = Math.min(rect[4], room.z + room.d / 2) - margin;
-  return { x: Math.max(minX, Math.min(maxX, x)), z: Math.max(minZ, Math.min(maxZ, z)) };
+  if (!rect || !room) return null;
+  return {
+    minX: Math.max(rect[1], room.x - room.w / 2) + margin, maxX: Math.min(rect[2], room.x + room.w / 2) - margin,
+    minZ: Math.max(rect[3], room.z - room.d / 2) + margin, maxZ: Math.min(rect[4], room.z + room.d / 2) - margin,
+  };
+}
+
+// Largest t in [0, 1] for which (ox + t*dx, oz + t*dz) is still inside `rect`. An origin outside the rect is not limited.
+export function rayRectLimit(ox, oz, dx, dz, rect) {
+  if (ox < rect.minX || ox > rect.maxX || oz < rect.minZ || oz > rect.maxZ) return 1;
+  let t = 1;
+  if (dx > 1e-9) t = Math.min(t, (rect.maxX - ox) / dx); else if (dx < -1e-9) t = Math.min(t, (rect.minX - ox) / dx);
+  if (dz > 1e-9) t = Math.min(t, (rect.maxZ - oz) / dz); else if (dz < -1e-9) t = Math.min(t, (rect.minZ - oz) / dz);
+  return Math.max(0, t);
+}
+
+// Coarse voxel copy of the room geometry (walls, furniture) that the orbit camera must not sink into.
+// Floors and ceilings are skipped (the camera always sits above the first and the player never sees the second).
+export class OcclusionGrid {
+  constructor({ minX, minY, minZ, maxX, maxY, maxZ }, cell = 0.2) {
+    this.cell = cell;
+    this.minX = minX; this.minY = minY; this.minZ = minZ;
+    this.nx = Math.ceil((maxX - minX) / cell); this.ny = Math.ceil((maxY - minY) / cell); this.nz = Math.ceil((maxZ - minZ) / cell);
+    this.cells = new Uint8Array(this.nx * this.ny * this.nz);
+  }
+
+  #mark(x, y, z) {
+    const i = Math.floor((x - this.minX) / this.cell), j = Math.floor((y - this.minY) / this.cell), k = Math.floor((z - this.minZ) / this.cell);
+    if (i < 0 || j < 0 || k < 0 || i >= this.nx || j >= this.ny || k >= this.nz) return;
+    this.cells[(j * this.nz + k) * this.nx + i] = 1;
+  }
+
+  isBlocked(x, y, z) {
+    const i = Math.floor((x - this.minX) / this.cell), j = Math.floor((y - this.minY) / this.cell), k = Math.floor((z - this.minZ) / this.cell);
+    if (i < 0 || j < 0 || k < 0 || i >= this.nx || j >= this.ny || k >= this.nz) return false;
+    return this.cells[(j * this.nz + k) * this.nx + i] === 1;
+  }
+
+  addTriangle(ax, ay, az, bx, by, bz, cx, cy, cz) {
+    const ux = bx - ax, uy = by - ay, uz = bz - az, vx = cx - ax, vy = cy - ay, vz = cz - az;
+    const nxv = uy * vz - uz * vy, nyv = uz * vx - ux * vz, nzv = ux * vy - uy * vx;
+    const nLen = Math.hypot(nxv, nyv, nzv);
+    if (nLen < 1e-12 || Math.abs(nyv) / nLen > 0.85) return;
+    const longest = Math.max(Math.hypot(ux, uy, uz), Math.hypot(vx, vy, vz), Math.hypot(cx - bx, cy - by, cz - bz));
+    const n = Math.max(1, Math.ceil(longest / (this.cell * 0.6)));
+    for (let i = 0; i <= n; i++) for (let j = 0; j <= n - i; j++) {
+      const p = i / n, q = j / n;
+      this.#mark(ax + ux * p + vx * q, ay + uy * p + vy * q, az + uz * p + vz * q);
+    }
+  }
+
+  // Fraction of the way from (ox, oy, oz) to (ex, ey, ez) at which the first blocked voxel is met, or 1 if the path is clear.
+  // The first `from` fraction of the path is ignored (the player's own body).
+  firstHit(ox, oy, oz, ex, ey, ez, from = 0) {
+    const length = Math.hypot(ex - ox, ey - oy, ez - oz);
+    if (!(length > 1e-9) || !Number.isFinite(length)) return 1;
+    const step = this.cell * 0.5 / length;
+    for (let t = from; t < 1; t += step) {
+      if (this.isBlocked(ox + (ex - ox) * t, oy + (ey - oy) * t, oz + (ez - oz) * t)) return t;
+    }
+    return 1;
+  }
 }
 
 export const SPECIAL_EXITS = {
@@ -178,7 +238,7 @@ export class AcademyScene {
     this.cameraDesired = new THREE.Vector3();
     this.mapTarget = new THREE.Vector3(7, 0, -11);
     this.lastCameraUpdate = 0;
-    this.cameraArea = null;
+    this.occlusion = null;
     this.#buildLights();
     this.#buildRooms();
     this.#buildObjects();
@@ -193,6 +253,7 @@ export class AcademyScene {
     window.addEventListener('resize', this.#onResize);
     this.resize();
     this.refresh();
+    Promise.all([this.classroomLoad, this.roomModelsLoad, this.itemModelsLoad]).then(() => this.#buildOcclusion());
   }
 
   #buildLights() {
@@ -1152,25 +1213,56 @@ export class AcademyScene {
       return;
     }
     const distance = this.game.player().form === 'F12' ? 8.5 : this.game.player().form === 'F08' ? 6.2 : this.game.player().form === 'F00' ? 6.5 : 7.2;
-    // The camera orbits on a sphere around the player: pitch is its elevation angle.
+    // The camera orbits on a sphere around the player: pitch is its elevation angle and only the mouse changes it.
     const targetY = 0.78 + this.jumpHeight * 0.35;
     const reach = distance * Math.cos(this.pitch);
     const height = Math.max(0.5, targetY + distance * Math.sin(this.pitch) - (this.game.player().form === 'F09' ? 0.4 : 0));
-    const dx = Math.sin(this.yaw) * reach;
-    const dz = Math.cos(this.yaw) * reach;
-    const area = this.game.player().area;
-    const wanted = clampCameraToArea(area, this.playerPosition.x - dx, this.playerPosition.z + dz);
-    // A camera squeezed against a wall rises so it looks down at the player instead of sitting in their face.
-    const squeezed = Math.max(0, 1 - Math.hypot(wanted.x - this.playerPosition.x, wanted.z - this.playerPosition.z) / reach);
-    this.cameraDesired.set(wanted.x, height + squeezed * 2.5, wanted.z);
+    this.cameraDesired.set(this.playerPosition.x - Math.sin(this.yaw) * reach, height, this.playerPosition.z + Math.cos(this.yaw) * reach);
     this.camera.position.lerp(this.cameraDesired, smooth);
-    // The lerp can still clip a wall while the player walks through a doorway; only clamp once the camera is inside this room.
-    const held = clampCameraToArea(area, this.camera.position.x, this.camera.position.z);
-    const inside = Math.hypot(held.x - this.camera.position.x, held.z - this.camera.position.z) < 1e-6;
-    if (inside) this.cameraArea = area;
-    else if (this.cameraArea === area) { this.camera.position.x = held.x; this.camera.position.z = held.z; }
+    this.#pullCameraIn(this.playerPosition.x, targetY, this.playerPosition.z);
     this.cameraTarget.set(this.playerPosition.x, targetY, this.playerPosition.z);
     this.camera.lookAt(this.cameraTarget);
+  }
+
+  // Slides the camera along its line to the player until it is clear of the room walls and of any model in the way,
+  // so the view angle never changes when something is in the way, only the distance.
+  #pullCameraIn(px, py, pz) {
+    const cam = this.camera.position;
+    const dx = cam.x - px, dy = cam.y - py, dz = cam.z - pz;
+    const length = Math.hypot(dx, dy, dz);
+    if (length < 1e-6) return;
+    let t = 1;
+    const rect = areaCameraRect(this.game.player().area);
+    if (rect) t = Math.min(t, rayRectLimit(px, pz, dx, dz, rect));
+    if (this.occlusion) t = Math.min(t, this.occlusion.firstHit(px, py, pz, cam.x, cam.y, cam.z, Math.min(1, CAMERA_BODY_CLEARANCE / length)) - CAMERA_WALL_CLEARANCE / length);
+    t = Math.max(t, Math.min(1, CAMERA_MIN_DISTANCE / length));
+    cam.set(px + dx * t, py + dy * t, pz + dz * t);
+  }
+
+  // Builds the camera occlusion grid from every static, visible mesh once the room models have loaded.
+  #buildOcclusion() {
+    const grid = new OcclusionGrid({ minX: -30, minY: 0, minZ: -28, maxX: 46, maxY: 3, maxZ: 8 });
+    const skip = new Set([this.playerGroup, this.humanGroup, ...this.itemGroups.values(), ...this.exitGroups.values(),
+      ...['S05', 'S09', 'S19'].map((id) => this.targetGroups.get(id)), ...this.classroomExitDoors]);
+    const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+    this.scene.updateMatrixWorld(true);
+    const walk = (node) => {
+      if (!node.visible || skip.has(node) || node.isSprite || node.isLight || node.isSkinnedMesh) return;
+      const position = node.isMesh && node.geometry.attributes.position;
+      if (position) {
+        const index = node.geometry.index;
+        const count = index ? index.count : position.count;
+        for (let i = 0; i + 2 < count; i += 3) {
+          a.fromBufferAttribute(position, index ? index.getX(i) : i).applyMatrix4(node.matrixWorld);
+          b.fromBufferAttribute(position, index ? index.getX(i + 1) : i + 1).applyMatrix4(node.matrixWorld);
+          c.fromBufferAttribute(position, index ? index.getX(i + 2) : i + 2).applyMatrix4(node.matrixWorld);
+          grid.addTriangle(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
+        }
+      }
+      for (const child of node.children) walk(child);
+    };
+    walk(this.scene);
+    this.occlusion = grid;
   }
 
   render() {

@@ -77,7 +77,6 @@ export class AcademyScene {
     this.roomGroups = new Map();
     this.playerGroup = null;
     this.playerRig = null;
-    this.humanModel = null;
     this.playerAnimationTime = 0;
     this.jumpHeight = 0;
     this.jumpVelocity = 0;
@@ -92,7 +91,6 @@ export class AcademyScene {
     this.#buildRooms();
     this.#buildObjects();
     this.#buildPlayer();
-    this.playerModelLoad = this.#loadPlayerModel();
     this.classroomLoad = this.#loadClassroomModel();
     this.#onResize = () => this.resize();
     window.addEventListener('resize', this.#onResize);
@@ -476,42 +474,63 @@ export class AcademyScene {
     const mat = (color, metalness = 0.04) => new THREE.MeshStandardMaterial({ color, roughness: 0.78, metalness });
     const add = (mesh, x = 0, y = 0, z = 0) => { mesh.position.set(x, y, z); mesh.castShadow = true; group.add(mesh); };
     if (id === 'F00') {
-      const coat = mat(0x68766b), trim = mat(0x455349), shirt = mat(0xd6cbb1), skin = mat(0xc9a987), hair = mat(0x382f29), trousers = mat(0x51483d), shoes = mat(0x40372f);
+      const coat = mat(0x20283d), trim = mat(0x151b2a), shirt = mat(0xf2eee5), skin = mat(0xf0c9ad), hair = mat(0xaaa18e), trousers = mat(0x222230), shoes = mat(0x171923);
       const ellipsoid = (parent, material, size, position) => {
         const mesh = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 16), material);
         mesh.scale.set(...size); mesh.position.set(...position); mesh.castShadow = true; parent.add(mesh); return mesh;
       };
-      // Compact, softly rounded student silhouette with joint pivots for continuous motion.
+      // Hand-built student with real shoulder, elbow, hip and knee pivots.
       const torso = new THREE.Group(); torso.position.y = 0.68; group.add(torso);
-      ellipsoid(torso, coat, [0.205, 0.29, 0.13], [0, 0.04, 0]);
-      ellipsoid(torso, shirt, [0.105, 0.22, 0.035], [0, 0.055, 0.116]);
-      ellipsoid(torso, trim, [0.215, 0.09, 0.14], [0, -0.18, 0]);
-      ellipsoid(torso, mat(0xb6a16e, 0.25), [0.018, 0.018, 0.014], [0.12, 0.03, 0.128]);
+      ellipsoid(torso, shirt, [0.19, 0.265, 0.125], [0, 0.04, 0]);
+      ellipsoid(torso, coat, [0.166, 0.235, 0.043], [0, 0.045, 0.104]);
+      const collar = mat(0xffffff);
+      // Small layered collar and tie add readable uniform details at game scale.
+      ellipsoid(torso, collar, [0.055, 0.065, 0.018], [-0.048, 0.215, 0.112]).rotation.z = -0.35;
+      ellipsoid(torso, collar, [0.055, 0.065, 0.018], [0.048, 0.215, 0.112]).rotation.z = 0.35;
+      ellipsoid(torso, mat(0x8e4351), [0.026, 0.112, 0.018], [0, 0.12, 0.15]);
+      // Pleated skirt with a dark waistband and subtle vertical folds.
+      const skirtMat = mat(0x25283b);
+      const skirt = new THREE.Mesh(new THREE.CylinderGeometry(0.135, 0.21, 0.22, 24, 1, false), skirtMat);
+      skirt.position.set(0, -0.235, 0); skirt.castShadow = true; torso.add(skirt);
+      const pleatMat = mat(0x45465a);
+      for (let i = 0; i < 12; i++) {
+        const angle = i * Math.PI / 6;
+        const fold = new THREE.Mesh(new THREE.BoxGeometry(0.009, 0.17, 0.012), pleatMat);
+        fold.position.set(Math.sin(angle) * 0.17, -0.235, Math.cos(angle) * 0.17);
+        fold.rotation.y = angle; fold.castShadow = true; torso.add(fold);
+      }
+      ellipsoid(torso, trim, [0.14, 0.035, 0.13], [0, -0.115, 0]);
       const head = new THREE.Group(); head.position.set(0, 1.02, 0); group.add(head);
       ellipsoid(head, skin, [0.145, 0.16, 0.14], [0, 0, 0]);
       ellipsoid(head, hair, [0.15, 0.105, 0.148], [0, 0.09, -0.018]);
       ellipsoid(head, hair, [0.145, 0.065, 0.045], [0, 0.035, 0.11]);
-      const eye = mat(0x322d28);
-      ellipsoid(head, eye, [0.012, 0.012, 0.009], [-0.047, 0.008, 0.137]);
-      ellipsoid(head, eye, [0.012, 0.012, 0.009], [0.047, 0.008, 0.137]);
+      for (const side of [-1, 1]) ellipsoid(head, hair, [0.046, 0.105, 0.055], [side * 0.112, -0.035, 0.09]);
+      const eyeWhite = mat(0xfaf8f1), eye = mat(0x403746), iris = mat(0x66807e);
+      for (const x of [-0.047, 0.047]) {
+        ellipsoid(head, eyeWhite, [0.021, 0.027, 0.012], [x, 0.008, 0.133]);
+        ellipsoid(head, iris, [0.012, 0.019, 0.008], [x, 0.003, 0.144]);
+        ellipsoid(head, eye, [0.006, 0.013, 0.005], [x, 0.001, 0.15]);
+      }
       ellipsoid(head, skin, [0.017, 0.02, 0.018], [0, -0.035, 0.142]);
       for (const side of [-1, 1]) {
         ellipsoid(head, skin, [0.035, 0.05, 0.025], [side * 0.145, -0.02, 0]);
-        const shoulder = new THREE.Group(); shoulder.position.set(side * 0.21, 0.86, 0); group.add(shoulder);
-        ellipsoid(shoulder, coat, [0.09, 0.105, 0.095], [0, -0.035, 0]);
+        const shoulder = new THREE.Group(); shoulder.position.set(side * 0.19, 0.86, 0); group.add(shoulder);
+        ellipsoid(shoulder, shirt, [0.073, 0.075, 0.075], [0, -0.025, 0]);
         const upperArm = new THREE.Group(); shoulder.add(upperArm);
-        const upper = new THREE.Mesh(new THREE.CapsuleGeometry(0.058, 0.16, 4, 10), coat); upper.position.y = -0.13; upper.castShadow = true; upperArm.add(upper);
-        const elbow = new THREE.Group(); elbow.position.y = -0.26; upperArm.add(elbow);
-        ellipsoid(elbow, trim, [0.056, 0.058, 0.057], [0, 0, 0]);
-        const forearm = new THREE.Mesh(new THREE.CapsuleGeometry(0.05, 0.13, 4, 10), coat); forearm.position.y = -0.11; forearm.castShadow = true; elbow.add(forearm);
-        const hand = ellipsoid(elbow, skin, [0.048, 0.052, 0.045], [0, -0.22, 0.005]);
+        upperArm.rotation.z = -side * 0.12;
+        const upper = new THREE.Mesh(new THREE.CapsuleGeometry(0.049, 0.14, 4, 10), shirt); upper.position.y = -0.12; upper.castShadow = true; upperArm.add(upper);
+        const elbow = new THREE.Group(); elbow.position.y = -0.24; upperArm.add(elbow);
+        ellipsoid(elbow, shirt, [0.045, 0.047, 0.045], [0, 0, 0]);
+        const forearm = new THREE.Mesh(new THREE.CapsuleGeometry(0.041, 0.13, 4, 10), shirt); forearm.position.y = -0.105; forearm.castShadow = true; elbow.add(forearm);
+        const wrist = new THREE.Group(); wrist.position.set(0, -0.21, 0.005); elbow.add(wrist);
+        ellipsoid(wrist, skin, [0.038, 0.05, 0.035], [0, -0.025, 0]);
         const hip = new THREE.Group(); hip.position.set(side * 0.105, 0.48, 0); group.add(hip);
         const thigh = new THREE.Mesh(new THREE.CapsuleGeometry(0.073, 0.13, 4, 10), trousers); thigh.position.y = -0.12; thigh.castShadow = true; hip.add(thigh);
         const knee = new THREE.Group(); knee.position.y = -0.24; hip.add(knee);
         ellipsoid(knee, trousers, [0.07, 0.065, 0.07], [0, 0, 0]);
         const shin = new THREE.Mesh(new THREE.CapsuleGeometry(0.059, 0.13, 4, 10), trousers); shin.position.y = -0.12; shin.castShadow = true; knee.add(shin);
         const foot = new THREE.Mesh(new THREE.CapsuleGeometry(0.065, 0.085, 3, 10), shoes); foot.rotation.x = Math.PI / 2; foot.position.set(0, -0.23, 0.045); foot.castShadow = true; knee.add(foot);
-        (group.userData.rig ??= { torso, head, arms: [], hips: [] }).arms.push({ upper: upperArm, elbow, side });
+        (group.userData.rig ??= { torso, head, arms: [], hips: [] }).arms.push({ upper: upperArm, elbow, wrist, side });
         group.userData.rig.hips.push({ hip, knee, side });
       }
     } else if (id === 'F01') {
@@ -594,7 +613,6 @@ export class AcademyScene {
   #rebuildFormMesh(target, formId) {
     for (const child of [...target.children]) {
       target.remove(child);
-      if (child === this.humanModel) continue;
       child.traverse((node) => {
         node.geometry?.dispose();
         const materials = Array.isArray(node.material) ? node.material : [node.material];
@@ -603,12 +621,6 @@ export class AcademyScene {
           material?.dispose();
         }
       });
-    }
-    if (formId === 'F00' && this.humanModel) {
-      target.add(this.humanModel);
-      target.userData.rig = this.playerRig;
-      if (target === this.playerGroup) this.playerRig = target.userData.rig;
-      return;
     }
     const shape = this.#formShape(formId);
     target.userData.rig = shape.userData.rig ?? null;
@@ -619,122 +631,9 @@ export class AcademyScene {
   #buildPlayer() {
     this.playerGroup = this.#formShape('F00');
     this.playerGroup.name = '玩家';
+    this.playerRig = this.playerGroup.userData.rig;
     this.playerGroup.position.copy(this.playerPosition);
     this.scene.add(this.playerGroup);
-    this.#rebuildFormMesh(this.playerGroup, 'F00');
-  }
-
-  async #loadPlayerModel() {
-    try {
-      const source = await loadGlb(new URL('../assets/models/vivi_manga_student_girl_style.glb', import.meta.url));
-      const bounds = new THREE.Box3().setFromObject(source);
-      const size = bounds.getSize(new THREE.Vector3());
-      if (!Number.isFinite(size.y) || size.y <= 0) throw new Error('玩家模型沒有有效高度');
-      source.scale.setScalar(1.3 / size.y);
-      source.updateMatrixWorld(true);
-      bounds.setFromObject(source);
-      const center = bounds.getCenter(new THREE.Vector3());
-      source.position.set(-center.x, -bounds.min.y, -center.z);
-      source.name = 'Vivi manga student';
-      source.updateMatrixWorld(true);
-      const inverseSource = source.matrixWorld.clone().invert();
-      source.traverse((node) => {
-        if (!node.isMesh) return;
-        node.castShadow = true;
-        node.receiveShadow = true;
-        node.frustumCulled = false;
-        const joints = node.userData.gltfSkin?.joints;
-        const positions = node.geometry.getAttribute('position');
-        const skinIndex = node.geometry.getAttribute('skinIndex');
-        const skinWeight = node.geometry.getAttribute('skinWeight');
-        if (joints && skinIndex && skinWeight) {
-          const meshToModel = inverseSource.clone().multiply(node.matrixWorld);
-          const modelToMesh = meshToModel.clone().invert();
-          node.userData.playerSkin = {
-            joints,
-            skinIndex,
-            skinWeight,
-            originalPositions: positions.array.slice(),
-            modelOffsetToMesh: new THREE.Matrix3().setFromMatrix4(modelToMesh),
-          };
-        }
-      });
-      this.humanModel = source;
-      this.playerRig = this.#createSkinnedPlayerRig(source);
-      if (this.game.player().form === 'F00') this.#rebuildFormMesh(this.playerGroup, 'F00');
-    } catch (error) {
-      console.error('玩家模型載入失敗，使用簡化角色。', error);
-    }
-  }
-
-  #createSkinnedPlayerRig(model) {
-    const find = (part) => model.getObjectByName(`mixamorig:${part}_Armature`);
-    const parts = {
-      leftArm: find('LeftArm'), rightArm: find('RightArm'),
-      leftForearm: find('LeftForeArm'), rightForearm: find('RightForeArm'),
-      leftHand: find('LeftHand'), rightHand: find('RightHand'),
-      leftLeg: find('LeftUpLeg'), rightLeg: find('RightUpLeg'),
-      leftKnee: find('LeftLeg'), rightKnee: find('RightLeg'),
-      leftFoot: find('LeftFoot'), rightFoot: find('RightFoot'),
-    };
-    const meshes = [];
-    model.traverse((node) => { if (node.isMesh && node.userData.playerSkin) meshes.push(node); });
-    return {
-      kind: 'weighted', parts, meshes,
-    };
-  }
-
-  #updatePlayerSkin() {
-    const rig = this.playerRig;
-    if (!rig || rig.kind !== 'weighted') return;
-    const gait = this.walking ? Math.sin(this.playerAnimationTime * 8) : 0;
-    const { parts } = rig;
-    const jump = this.jumpHeight > 0.02;
-    const jointOffsets = new Map();
-    const setOffset = (bone, x, y, z) => {
-      if (bone) jointOffsets.set(bone, new THREE.Vector3(x, y, z));
-    };
-    const upperArmUp = jump ? 0.0004 : 0;
-    const forearmUp = jump ? 0.0008 : -0.0008;
-    const handUp = jump ? 0.0012 : -0.0016;
-    setOffset(parts.leftArm, 0, gait * 0.00022, upperArmUp);
-    setOffset(parts.rightArm, 0, -gait * 0.00022, upperArmUp);
-    setOffset(parts.leftForearm, 0, gait * 0.00017, forearmUp);
-    setOffset(parts.rightForearm, 0, -gait * 0.00017, forearmUp);
-    setOffset(parts.leftHand, 0, gait * 0.00017, handUp);
-    setOffset(parts.rightHand, 0, -gait * 0.00017, handUp);
-    setOffset(parts.leftLeg, 0, jump ? 0 : -gait * 0.00028, 0);
-    setOffset(parts.rightLeg, 0, jump ? 0 : gait * 0.00028, 0);
-    setOffset(parts.leftKnee, 0, jump ? -0.00012 : Math.max(0, -gait) * 0.00014, jump ? -0.0001 : 0);
-    setOffset(parts.rightKnee, 0, jump ? -0.00012 : Math.max(0, gait) * 0.00014, jump ? -0.0001 : 0);
-    setOffset(parts.leftFoot, 0, jump ? -0.00008 : -Math.max(0, gait) * 0.00008, jump ? -0.00008 : 0);
-    setOffset(parts.rightFoot, 0, jump ? -0.00008 : -Math.max(0, -gait) * 0.00008, jump ? -0.00008 : 0);
-
-    const offset = new THREE.Vector3();
-    const localOffset = new THREE.Vector3();
-    for (const mesh of rig.meshes) {
-      const skin = mesh.userData.playerSkin;
-      const position = mesh.geometry.getAttribute('position');
-      for (let vertex = 0; vertex < position.count; vertex++) {
-        offset.set(0, 0, 0);
-        for (let influence = 0; influence < 4; influence++) {
-          const jointIndex = skin.skinIndex.getComponent(vertex, influence);
-          const weight = skin.skinWeight.getComponent(vertex, influence);
-          const jointOffset = jointOffsets.get(skin.joints[jointIndex]);
-          if (jointOffset && weight) offset.addScaledVector(jointOffset, weight);
-        }
-        localOffset.copy(offset).applyMatrix3(skin.modelOffsetToMesh);
-        const start = vertex * 3;
-        position.setXYZ(
-          vertex,
-          skin.originalPositions[start] + localOffset.x,
-          skin.originalPositions[start + 1] + localOffset.y,
-          skin.originalPositions[start + 2] + localOffset.z,
-        );
-      }
-      position.needsUpdate = true;
-      mesh.geometry.computeVertexNormals();
-    }
   }
 
   setForm(formId) {
@@ -897,19 +796,17 @@ export class AcademyScene {
       const gait = moving ? Math.sin(this.playerAnimationTime * 10) : 0;
       this.playerGroup.rotation.y = this.yaw + Math.PI;
       if (this.playerRig) {
-        if (this.playerRig.kind === 'weighted') this.#updatePlayerSkin();
-        else {
-          this.playerRig.torso.position.y = 0.68 + (moving ? Math.abs(gait) * 0.018 : Math.sin(this.playerAnimationTime * 2) * 0.006);
-          this.playerRig.head.rotation.z = moving ? Math.sin(this.playerAnimationTime * 5) * 0.025 : 0;
-          for (const { upper, elbow, side } of this.playerRig.arms) {
-            upper.rotation.x = this.jumpHeight > 0.02 ? -0.7 : gait * 0.48;
-            upper.rotation.z = side * (this.jumpHeight > 0.02 ? 0.18 : 0.04);
-            elbow.rotation.x = this.jumpHeight > 0.02 ? -0.35 : -0.08 - Math.max(0, gait) * 0.13;
-          }
-          for (const { hip, knee, side } of this.playerRig.hips) {
-            hip.rotation.x = this.jumpHeight > 0.02 ? (side < 0 ? -0.32 : 0.22) : gait * (side < 0 ? 0.42 : -0.42);
-            knee.rotation.x = this.jumpHeight > 0.02 ? 0.4 : Math.max(0, -gait * (side < 0 ? 1 : -1)) * 0.4;
-          }
+        this.playerRig.torso.position.y = 0.68 + (moving ? Math.abs(gait) * 0.012 : Math.sin(this.playerAnimationTime * 2) * 0.004);
+        this.playerRig.head.rotation.z = moving ? Math.sin(this.playerAnimationTime * 5) * 0.018 : 0;
+        for (const { upper, elbow, wrist, side } of this.playerRig.arms) {
+          // Arms hang from the shoulders; only a small fore/aft swing is added to the walk cycle.
+          upper.rotation.x = this.jumpHeight > 0.02 ? 0.35 : gait * 0.2;
+          elbow.rotation.x = this.jumpHeight > 0.02 ? -0.08 : -0.04 - Math.max(0, gait * side) * 0.06;
+          wrist.rotation.x = moving ? -gait * 0.045 : 0;
+        }
+        for (const { hip, knee, side } of this.playerRig.hips) {
+          hip.rotation.x = this.jumpHeight > 0.02 ? (side < 0 ? -0.32 : 0.22) : gait * (side < 0 ? 0.32 : -0.32);
+          knee.rotation.x = this.jumpHeight > 0.02 ? 0.4 : Math.max(0, -gait * (side < 0 ? 1 : -1)) * 0.34;
         }
       }
     }

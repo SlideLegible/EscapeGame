@@ -26,6 +26,24 @@ const ITEM_POSITIONS = {
   F11: [20.5, -22], F12: [-5, -2.8],
 };
 
+// Item models packed by scripts/pack-item-models.mjs. `nodes` keeps only the named
+// nodes of a multi-object pack; `rotate` stands the model upright; `fit` is the largest
+// dimension in world units.
+const ITEM_MODELS = {
+  F01: { nodes: ['Soda_Trash'], fit: 0.6 },
+  F02: { nodes: ['Can'], fit: 0.9 },
+  F03: { fit: 0.8 },
+  F04: { rotate: [-Math.PI / 2, 0, 0], fit: 0.8 },
+  F05: { rotate: [0, 0, Math.PI / 2], fit: 0.8 },
+  F06: { nodes: ['SM_PaperStack_13'], fit: 1.0 },
+  F07: { fit: 1.9 },
+  F08: { fit: 0.72 },
+  F09: { fit: 0.95 },
+  F10: { fit: 0.9 },
+  F11: { fit: 0.8 },
+  F12: { fit: 1.4 },
+};
+
 // Walkable collision rows measured from the bundled classroom's desk and chair layout.
 const CLASSROOM_DESK_COLUMNS = [-3.77, -1.67, 0.41, 2.43, 4.45, 6.5];
 const CLASSROOM_DESK_ROWS = [-3.96, -1.96, -0.01, 1.93, 3.89];
@@ -87,6 +105,8 @@ export class AcademyScene {
     this.#buildObjects();
     this.#buildPlayer();
     this.classroomLoad = this.#loadClassroomModel();
+    this.itemTemplates = new Map();
+    this.itemModelsLoad = this.#loadItemModels();
     this.#onResize = () => this.resize();
     window.addEventListener('resize', this.#onResize);
     this.resize();
@@ -238,6 +258,49 @@ export class AcademyScene {
     } catch (error) {
       console.error('教室模型載入失敗，使用簡化場景。', error);
     }
+  }
+
+  async #loadItemModels() {
+    await Promise.all(Object.entries(ITEM_MODELS).map(async ([id, config]) => {
+      try {
+        const model = await loadGlb(new URL(`../assets/models/items/${id.toLowerCase()}.glb`, import.meta.url));
+        this.itemTemplates.set(id, this.#normalizeItemModel(model, config));
+      } catch (error) {
+        console.error(`${id} 道具模型載入失敗，使用簡化形狀。`, error);
+      }
+    }));
+    for (const [id, group] of this.itemGroups) {
+      if (!this.itemTemplates.has(id)) continue;
+      this.#rebuildFormMesh(group, id);
+      group.userData.localBounds = this.#localBounds(group);
+    }
+    const form = this.game.player().form;
+    if (this.itemTemplates.has(form)) this.setForm(form);
+    this.refresh();
+  }
+
+  #normalizeItemModel(model, { nodes, rotate, fit }) {
+    model.updateMatrixWorld(true);
+    const root = new THREE.Group();
+    if (nodes) {
+      for (const name of nodes) {
+        const node = model.getObjectByName(name);
+        if (node) root.attach(node);
+      }
+    } else {
+      root.add(model);
+    }
+    if (rotate) root.rotation.set(...rotate);
+    root.updateMatrixWorld(true);
+    const bounds = new THREE.Box3().setFromObject(root);
+    const size = bounds.getSize(new THREE.Vector3());
+    const center = bounds.getCenter(new THREE.Vector3());
+    const wrapper = new THREE.Group();
+    wrapper.add(root);
+    const scale = fit / Math.max(size.x, size.y, size.z);
+    root.scale.multiplyScalar(scale);
+    root.position.set(-center.x * scale, -bounds.min.y * scale, -center.z * scale);
+    return wrapper;
   }
 
   #addClassroomClue() {
@@ -466,6 +529,11 @@ export class AcademyScene {
 
   #formShape(id) {
     const group = new THREE.Group();
+    const template = this.itemTemplates?.get(id);
+    if (template) {
+      group.add(template.clone(true));
+      return group;
+    }
     const mat = (color, metalness = 0.04) => new THREE.MeshStandardMaterial({ color, roughness: 0.78, metalness });
     const add = (mesh, x = 0, y = 0, z = 0) => { mesh.position.set(x, y, z); mesh.castShadow = true; group.add(mesh); };
     if (id === 'F00') {

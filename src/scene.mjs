@@ -49,20 +49,20 @@ export class AcademyScene {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x101d20);
     this.scene.fog = new THREE.FogExp2(0x101d20, 0.012);
-    this.camera = new THREE.PerspectiveCamera(48, 1, 0.1, 180);
+    this.camera = new THREE.PerspectiveCamera(52, 1, 0.1, 180);
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.8));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.1;
     this.keys = new Set();
-    this.yaw = 0;
+    this.yaw = 0.9;
     this.pitch = 0.28;
     this.pointerDown = null;
     this.started = false;
-    this.playerPosition = new THREE.Vector3(7, 0, 3.2);
+    this.playerPosition = new THREE.Vector3(3.5, 0, 0);
     this.humanPosition = this.playerPosition.clone();
     this.targetMeshes = [];
     this.targetGroups = new Map();
@@ -70,6 +70,9 @@ export class AcademyScene {
     this.playerGroup = null;
     this.playerMaterials = new Map();
     this.cameraTarget = new THREE.Vector3();
+    this.cameraDesired = new THREE.Vector3();
+    this.mapTarget = new THREE.Vector3(7, 0, -11);
+    this.lastCameraUpdate = 0;
     this.#buildLights();
     this.#buildRooms();
     this.#buildObjects();
@@ -198,26 +201,104 @@ export class AcademyScene {
     const pale = this.#material(0xb5b99d);
     const metal = new THREE.MeshStandardMaterial({ color: 0x899b8e, roughness: 0.35, metalness: 0.42 });
     switch (id) {
-      case 'S01': this.#box(group, 0, 1.45, 0, 2.6, 2.9, 0.24, this.#material(0x4c665b)); this.#box(group, 0.78, 1.5, 0.15, 0.08, 0.2, 0.08, this.#material(0xc4ef80)); break;
-      case 'S02': this.#box(group, 0, 0.48, 0, 0.9, 1.0, 0.8, this.#material(0x414d47)); this.#box(group, 0, 1.02, 0, 1.0, 0.08, 0.88, metal); break;
-      case 'S03': this.#box(group, 0, 1.35, 0, 1.25, 2.7, 0.8, this.#material(0x66847c)); this.#box(group, 0, 1.35, 0.43, 0.85, 0.75, 0.04, dark, false); this.#box(group, 0, 0.4, 0.44, 0.75, 0.55, 0.04, this.#material(0xa3ad91), false); break;
-      case 'S04': this.#box(group, 0, 0.1, 0, 1.7, 0.2, 0.9, wood); break;
+      case 'S01': {
+        const leaf = this.#material(0x526b5e);
+        this.#box(group, 0, 1.48, 0, 2.78, 2.96, 0.18, this.#material(0xb0b99b));
+        this.#box(group, 0, 1.46, 0.12, 2.48, 2.72, 0.16, leaf);
+        this.#box(group, 0, 1.46, 0.22, 2.08, 2.34, 0.06, this.#material(0x40584e));
+        this.#box(group, 0, 1.46, 0.27, 1.88, 2.14, 0.04, leaf, false);
+        this.#box(group, 0.93, 1.48, 0.32, 0.08, 0.24, 0.08, this.#material(0xd8be79));
+        break;
+      }
+      case 'S02': {
+        const bin = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.38, 0.98, 20), this.#material(0x46584f));
+        bin.position.y = 0.52; bin.castShadow = true; group.add(bin);
+        const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.09, 20), metal);
+        rim.position.y = 1.03; group.add(rim);
+        this.#box(group, 0, 0.5, 0.43, 0.3, 0.25, 0.035, dark, false);
+        break;
+      }
+      case 'S03': {
+        this.#box(group, 0, 1.38, 0, 1.36, 2.76, 0.78, this.#material(0x637f72));
+        this.#box(group, 0, 1.62, 0.41, 0.96, 1.05, 0.035, dark, false);
+        this.#box(group, 0, 0.7, 0.42, 0.88, 0.42, 0.04, this.#material(0x273e38), false);
+        this.#box(group, 0, 0.42, 0.45, 0.84, 0.07, metal, false);
+        for (let row = 0; row < 3; row++) for (let col = 0; col < 3; col++) {
+          this.#box(group, -0.36 + col * 0.36, 2.3 - row * 0.3, 0.42, 0.25, 0.18, 0.035, this.#material([0xb57859, 0xd2b774, 0x799a82][(row + col) % 3]), false);
+        }
+        break;
+      }
+      case 'S04': {
+        const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.58, 0.42, 0.68, 16), this.#material(0x987e60));
+        pot.position.y = 0.42; pot.castShadow = true; group.add(pot);
+        this.#box(group, 0, 0.79, 0, 1.2, 0.12, 0.85, wood);
+        const stem = this.#material(0x587c58);
+        for (const [x, y, z, scale] of [[-0.2,1.35,0,0.7],[0.2,1.55,0.08,0.6],[0,1.8,-0.05,0.65],[-0.4,1.65,0.04,0.5]]) {
+          const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.34, 10, 8), stem);
+          leaf.position.set(x, y, z); leaf.scale.set(1, scale, 0.7); leaf.castShadow = true; group.add(leaf);
+        }
+        break;
+      }
       case 'S05': case 'S09': case 'S19': this.#box(group, 0, 1.35, 0, 2.0, 2.7, 0.2, this.#material(0x53675b)); break;
       case 'S06': this.#box(group, 0, 0.72, 0, 1.4, 0.12, 0.8, wood); this.#box(group, 0, 0.36, 0, 1.2, 0.62, 0.65, wood); break;
       case 'S07': this.#box(group, 0, 0.58, 0, 1.3, 0.95, 0.1, dark); this.#box(group, 0, 0.52, 0.08, 1.12, 0.7, 0.03, this.#material(0x466b63), false); break;
       case 'S08': this.#box(group, 0, 0.3, 0, 1.0, 0.55, 0.7, this.#material(0x97866a)); break;
       case 'S10': this.#box(group, 0, 0.4, 0, 0.85, 0.8, 0.85, this.#material(0x796e5a)); this.#box(group, 0, 0.96, 0, 1.05, 0.16, 1.05, this.#material(0x465947)); break;
-      case 'S11': this.#box(group, 0, 0.25, 0, 0.8, 0.5, 1.15, pale); this.#box(group, 0, 0.75, -0.2, 0.75, 0.8, 0.35, pale); break;
+      case 'S11': {
+        const porcelain = this.#material(0xe2e5d4, 0.28);
+        const base = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.46, 0.56, 18), porcelain);
+        base.position.set(0, 0.34, 0.1); base.scale.z = 1.25; base.castShadow = true; group.add(base);
+        const bowl = new THREE.Mesh(new THREE.SphereGeometry(0.52, 20, 14), porcelain);
+        bowl.position.set(0, 0.68, 0.05); bowl.scale.set(0.92, 0.48, 1.12); bowl.castShadow = true; group.add(bowl);
+        const seat = new THREE.Mesh(new THREE.TorusGeometry(0.38, 0.065, 8, 24), this.#material(0xf0f0e5, 0.25));
+        seat.position.set(0, 0.89, 0.05); seat.rotation.x = Math.PI / 2; seat.scale.set(1, 1.25, 1); group.add(seat);
+        this.#box(group, 0, 0.94, -0.43, 0.76, 0.84, 0.25, porcelain);
+        break;
+      }
       case 'S12': this.#box(group, 0, 0.42, 0, 0.65, 0.82, 0.62, this.#material(0x68766d)); break;
-      case 'S13': this.#box(group, 0, 2.7, 0, 2.5, 1.0, 0.12, metal); break;
-      case 'S14': this.#box(group, 0, 1.65, 0, 4.6, 2.3, 0.16, this.#material(0x304b43)); break;
+      case 'S13': {
+        this.#box(group, 0, 2.7, 0, 2.7, 1.2, 0.16, metal);
+        this.#box(group, 0, 2.7, 0.11, 2.38, 0.9, 0.05, this.#material(0x263f40), false);
+        this.#box(group, 0, 2.7, 0.16, 0.08, 0.92, 0.05, this.#material(0xc6c9a7), false);
+        this.#box(group, 0, 2.7, 0.16, 2.38, 0.07, 0.05, this.#material(0xc6c9a7), false);
+        break;
+      }
+      case 'S14': {
+        this.#box(group, 0, 1.65, 0, 4.8, 2.5, 0.16, wood);
+        this.#box(group, 0, 1.65, 0.1, 4.48, 2.18, 0.04, this.#material(0x29443c), false);
+        this.#box(group, 0, 0.35, 0.1, 4.65, 0.12, 0.24, wood);
+        const chalk = document.createElement('canvas'); chalk.width = 1024; chalk.height = 320;
+        const ctx = chalk.getContext('2d');
+        ctx.fillStyle = '#304b43'; ctx.fillRect(0, 0, chalk.width, chalk.height);
+        ctx.fillStyle = '#d8d8bf'; ctx.font = '38px Georgia, serif'; ctx.fillText('WKH SDVVZRUG LV QRW KHUH', 48, 130);
+        ctx.font = '21px sans-serif'; ctx.fillStyle = '#9eb5a2'; ctx.fillText('Caesar cipher  ·  shift 3', 50, 195);
+        const boardMap = new THREE.CanvasTexture(chalk); boardMap.colorSpace = THREE.SRGBColorSpace;
+        this.#box(group, 0, 1.67, 0.14, 4.38, 2.08, 0.025, new THREE.MeshStandardMaterial({ map: boardMap, roughness: 0.95 }), false);
+        break;
+      }
       case 'S15': this.#box(group, 0, 1.2, 0, 1.2, 2.2, 0.35, this.#material(0x62685b)); this.#box(group, 0, 1.3, 0.2, 0.18, 0.85, 0.12, this.#material(0x222a25)); break;
       case 'S16': this.#box(group, 0, 0.56, 0, 1.8, 1.1, 0.8, wood); this.#box(group, 0, 1.14, 0, 2.0, 0.12, 0.9, wood); break;
-      case 'S17': this.#box(group, 0, 1.55, 0, 2.4, 2.2, 0.13, this.#material(0x79745f)); break;
-      case 'S18': this.#box(group, 0, 1.35, 0, 1.3, 1.65, 0.12, pale); break;
+      case 'S17': {
+        this.#box(group, 0, 1.55, 0, 2.55, 2.35, 0.15, wood);
+        this.#box(group, 0, 1.55, 0.1, 2.3, 2.1, 0.04, this.#material(0x8e8068), false);
+        for (const [x, y, color] of [[-0.55,2.05,0xb68069],[0.48,1.9,0xc3b881],[-0.15,1.1,0x819b85]]) {
+          this.#box(group, x, y, 0.14, 0.65, 0.72, 0.045, this.#material(color), false);
+          this.#box(group, x, y + 0.12, 0.17, 0.42, 0.04, pale, false);
+          this.#box(group, x, y - 0.03, 0.17, 0.34, 0.025, pale, false);
+        }
+        break;
+      }
+      case 'S18': {
+        this.#box(group, 0, 1.35, 0, 1.42, 1.78, 0.14, this.#material(0x9c9a82));
+        this.#box(group, 0, 1.35, 0.1, 1.26, 1.62, 0.035, pale, false);
+        this.#box(group, 0, 2.02, 0.14, 1.1, 0.22, 0.035, this.#material(0x9c624f), false);
+        for (let row = 0; row < 4; row++) for (let col = 0; col < 5; col++) {
+          this.#box(group, -0.42 + col * 0.21, 1.65 - row * 0.25, 0.14, 0.12, 0.13, 0.025, this.#material(row === 2 && col === 4 ? 0xb95c4d : 0xd9d6bd), false);
+        }
+        break;
+      }
       case 'S20': this.#box(group, 0, 0.7, 0, 1.1, 0.85, 0.8, wood); break;
     }
-    group.add(this.#label(OBJECTS[id], 0, id === 'S13' ? 3.55 : 3.0, 0.1, 20));
     return group;
   }
 
@@ -248,9 +329,19 @@ export class AcademyScene {
     const mat = (color, metalness = 0.04) => new THREE.MeshStandardMaterial({ color, roughness: 0.62, metalness });
     const add = (mesh, x = 0, y = 0, z = 0) => { mesh.position.set(x, y, z); mesh.castShadow = true; group.add(mesh); };
     if (id === 'F00') {
-      add(new THREE.Mesh(new THREE.CapsuleGeometry(0.38, 0.78, 4, 8), mat(0x92a889)), 0, 0.85);
-      add(new THREE.Mesh(new THREE.SphereGeometry(0.29, 16, 12), mat(0xd1bc9a)), 0, 1.62);
-      add(new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.14, 0.48), mat(0x374a42)), 0, 0.2);
+      const coat = mat(0x718b76), skin = mat(0xc9ac8d), hair = mat(0x352f2b), trousers = mat(0x394b49), shoes = mat(0x263632);
+      add(new THREE.Mesh(new THREE.CapsuleGeometry(0.36, 0.7, 5, 12), coat), 0, 0.92);
+      add(new THREE.Mesh(new THREE.SphereGeometry(0.3, 20, 16), skin), 0, 1.66);
+      const cap = new THREE.Mesh(new THREE.SphereGeometry(0.305, 18, 8, 0, Math.PI * 2, 0, Math.PI * 0.52), hair);
+      add(cap, 0, 1.79);
+      for (const side of [-1, 1]) {
+        const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.105, 0.5, 4, 8), coat);
+        arm.rotation.z = side * -0.16; add(arm, side * 0.39, 0.91);
+        const leg = new THREE.Mesh(new THREE.CapsuleGeometry(0.13, 0.45, 4, 8), trousers);
+        add(leg, side * 0.17, 0.3);
+        add(new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.12, 0.38), shoes), side * 0.17, 0.08, -0.05);
+      }
+      add(new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.4, 0.09), mat(0xc4ef80)), 0.12, 1.0, -0.31);
     } else if (id === 'F01') {
       add(new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.38, 0.62, 16), mat(0x8b9b8c, 0.55)), 0, 0.45);
       add(new THREE.Mesh(new THREE.CylinderGeometry(0.37, 0.37, 0.06, 16), mat(0x4f5e53, 0.4)), 0, 0.77);
@@ -299,7 +390,6 @@ export class AcademyScene {
     }
     const shape = this.#formShape(formId);
     while (shape.children.length) target.add(shape.children[0]);
-    target.add(this.#label(FORMS[formId], 0, 2.2, 0, 19));
   }
 
   #buildPlayer() {
@@ -319,7 +409,7 @@ export class AcademyScene {
     if (previousForm === 'F00' && player.form !== 'F00') this.humanPosition.copy(this.playerPosition);
     if (result.location === 'L01') this.playerPosition.set(38, 0, -9);
     else if (result.location === 'L02') this.playerPosition.set(38, 0, -21);
-    else if (result.ending === 'E05') this.playerPosition.set(7, 0, 3.2);
+    else if (result.ending === 'E05') this.playerPosition.set(3.5, 0, 0);
     else if (!result.ending && player.form === 'F00' && previousForm !== 'F00') this.playerPosition.copy(this.humanPosition);
     this.playerGroup.position.copy(this.playerPosition);
     this.setForm(player.form);
@@ -343,10 +433,10 @@ export class AcademyScene {
       const door = this.targetGroups.get(doorId);
       if (door) door.visible = !this.game.isDoorOpen(doorId);
     }
+    const nearest = this.nearestTarget();
     for (const [id, group] of [...this.targetGroups, ...this.itemGroups]) {
       if (!group.visible) continue;
-      const near = Math.hypot(group.position.x - this.playerPosition.x, group.position.z - this.playerPosition.z) <= 4.5;
-      for (const child of group.children) if (child.isSprite) child.visible = near;
+      for (const child of group.children) if (child.isSprite) child.visible = nearest?.id === id;
     }
     this.playerGroup.visible = true;
   }
@@ -403,18 +493,22 @@ export class AcademyScene {
     if (this.game.player().form !== 'F00') this.game.item(this.game.player().form).area = area;
   }
 
-  updateCamera() {
+  updateCamera(now = performance.now()) {
+    const dt = this.lastCameraUpdate ? Math.min(0.1, (now - this.lastCameraUpdate) / 1000) : 1 / 60;
+    this.lastCameraUpdate = now;
+    const smooth = 1 - Math.exp(-10 * dt);
     if (this.game.player().canSeeWholeMap) {
-      this.camera.position.lerp(new THREE.Vector3(7, 50, -14), 0.06);
-      this.camera.lookAt(new THREE.Vector3(7, 0, -11));
+      this.cameraDesired.set(7, 50, -14);
+      this.camera.position.lerp(this.cameraDesired, smooth);
+      this.camera.lookAt(this.mapTarget);
       return;
     }
-    const distance = this.game.player().form === 'F12' ? 10.2 : this.game.player().form === 'F08' ? 7.8 : 9.2;
-    const height = (this.game.player().form === 'F09' || this.game.player().form === 'F10' ? 6.0 : 7.4) + this.pitch * 1.5;
+    const distance = this.game.player().form === 'F12' ? 8.5 : this.game.player().form === 'F08' ? 6.2 : 7.2;
+    const height = (this.game.player().form === 'F09' || this.game.player().form === 'F10' ? 3.4 : 3.8) + this.pitch * 1.5;
     const dx = Math.sin(this.yaw) * distance;
     const dz = Math.cos(this.yaw) * distance;
-    const desired = new THREE.Vector3(this.playerPosition.x - dx, height, this.playerPosition.z + dz);
-    this.camera.position.lerp(desired, 0.13);
+    this.cameraDesired.set(this.playerPosition.x - dx, height, this.playerPosition.z + dz);
+    this.camera.position.lerp(this.cameraDesired, smooth);
     this.cameraTarget.set(this.playerPosition.x, 1.15, this.playerPosition.z);
     this.camera.lookAt(this.cameraTarget);
   }

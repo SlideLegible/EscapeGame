@@ -1445,7 +1445,9 @@ export class AcademyScene {
     if (this.jumpHeight > 0 || this.jumpVelocity > 0) {
       this.jumpElapsed += dt;
       jump.time = jumpClipTime(this.jumpElapsed);
-      this.playerMixer.update(0);
+      // The jump action is paused so its time stays where it was scrubbed, but the mixer must
+      // still advance so the start crossfade weight can progress.
+      this.playerMixer.update(dt);
       return true;
     }
     this.jumpAnimating = false;

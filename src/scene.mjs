@@ -279,8 +279,11 @@ export function removeRootTranslationTrack(clip, root) {
 
 // Physics airtime of a jump (2 * jumpVelocity / gravity) and the clip time of the landing pose.
 export const JUMP_AIRTIME = (2 * 4.3) / 11.5;
-export const JUMP_CLIP_LAND_TIME = 0.8;
-const JUMP_FADE_SECONDS = 0.25;
+// The clip's on-ground wind-up is skipped: the scrub runs from feet-off-ground to touchdown.
+export const JUMP_CLIP_TAKEOFF_TIME = 0.55;
+export const JUMP_CLIP_LAND_TIME = 1.07;
+// Long enough for the landing crouch (bottom near clip time 1.27) to show before the walk pose returns.
+const JUMP_FADE_SECONDS = 0.35;
 
 export function pickPlayerClips(clips = []) {
   const withTracks = clips.filter((clip) => clip.tracks.length > 0);
@@ -288,8 +291,8 @@ export function pickPlayerClips(clips = []) {
   return { walk: byName('Walking') ?? withTracks[0] ?? null, jump: byName('Jumping') };
 }
 
-export function jumpClipTime(airElapsed, airtime = JUMP_AIRTIME, landTime = JUMP_CLIP_LAND_TIME) {
-  return Math.min(1, Math.max(0, airElapsed / airtime)) * landTime;
+export function jumpClipTime(airElapsed, airtime = JUMP_AIRTIME, landTime = JUMP_CLIP_LAND_TIME, takeoffTime = JUMP_CLIP_TAKEOFF_TIME) {
+  return takeoffTime + Math.min(1, Math.max(0, airElapsed / airtime)) * (landTime - takeoffTime);
 }
 
 export const SPECIAL_EXITS = {
@@ -1418,6 +1421,7 @@ export class AcademyScene {
     const jump = this.playerJumpAction;
     if (!jump) return;
     jump.reset();
+    jump.time = JUMP_CLIP_TAKEOFF_TIME;
     jump.paused = true;
     jump.play();
     jump.crossFadeFrom(this.playerWalkAction, 0.08, false);

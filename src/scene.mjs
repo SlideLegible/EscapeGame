@@ -84,6 +84,7 @@ const MODEL_TARGETS = new Set(['S04', 'S05', 'S09', 'S14', 'S16', 'S19', 'S20'])
 const ROOM_NAMES = Object.fromEntries(Object.entries(ROOM).map(([id, room]) => [id, room.label]));
 // Orbit camera collision: how far into the ray the player's own body is ignored, how far to stay off a wall, and the closest it may get.
 const CAMERA_BODY_CLEARANCE = 0.6, CAMERA_WALL_CLEARANCE = 0.3, CAMERA_MIN_DISTANCE = 0.45;
+const PLAYER_TURN_SPEED = 18;
 const palette = { wall: 0xb3a789, trim: 0x51483b, wood: 0x8d704a, light: 0xe8d8b6, dark: 0x292720, lime: 0xc4ef80 };
 
 // Walkable rectangles per area, checked in order (the first match wins where they overlap).
@@ -102,18 +103,30 @@ const AREA_RECTS = [
 // `height` keeps a black block under a low door frame.
 // The corridor's entrances are the doors painted on its walls, so they get no black block.
 export const DOORWAYS = [
-  { door: 'S19', axis: 'z', sides: {
-    Classroom: { line: -5.3, span: [-7.05, -4.12], spawn: [-5.6, -4.4], height: 2.45 },
-    Corridor: { line: -7.95, span: [-6.96, -5.56], spawn: [-6.26, -9.0], block: false } } },
-  { door: 'S05', axis: 'z', sides: {
-    Corridor: { line: -13.72, span: [3.38, 4.78], spawn: [4.08, -12.7], block: false },
-    Office: { line: -16.05, span: [2.8, 5.4], spawn: [4.1, -17.1] } } },
-  { door: null, axis: 'z', sides: {
-    Corridor: { line: -13.72, span: [-6.96, -5.56], spawn: [-6.26, -12.7], block: false },
-    Restroom: { line: -16.42, span: [-12.3, -9.7], spawn: [-11, -17.4] } } },
-  { door: null, axis: 'z', sides: {
-    Corridor: { line: -13.72, span: [13.74, 15.14], spawn: [14.44, -12.7], block: false },
-    GuardRoom: { line: -16.05, span: [13.1, 15.7], spawn: [14.4, -17.1] } } },
+  {
+    door: 'S19', axis: 'z', sides: {
+      Classroom: { line: -5.3, span: [-7.05, -4.12], spawn: [-5.6, -4.4], height: 2.45 },
+      Corridor: { line: -7.95, span: [-6.96, -5.56], spawn: [-6.26, -9.0], block: false }
+    }
+  },
+  {
+    door: 'S05', axis: 'z', sides: {
+      Corridor: { line: -13.72, span: [3.38, 4.78], spawn: [4.08, -12.7], block: false },
+      Office: { line: -16.05, span: [2.8, 5.4], spawn: [4.1, -17.1] }
+    }
+  },
+  {
+    door: null, axis: 'z', sides: {
+      Corridor: { line: -13.72, span: [-6.96, -5.56], spawn: [-6.26, -12.7], block: false },
+      Restroom: { line: -16.42, span: [-12.3, -9.7], spawn: [-11, -17.4] }
+    }
+  },
+  {
+    door: null, axis: 'z', sides: {
+      Corridor: { line: -13.72, span: [13.74, 15.14], spawn: [14.44, -12.7], block: false },
+      GuardRoom: { line: -16.05, span: [13.1, 15.7], spawn: [14.4, -17.1] }
+    }
+  },
 ];
 
 // The corridor model's south wall (windows) is replaced by a mirror of its north wall, so both walls have doors.
@@ -319,7 +332,6 @@ export class AcademyScene {
     this.keys = new Set();
     this.yaw = 0;
     this.playerFacingYaw = Math.PI;
-    this.turningInPlace = false;
     this.pitch = 0.28;
     this.pointerDown = null;
     this.started = false;
@@ -769,7 +781,7 @@ export class AcademyScene {
       case 'S17': {
         this.#box(group, 0, 1.55, 0, 2.55, 2.35, 0.15, wood);
         this.#box(group, 0, 1.55, 0.1, 2.3, 2.1, 0.04, this.#material(0x8e8068), false);
-        for (const [x, y, color] of [[-0.55,2.05,0xb68069],[0.48,1.9,0xc3b881],[-0.15,1.1,0x819b85]]) {
+        for (const [x, y, color] of [[-0.55, 2.05, 0xb68069], [0.48, 1.9, 0xc3b881], [-0.15, 1.1, 0x819b85]]) {
           this.#box(group, x, y, 0.14, 0.65, 0.72, 0.045, this.#material(color), false);
           this.#box(group, x, y + 0.12, 0.17, 0.42, 0.04, pale, false);
           this.#box(group, x, y - 0.03, 0.17, 0.34, 0.025, pale, false);
@@ -998,27 +1010,27 @@ export class AcademyScene {
       add(new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.72, 0.72), mat(0xe4e0c6)), 0, 0.43);
       const pip = mat(0x34483c);
       const dot = (x, y, z) => add(new THREE.Mesh(new THREE.SphereGeometry(0.052, 10, 8), pip), x, y, z);
-      for (const [x,y] of [[-.18,.61],[.18,.25],[0,.43]]) dot(x,y,0.37);
-      for (const [x,y] of [[-.17,.6],[.17,.6],[-.17,.26],[.17,.26]]) dot(x,y,-0.37);
-      for (const [z,y] of [[-.17,.6],[.17,.26]]) dot(0.37,y,z);
-      for (const [z,y] of [[-.18,.61],[.18,.61],[-.18,.25],[.18,.25],[0,.43]]) dot(-0.37,y,z);
-      for (const [x,z] of [[-.18,-.18],[.18,-.18],[0,0],[-.18,.18],[.18,.18]]) dot(x,0.8,z);
-      for (const [x,z] of [[-.2,-.2],[.2,-.2],[-.2,.2],[.2,.2],[0,0],[-.2,0]]) dot(x,0.06,z);
+      for (const [x, y] of [[-.18, .61], [.18, .25], [0, .43]]) dot(x, y, 0.37);
+      for (const [x, y] of [[-.17, .6], [.17, .6], [-.17, .26], [.17, .26]]) dot(x, y, -0.37);
+      for (const [z, y] of [[-.17, .6], [.17, .26]]) dot(0.37, y, z);
+      for (const [z, y] of [[-.18, .61], [.18, .61], [-.18, .25], [.18, .25], [0, .43]]) dot(-0.37, y, z);
+      for (const [x, z] of [[-.18, -.18], [.18, -.18], [0, 0], [-.18, .18], [.18, .18]]) dot(x, 0.8, z);
+      for (const [x, z] of [[-.2, -.2], [.2, -.2], [-.2, .2], [.2, .2], [0, 0], [-.2, 0]]) dot(x, 0.06, z);
     } else if (id === 'F09') {
       const ring = new THREE.Mesh(new THREE.TorusGeometry(0.46, 0.09, 10, 28), mat(0xd6c88c, 0.4)); ring.rotation.x = Math.PI / 2; add(ring, 0, 0.88);
-      add(new THREE.Mesh(new THREE.CylinderGeometry(0.34,0.34,0.08,24), mat(0xddd6b7)), 0, 0.88);
-      add(new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.3,0.085,24), mat(0x47574b)), 0, 0.88);
+      add(new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.08, 24), mat(0xddd6b7)), 0, 0.88);
+      add(new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.085, 24), mat(0x47574b)), 0, 0.88);
       for (let i = 0; i < 12; i++) {
         const angle = i * Math.PI / 6;
-        add(new THREE.Mesh(new THREE.BoxGeometry(0.035,0.025,0.085), mat(0xd9d3b2)), Math.sin(angle) * 0.24, 0.94, Math.cos(angle) * 0.24);
+        add(new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.025, 0.085), mat(0xd9d3b2)), Math.sin(angle) * 0.24, 0.94, Math.cos(angle) * 0.24);
       }
-      add(new THREE.Mesh(new THREE.BoxGeometry(0.045,0.025,0.23), mat(0xd6c88c)), 0, 0.95, -0.04);
-      const hand = new THREE.Mesh(new THREE.BoxGeometry(0.04,0.025,0.16), mat(0xe2b877)); hand.rotation.y = -0.75; add(hand, 0.04, 0.96, 0.02);
-      add(new THREE.Mesh(new THREE.SphereGeometry(0.045,10,8), mat(0xd6c88c)), 0, 0.96, 0);
+      add(new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.025, 0.23), mat(0xd6c88c)), 0, 0.95, -0.04);
+      const hand = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.025, 0.16), mat(0xe2b877)); hand.rotation.y = -0.75; add(hand, 0.04, 0.96, 0.02);
+      add(new THREE.Mesh(new THREE.SphereGeometry(0.045, 10, 8), mat(0xd6c88c)), 0, 0.96, 0);
     } else if (id === 'F12') {
-      add(new THREE.Mesh(new THREE.BoxGeometry(0.8,0.13,0.75), mat(palette.wood)), 0, 0.58);
-      add(new THREE.Mesh(new THREE.BoxGeometry(0.8,0.75,0.14), mat(palette.wood)), 0, 1.0, -0.3);
-      for (const x of [-0.3,0.3]) for (const z of [-0.27,0.27]) add(new THREE.Mesh(new THREE.BoxGeometry(0.08,0.55,0.08), mat(0x6c5840)), x, 0.27, z);
+      add(new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.13, 0.75), mat(palette.wood)), 0, 0.58);
+      add(new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.75, 0.14), mat(palette.wood)), 0, 1.0, -0.3);
+      for (const x of [-0.3, 0.3]) for (const z of [-0.27, 0.27]) add(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.55, 0.08), mat(0x6c5840)), x, 0.27, z);
     }
     return group;
   }
@@ -1373,31 +1385,22 @@ export class AcademyScene {
       const moveZ = fz * forward + rz * right;
       const targetYaw = Math.atan2(moveX, moveZ);
       if (this.game.player().form === 'F00') {
-        const wasTurningInPlace = this.turningInPlace;
-        const turn = advancePlayerFacing(this.playerFacingYaw, targetYaw, 7 * dt);
+        const turn = advancePlayerFacing(this.playerFacingYaw, targetYaw, PLAYER_TURN_SPEED * dt);
         this.playerFacingYaw = turn.yaw;
-        this.turningInPlace = turn.turning;
         this.playerGroup.rotation.y = this.playerFacingYaw;
-        if (turn.turning && !wasTurningInPlace && this.playerWalkAction) {
-          this.playerWalkAction.reset().play();
-          this.playerMixer.update(0);
-          this.playerWalkAction.paused = true;
-        }
-      } else {
-        this.turningInPlace = false;
       }
-    } else {
-      this.turningInPlace = false;
     }
     let moving = false;
-    if (hasMovementInput && !(human && this.turningInPlace)) {
+    if (hasMovementInput) {
       const speed = this.game.player().form === 'F08' ? 2.6 : this.game.player().form === 'F09' ? 1.8 : 4.4;
       const fx = Math.sin(this.yaw), fz = -Math.cos(this.yaw);
       const rx = Math.cos(this.yaw), rz = Math.sin(this.yaw);
       const oldX = this.playerPosition.x, oldZ = this.playerPosition.z;
       let nx = oldX + (fx * forward + rx * right) * speed * dt;
       let nz = oldZ + (fz * forward + rz * right) * speed * dt;
-      const radius = this.game.player().form === 'F12' ? 0.38 : 0.3;
+      // The human model is narrower at the feet than the other forms' generic 0.3-unit collider.
+      // A smaller footprint keeps chair and desk clearances usable without changing obstacle geometry.
+      const radius = human ? 0 : this.game.player().form === 'F12' ? 0.38 : 0.3;
       const from = this.game.player().area;
       // Rooms never join directly: walking up to a room's doorway starts the transition to the room behind it.
       for (const doorway of DOORWAYS) {
@@ -1504,7 +1507,10 @@ export class AcademyScene {
       this.playerPosition.z + Math.cos(this.yaw) * reach + Math.sin(this.yaw) * shoulder);
     this.camera.position.lerp(this.cameraDesired, smooth);
     this.#pullCameraIn(this.playerPosition.x, targetY, this.playerPosition.z);
-    this.cameraTarget.set(this.playerPosition.x, targetY, this.playerPosition.z);
+    // Aim from the shoulder-offset camera toward the matching shoulder point so the view's
+    // horizontal center line stays parallel to the forward direction used by W.
+    this.cameraTarget.set(this.playerPosition.x + Math.cos(this.yaw) * shoulder, targetY,
+      this.playerPosition.z + Math.sin(this.yaw) * shoulder);
     this.camera.lookAt(this.cameraTarget);
   }
 

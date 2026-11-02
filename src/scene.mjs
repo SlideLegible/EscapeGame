@@ -389,15 +389,15 @@ export class AcademyScene {
   }
 
   #buildLights() {
-    this.scene.add(new THREE.HemisphereLight(0xf0dfc0, 0x39352e, 2.25));
-    const key = new THREE.DirectionalLight(0xffedcf, 2.2);
+    this.scene.add(new THREE.HemisphereLight(0x8e9b91, 0x111511, 0.42));
+    const key = new THREE.DirectionalLight(0xc4c1aa, 0.22);
     key.position.set(-12, 24, 15);
     key.castShadow = true;
     key.shadow.mapSize.set(1024, 1024);
     key.shadow.camera.left = -45; key.shadow.camera.right = 45;
     key.shadow.camera.top = 30; key.shadow.camera.bottom = -42;
     this.scene.add(key);
-    const pool = new THREE.PointLight(0xc4ef80, 26, 25, 2);
+    const pool = new THREE.PointLight(0xc4ef80, 6, 18, 2);
     pool.position.set(0, 7, -9);
     this.scene.add(pool);
   }

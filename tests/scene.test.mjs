@@ -1,7 +1,7 @@
 import * as THREE from '../vendor/three.module.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { advancePlayerFacing, areaAt, areaCameraRect, bodyPathIntersectsGrid, bodyPathStepHeight, ITEM_POSITIONS, dropPoint, entryPoint, nearestCandidate, OcclusionGrid, rayRectLimit, removeRootTranslationTrack, standingClipFrom, hangingArmTracks, pickPlayerClips, jumpClipTime, roomClipRect, DOORWAYS, CORRIDOR_HALF_LENGTH, SPECIAL_EXITS, OBJECT_POSITIONS, LECTERN_SIZE } from '../src/scene.mjs';
+import { advancePlayerFacing, areaAt, areaCameraRect, bodyPathIntersectsGrid, bodyPathStepHeight, ITEM_POSITIONS, dropPoint, entryPoint, nearestCandidate, OcclusionGrid, rayRectLimit, removeRootTranslationTrack, standingClipFrom, hangingArmTracks, pickPlayerClips, jumpClipTime, JUMP_CLIP_TAKEOFF_TIME, JUMP_CLIP_LAND_TIME, roomClipRect, DOORWAYS, CORRIDOR_HALF_LENGTH, SPECIAL_EXITS, OBJECT_POSITIONS, LECTERN_SIZE } from '../src/scene.mjs';
 
 test('walkable room areas touch across the classroom, corridor, office, restroom, and storage thresholds', () => {
   assert.equal(areaAt(7, -6.2), 'Corridor');
@@ -385,10 +385,12 @@ test('player clips are chosen by name with a first-clip fallback for walking', (
   assert.deepEqual(pickPlayerClips([]), { walk: null, jump: null });
 });
 
-test('jump clip time follows the physics airtime so touchdown lands on the landing pose', () => {
-  assert.equal(jumpClipTime(0, 0.75, 0.8), 0);
-  assert.ok(Math.abs(jumpClipTime(0.375, 0.75, 0.8) - 0.4) < 1e-9);
-  assert.equal(jumpClipTime(0.75, 0.75, 0.8), 0.8);
-  assert.equal(jumpClipTime(2, 0.75, 0.8), 0.8);
-  assert.equal(jumpClipTime(-1, 0.75, 0.8), 0);
+test('jump clip time maps airtime onto the takeoff-to-touchdown span of the clip', () => {
+  assert.equal(jumpClipTime(0, 0.75, 1.07, 0.55), 0.55);
+  assert.ok(Math.abs(jumpClipTime(0.375, 0.75, 1.07, 0.55) - 0.81) < 1e-9);
+  assert.equal(jumpClipTime(0.75, 0.75, 1.07, 0.55), 1.07);
+  assert.equal(jumpClipTime(2, 0.75, 1.07, 0.55), 1.07);
+  assert.equal(jumpClipTime(-1, 0.75, 1.07, 0.55), 0.55);
+  assert.equal(JUMP_CLIP_TAKEOFF_TIME, 0.55);
+  assert.equal(JUMP_CLIP_LAND_TIME, 1.07);
 });

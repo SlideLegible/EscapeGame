@@ -84,6 +84,7 @@ const MODEL_TARGETS = new Set(['S04', 'S05', 'S09', 'S14', 'S16', 'S19', 'S20'])
 const ROOM_NAMES = Object.fromEntries(Object.entries(ROOM).map(([id, room]) => [id, room.label]));
 // Orbit camera collision: how far into the ray the player's own body is ignored, how far to stay off a wall, and the closest it may get.
 const CAMERA_BODY_CLEARANCE = 0.6, CAMERA_WALL_CLEARANCE = 0.3, CAMERA_MIN_DISTANCE = 0.45;
+const PLAYER_TURN_SPEED = 18;
 const palette = { wall: 0xb3a789, trim: 0x51483b, wood: 0x8d704a, light: 0xe8d8b6, dark: 0x292720, lime: 0xc4ef80 };
 
 // Walkable rectangles per area, checked in order (the first match wins where they overlap).
@@ -331,7 +332,6 @@ export class AcademyScene {
     this.keys = new Set();
     this.yaw = 0;
     this.playerFacingYaw = Math.PI;
-    this.turningInPlace = false;
     this.pitch = 0.28;
     this.pointerDown = null;
     this.started = false;
@@ -1385,24 +1385,13 @@ export class AcademyScene {
       const moveZ = fz * forward + rz * right;
       const targetYaw = Math.atan2(moveX, moveZ);
       if (this.game.player().form === 'F00') {
-        const wasTurningInPlace = this.turningInPlace;
-        const turn = advancePlayerFacing(this.playerFacingYaw, targetYaw, 7 * dt);
+        const turn = advancePlayerFacing(this.playerFacingYaw, targetYaw, PLAYER_TURN_SPEED * dt);
         this.playerFacingYaw = turn.yaw;
-        this.turningInPlace = turn.turning;
         this.playerGroup.rotation.y = this.playerFacingYaw;
-        if (turn.turning && !wasTurningInPlace && this.playerWalkAction) {
-          this.playerWalkAction.reset().play();
-          this.playerMixer.update(0);
-          this.playerWalkAction.paused = true;
-        }
-      } else {
-        this.turningInPlace = false;
       }
-    } else {
-      this.turningInPlace = false;
     }
     let moving = false;
-    if (hasMovementInput && !(human && this.turningInPlace)) {
+    if (hasMovementInput) {
       const speed = this.game.player().form === 'F08' ? 2.6 : this.game.player().form === 'F09' ? 1.8 : 4.4;
       const fx = Math.sin(this.yaw), fz = -Math.cos(this.yaw);
       const rx = Math.cos(this.yaw), rz = Math.sin(this.yaw);

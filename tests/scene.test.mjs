@@ -295,7 +295,7 @@ test('human movement can step over a low obstacle but not a wall', () => {
   assert.equal(bodyPathStepHeight(wall, 4.5, 5, 6.5, 5), null);
 });
 
-test('human quarter and half turns both pivot in place before movement resumes', () => {
+test('human facing rotates toward quarter and half turn targets', () => {
   for (const target of [Math.PI / 2, Math.PI]) {
     let yaw = 0;
     let turn = advancePlayerFacing(yaw, target, 0.1);

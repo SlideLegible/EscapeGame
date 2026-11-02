@@ -277,9 +277,11 @@ export function removeRootTranslationTrack(clip, root) {
   return removed;
 }
 
-const LEG_BONE = /(Left|Right)(UpLeg|Leg|Foot|Toe)/;
+// Legs, hips, spine, neck and head: the bind pose is upright, the clip's frame 0 leans forward.
+const NON_ARM_BONE = /(Left|Right)(UpLeg|Leg|Foot|Toe)|Hips|Spine|Neck|Head/;
 
-// Standing pose: a clone of the clip without leg tracks, so legs settle at the straight bind pose.
+// Standing pose: a clone of the clip keeping only shoulder/arm/hand/finger tracks (the bind pose is a T-pose);
+// legs, torso and head fall back to the upright bind pose.
 // Track names are `<node uuid>.<property>`; root resolves the uuid to a bone name.
 export function standingClipFrom(clip, root) {
   const standing = clip.clone();
@@ -287,7 +289,7 @@ export function standingClipFrom(clip, root) {
   standing.tracks = clip.tracks.filter((track) => {
     const id = track.name.split('.')[0];
     const boneName = root?.getObjectByProperty?.('uuid', id)?.name ?? id;
-    return !LEG_BONE.test(boneName);
+    return !NON_ARM_BONE.test(boneName);
   });
   return standing;
 }
@@ -1171,7 +1173,7 @@ export class AcademyScene {
         this.playerWalkAction = this.playerMixer.clipAction(walkClip);
         this.playerWalkAction.setLoop(THREE.LoopRepeat, Infinity);
         if (jumpClip) {
-          // Frame 0 of the jump clip is an upright pose; legs are dropped so they stay straight.
+          // Frame 0 of the jump clip is an upright pose; only the arms are kept so the body stays upright.
           const standClip = standingClipFrom(jumpClip, source);
           this.playerStandAction = this.playerMixer.clipAction(standClip);
           this.playerStandAction.reset().play();

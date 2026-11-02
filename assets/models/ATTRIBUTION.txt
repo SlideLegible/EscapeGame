@@ -15,5 +15,6 @@ License: Creative Commons Attribution-NonCommercial-ShareAlike (CC BY-NC-SA),
 as listed in the model's embedded GLB metadata.
 
 The original model and textures are bundled unchanged; a teammate added the
-walking animation. The project scales the model to fit the classroom and uses
+walking animation, and a Mixamo jump animation (same mixamorig skeleton) was
+added alongside it by scripts/pack-player-animations.py (actions: Walking, Jumping). The project scales the model to fit the classroom and uses
 it as the human player character.

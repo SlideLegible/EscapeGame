@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { advancePlayerFacing, areaAt, areaCameraRect, bodyPathIntersectsGrid, bodyPathStepHeight, ITEM_POSITIONS, dropPoint, entryPoint, nearestCandidate, OcclusionGrid, rayRectLimit, removeRootTranslationTrack, pickPlayerClips, jumpClipTime, roomClipRect, DOORWAYS, CORRIDOR_HALF_LENGTH, SPECIAL_EXITS, OBJECT_POSITIONS, LECTERN_SIZE } from '../src/scene.mjs';
+import { advancePlayerFacing, areaAt, areaCameraRect, bodyPathIntersectsGrid, bodyPathStepHeight, ITEM_POSITIONS, dropPoint, entryPoint, nearestCandidate, OcclusionGrid, rayRectLimit, removeRootTranslationTrack, standingClipFrom, pickPlayerClips, jumpClipTime, roomClipRect, DOORWAYS, CORRIDOR_HALF_LENGTH, SPECIAL_EXITS, OBJECT_POSITIONS, LECTERN_SIZE } from '../src/scene.mjs';
 
 test('walkable room areas touch across the classroom, corridor, office, restroom, and storage thresholds', () => {
   assert.equal(areaAt(7, -6.2), 'Corridor');
@@ -317,6 +317,18 @@ test('human walk animation drops root translation while keeping skeletal tracks'
   assert.equal(removeRootTranslationTrack(clip, root), true);
   assert.deepEqual(clip.tracks, [rotation]);
   assert.equal(removeRootTranslationTrack(clip, root), false);
+});
+
+test('standing clip keeps upper-body tracks and drops leg bone tracks without touching the source', () => {
+  const names = { u1: 'mixamorig:Hips', u2: 'mixamorig:LeftUpLeg', u3: 'mixamorig:RightLeg', u4: 'mixamorig:LeftFoot', u5: 'mixamorig:RightToeBase', u6: 'mixamorig:LeftToe_End', u7: 'mixamorig:Spine', u8: 'mixamorig:LeftArm', u9: 'mixamorig:Head' };
+  const root = { getObjectByProperty: (key, id) => (key === 'uuid' && names[id] ? { name: names[id] } : undefined) };
+  const tracks = Object.keys(names).map((id) => ({ name: `${id}.quaternion` }));
+  const clip = { name: 'Jumping', tracks, clone() { return { name: this.name, tracks: [...this.tracks], clone: this.clone }; } };
+  const standing = standingClipFrom(clip, root);
+  assert.equal(standing.name, 'Standing');
+  assert.deepEqual(standing.tracks.map((t) => names[t.name.split('.')[0]]), ['mixamorig:Hips', 'mixamorig:Spine', 'mixamorig:LeftArm', 'mixamorig:Head']);
+  assert.equal(clip.name, 'Jumping');
+  assert.equal(clip.tracks.length, 9);
 });
 
 test('player model GLB carries both Walking and Jumping animations', async () => {

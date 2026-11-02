@@ -277,6 +277,21 @@ export function removeRootTranslationTrack(clip, root) {
   return removed;
 }
 
+const LEG_BONE = /(Left|Right)(UpLeg|Leg|Foot|Toe)/;
+
+// Standing pose: a clone of the clip without leg tracks, so legs settle at the straight bind pose.
+// Track names are `<node uuid>.<property>`; root resolves the uuid to a bone name.
+export function standingClipFrom(clip, root) {
+  const standing = clip.clone();
+  standing.name = 'Standing';
+  standing.tracks = clip.tracks.filter((track) => {
+    const id = track.name.split('.')[0];
+    const boneName = root?.getObjectByProperty?.('uuid', id)?.name ?? id;
+    return !LEG_BONE.test(boneName);
+  });
+  return standing;
+}
+
 // Physics airtime of a jump (2 * jumpVelocity / gravity) and the clip time of the landing pose.
 export const JUMP_AIRTIME = (2 * 4.3) / 11.5;
 export const JUMP_CLIP_LAND_TIME = 0.8;
@@ -1156,9 +1171,8 @@ export class AcademyScene {
         this.playerWalkAction = this.playerMixer.clipAction(walkClip);
         this.playerWalkAction.setLoop(THREE.LoopRepeat, Infinity);
         if (jumpClip) {
-          // Frame 0 of the jump clip is a settled standing pose; a clone keeps its own action.
-          const standClip = jumpClip.clone();
-          standClip.name = 'Standing';
+          // Frame 0 of the jump clip is an upright pose; legs are dropped so they stay straight.
+          const standClip = standingClipFrom(jumpClip, source);
           this.playerStandAction = this.playerMixer.clipAction(standClip);
           this.playerStandAction.reset().play();
           this.playerStandAction.paused = true;

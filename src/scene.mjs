@@ -1506,7 +1506,10 @@ export class AcademyScene {
       this.playerPosition.z + Math.cos(this.yaw) * reach + Math.sin(this.yaw) * shoulder);
     this.camera.position.lerp(this.cameraDesired, smooth);
     this.#pullCameraIn(this.playerPosition.x, targetY, this.playerPosition.z);
-    this.cameraTarget.set(this.playerPosition.x, targetY, this.playerPosition.z);
+    // Aim from the shoulder-offset camera toward the matching shoulder point so the view's
+    // horizontal center line stays parallel to the forward direction used by W.
+    this.cameraTarget.set(this.playerPosition.x + Math.cos(this.yaw) * shoulder, targetY,
+      this.playerPosition.z + Math.sin(this.yaw) * shoulder);
     this.camera.lookAt(this.cameraTarget);
   }
 

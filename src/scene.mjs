@@ -277,42 +277,6 @@ export function removeRootTranslationTrack(clip, root) {
   return removed;
 }
 
-// Finger bones only: the arms themselves hang from hangingArmTracks, everything else stays in the bind pose.
-const FINGER_BONE = /(Left|Right)Hand(Thumb|Index|Middle|Ring|Pinky)\d/;
-
-// Standing pose base: a clone of the clip keeping only the finger tracks (relaxed fingers from frame 0).
-// Track names are `<node uuid>.<property>`; root resolves the uuid to a bone name.
-export function standingClipFrom(clip, root) {
-  const standing = clip.clone();
-  standing.name = 'Standing';
-  standing.tracks = clip.tracks.filter((track) => {
-    const id = track.name.split('.')[0];
-    const boneName = root?.getObjectByProperty?.('uuid', id)?.name ?? id;
-    return FINGER_BONE.test(boneName);
-  });
-  return standing;
-}
-
-// Single-key quaternion tracks that make each upper arm hang down, tilted slightly outward (Left -> +x, Right -> -x).
-// Call while the model is still in its bind pose (T-pose), before any mixer update.
-export function hangingArmTracks(root, { outward = 0.15 } = {}) {
-  root.updateMatrixWorld(true);
-  const rootQuat = root.getWorldQuaternion(new THREE.Quaternion());
-  const tracks = [];
-  for (const [side, sign] of [['Left', 1], ['Right', -1]]) {
-    const arm = root.getObjectByName(`mixamorig:${side}Arm`);
-    const fore = root.getObjectByName(`mixamorig:${side}ForeArm`);
-    if (!arm || !fore || !arm.parent) continue;
-    const current = fore.getWorldPosition(new THREE.Vector3()).sub(arm.getWorldPosition(new THREE.Vector3())).normalize();
-    const target = new THREE.Vector3(sign * outward, -1, 0).normalize().applyQuaternion(rootQuat);
-    const delta = new THREE.Quaternion().setFromUnitVectors(current, target);
-    const newWorld = delta.multiply(arm.getWorldQuaternion(new THREE.Quaternion()));
-    const local = arm.parent.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(newWorld);
-    tracks.push(new THREE.QuaternionKeyframeTrack(`${arm.uuid}.quaternion`, [0], local.toArray()));
-  }
-  return tracks;
-}
-
 // Physics airtime of a jump (2 * jumpVelocity / gravity) and the clip time of the landing pose.
 export const JUMP_AIRTIME = (2 * 4.3) / 11.5;
 // The clip's on-ground wind-up is skipped: the scrub runs from feet-off-ground to touchdown.
@@ -325,7 +289,7 @@ const STAND_FADE_SECONDS = 0.2;
 export function pickPlayerClips(clips = []) {
   const withTracks = clips.filter((clip) => clip.tracks.length > 0);
   const byName = (name) => withTracks.find((clip) => clip.name === name) ?? null;
-  return { walk: byName('Walking') ?? withTracks[0] ?? null, jump: byName('Jumping') };
+  return { walk: byName('Walking') ?? withTracks[0] ?? null, jump: byName('Jumping'), idle: byName('Idle') };
 }
 
 export function jumpClipTime(airElapsed, airtime = JUMP_AIRTIME, landTime = JUMP_CLIP_LAND_TIME, takeoffTime = JUMP_CLIP_TAKEOFF_TIME) {
@@ -1186,27 +1150,27 @@ export class AcademyScene {
         node.frustumCulled = false;
       });
       this.humanModel = source;
-      const { walk: walkClip, jump: jumpClip } = pickPlayerClips(source.animations ?? []);
+      const { walk: walkClip, jump: jumpClip, idle: idleClip } = pickPlayerClips(source.animations ?? []);
       if (walkClip) {
         const hips = source.getObjectByName('mixamorig:Hips');
         removeRootTranslationTrack(walkClip, hips);
         if (jumpClip) removeRootTranslationTrack(jumpClip, hips);
+        if (idleClip) removeRootTranslationTrack(idleClip, hips);
         this.playerMixer = new THREE.AnimationMixer(source);
         this.playerWalkAction = this.playerMixer.clipAction(walkClip);
         this.playerWalkAction.setLoop(THREE.LoopRepeat, Infinity);
         if (jumpClip) {
-          // Standing: arms hang down (computed from the bind pose), fingers from jump frame 0, the rest stays bind pose.
-          const armTracks = hangingArmTracks(source);
-          const standClip = standingClipFrom(jumpClip, source);
-          standClip.tracks.push(...armTracks);
-          this.playerStandAction = this.playerMixer.clipAction(standClip);
-          this.playerStandAction.reset().play();
-          this.playerStandAction.paused = true;
-          this.playerStanding = true;
-          this.playerMixer.update(0);
           this.playerJumpAction = this.playerMixer.clipAction(jumpClip);
           this.playerJumpAction.setLoop(THREE.LoopOnce, 1);
           this.playerJumpAction.clampWhenFinished = true;
+        }
+        if (idleClip) {
+          // Standing: the looping Mixamo idle clip plays whenever the player is not moving.
+          this.playerStandAction = this.playerMixer.clipAction(idleClip);
+          this.playerStandAction.setLoop(THREE.LoopRepeat, Infinity);
+          this.playerStandAction.reset().play();
+          this.playerStanding = true;
+          this.playerMixer.update(0);
         } else {
           this.playerWalkAction.reset().play();
           this.playerMixer.update(0);
@@ -1510,9 +1474,7 @@ export class AcademyScene {
       walk.crossFadeFrom(stand, STAND_FADE_SECONDS, false);
       this.playerStanding = false;
     } else if (!moving && !this.playerStanding) {
-      stand.reset();
-      stand.paused = true;
-      stand.play();
+      stand.reset().play();
       stand.crossFadeFrom(walk, STAND_FADE_SECONDS, false);
       this.playerStanding = true;
     }
@@ -1537,7 +1499,7 @@ export class AcademyScene {
     jump.paused = false;
     const next = this.playerStandAction && !moving ? this.playerStandAction : this.playerWalkAction;
     next.reset();
-    next.paused = !moving;
+    next.paused = next === this.playerWalkAction && !moving;
     next.play();
     next.crossFadeFrom(jump, JUMP_FADE_SECONDS, false);
     if (this.playerStandAction) this.playerStanding = !moving;

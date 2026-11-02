@@ -1,6 +1,7 @@
+import * as THREE from '../vendor/three.module.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { advancePlayerFacing, areaAt, areaCameraRect, bodyPathIntersectsGrid, bodyPathStepHeight, ITEM_POSITIONS, dropPoint, entryPoint, nearestCandidate, OcclusionGrid, rayRectLimit, removeRootTranslationTrack, pickPlayerClips, jumpClipTime, JUMP_CLIP_TAKEOFF_TIME, JUMP_CLIP_LAND_TIME, roomClipRect, DOORWAYS, CORRIDOR_HALF_LENGTH, SPECIAL_EXITS, OBJECT_POSITIONS, LECTERN_SIZE } from '../src/scene.mjs';
+import { advancePlayerFacing, areaAt, areaCameraRect, bodyPathIntersectsGrid, bodyPathStepHeight, ITEM_POSITIONS, dropPoint, entryPoint, nearestCandidate, OcclusionGrid, rayRectLimit, removeRootTranslationTrack, standingClipFrom, hangingArmTracks, pickPlayerClips, jumpClipTime, JUMP_CLIP_TAKEOFF_TIME, JUMP_CLIP_LAND_TIME, roomClipRect, DOORWAYS, CORRIDOR_HALF_LENGTH, SPECIAL_EXITS, OBJECT_POSITIONS, LECTERN_SIZE } from '../src/scene.mjs';
 
 test('walkable room areas touch across the classroom, corridor, office, restroom, and storage thresholds', () => {
   assert.equal(areaAt(7, -6.2), 'Corridor');
@@ -317,6 +318,54 @@ test('human walk animation drops root translation while keeping skeletal tracks'
   assert.equal(removeRootTranslationTrack(clip, root), true);
   assert.deepEqual(clip.tracks, [rotation]);
   assert.equal(removeRootTranslationTrack(clip, root), false);
+});
+
+test('standing clip keeps only finger tracks and drops shoulder, arm, hand, leg, torso and head tracks without touching the source', () => {
+  const names = { u1: 'mixamorig:Hips', u2: 'mixamorig:LeftUpLeg', u3: 'mixamorig:RightLeg', u4: 'mixamorig:LeftFoot', u5: 'mixamorig:RightToeBase', u6: 'mixamorig:LeftToe_End', u7: 'mixamorig:Spine', u8: 'mixamorig:LeftArm', u9: 'mixamorig:Head', u10: 'mixamorig:Spine1', u11: 'mixamorig:Spine2', u12: 'mixamorig:Neck', u13: 'mixamorig:HeadTop_End', u14: 'mixamorig:RightShoulder', u15: 'mixamorig:RightForeArm', u16: 'mixamorig:LeftHand', u17: 'mixamorig:LeftHandIndex1' };
+  const root = { getObjectByProperty: (key, id) => (key === 'uuid' && names[id] ? { name: names[id] } : undefined) };
+  const tracks = Object.keys(names).map((id) => ({ name: `${id}.quaternion` }));
+  const clip = { name: 'Jumping', tracks, clone() { return { name: this.name, tracks: [...this.tracks], clone: this.clone }; } };
+  const standing = standingClipFrom(clip, root);
+  assert.equal(standing.name, 'Standing');
+  assert.deepEqual(standing.tracks.map((t) => names[t.name.split('.')[0]]), ['mixamorig:LeftHandIndex1']);
+  assert.equal(clip.name, 'Jumping');
+  assert.equal(clip.tracks.length, 17);
+});
+
+function tPoseRig() {
+  const root = new THREE.Group();
+  root.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.7);
+  const hips = new THREE.Bone();
+  hips.position.set(0, 0.9, 0);
+  root.add(hips);
+  const bones = {};
+  for (const [side, sign] of [['Left', 1], ['Right', -1]]) {
+    const shoulder = new THREE.Bone(); shoulder.name = `mixamorig:${side}Shoulder`; shoulder.position.set(sign * 0.05, 0.15, 0);
+    const arm = new THREE.Bone(); arm.name = `mixamorig:${side}Arm`; arm.position.set(sign * 0.06, 0, 0);
+    const fore = new THREE.Bone(); fore.name = `mixamorig:${side}ForeArm`; fore.position.set(sign * 0.18, 0, 0);
+    const hand = new THREE.Bone(); hand.name = `mixamorig:${side}Hand`; hand.position.set(sign * 0.17, 0, 0);
+    hips.add(shoulder); shoulder.add(arm); arm.add(fore); fore.add(hand);
+    bones[side] = { arm, fore };
+  }
+  root.updateMatrixWorld(true);
+  return { root, bones };
+}
+
+test('hanging arm tracks point the upper arm down with a slight outward tilt on both sides', () => {
+  const { root, bones } = tPoseRig();
+  const tracks = hangingArmTracks(root, { outward: 0.15 });
+  assert.equal(tracks.length, 2);
+  for (const [side, sign] of [['Left', 1], ['Right', -1]]) {
+    const { arm, fore } = bones[side];
+    const track = tracks.find((t) => t.name === `${arm.uuid}.quaternion`);
+    assert.ok(track);
+    assert.deepEqual(Array.from(track.times), [0]);
+    arm.quaternion.fromArray(track.values);
+    root.updateMatrixWorld(true);
+    const dir = fore.getWorldPosition(new THREE.Vector3()).sub(arm.getWorldPosition(new THREE.Vector3())).normalize();
+    const want = new THREE.Vector3(sign * 0.15, -1, 0).normalize().applyQuaternion(root.getWorldQuaternion(new THREE.Quaternion()));
+    assert.ok(dir.distanceTo(want) < 1e-6, `${side} ${dir.toArray()} vs ${want.toArray()}`);
+  }
 });
 
 test('player model GLB carries both Walking and Jumping animations', async () => {

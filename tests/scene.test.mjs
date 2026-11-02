@@ -368,21 +368,23 @@ test('hanging arm tracks point the upper arm down with a slight outward tilt on 
   }
 });
 
-test('player model GLB carries both Walking and Jumping animations', async () => {
+test('player model GLB carries Idle, Jumping and Walking animations', async () => {
   const { readFileSync } = await import('node:fs');
   const buffer = readFileSync(new URL('../assets/models/vivi_manga_student_girl_style.glb', import.meta.url));
   const json = JSON.parse(buffer.subarray(20, 20 + buffer.readUInt32LE(12)).toString('utf8'));
-  assert.deepEqual(json.animations.map((a) => a.name).sort(), ['Jumping', 'Walking']);
+  assert.deepEqual(json.animations.map((a) => a.name).sort(), ['Idle', 'Jumping', 'Walking']);
   for (const animation of json.animations) assert.ok(animation.channels.length > 100);
 });
 
 test('player clips are chosen by name with a first-clip fallback for walking', () => {
   const walking = { name: 'Walking', tracks: [1] };
   const jumping = { name: 'Jumping', tracks: [1] };
-  assert.deepEqual(pickPlayerClips([jumping, walking]), { walk: walking, jump: jumping });
+  const idle = { name: 'Idle', tracks: [1] };
+  assert.deepEqual(pickPlayerClips([jumping, idle, walking]), { walk: walking, jump: jumping, idle });
+  assert.deepEqual(pickPlayerClips([jumping, walking]), { walk: walking, jump: jumping, idle: null });
   const legacy = { name: 'Armature|mixamo.com|Layer0', tracks: [1] };
-  assert.deepEqual(pickPlayerClips([{ name: 'empty', tracks: [] }, legacy]), { walk: legacy, jump: null });
-  assert.deepEqual(pickPlayerClips([]), { walk: null, jump: null });
+  assert.deepEqual(pickPlayerClips([{ name: 'empty', tracks: [] }, legacy]), { walk: legacy, jump: null, idle: null });
+  assert.deepEqual(pickPlayerClips([]), { walk: null, jump: null, idle: null });
 });
 
 test('jump clip time maps airtime onto the takeoff-to-touchdown span of the clip', () => {

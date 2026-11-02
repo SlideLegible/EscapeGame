@@ -277,11 +277,10 @@ export function removeRootTranslationTrack(clip, root) {
   return removed;
 }
 
-// Legs, hips, spine, neck and head: the bind pose is upright, the clip's frame 0 leans forward.
-const NON_ARM_BONE = /(Left|Right)(UpLeg|Leg|Foot|Toe)|Hips|Spine|Neck|Head/;
+// Finger bones only: the arms themselves hang from hangingArmTracks, everything else stays in the bind pose.
+const FINGER_BONE = /(Left|Right)Hand(Thumb|Index|Middle|Ring|Pinky)\d/;
 
-// Standing pose: a clone of the clip keeping only shoulder/arm/hand/finger tracks (the bind pose is a T-pose);
-// legs, torso and head fall back to the upright bind pose.
+// Standing pose base: a clone of the clip keeping only the finger tracks (relaxed fingers from frame 0).
 // Track names are `<node uuid>.<property>`; root resolves the uuid to a bone name.
 export function standingClipFrom(clip, root) {
   const standing = clip.clone();
@@ -289,9 +288,29 @@ export function standingClipFrom(clip, root) {
   standing.tracks = clip.tracks.filter((track) => {
     const id = track.name.split('.')[0];
     const boneName = root?.getObjectByProperty?.('uuid', id)?.name ?? id;
-    return !NON_ARM_BONE.test(boneName);
+    return FINGER_BONE.test(boneName);
   });
   return standing;
+}
+
+// Single-key quaternion tracks that make each upper arm hang down, tilted slightly outward (Left -> +x, Right -> -x).
+// Call while the model is still in its bind pose (T-pose), before any mixer update.
+export function hangingArmTracks(root, { outward = 0.15 } = {}) {
+  root.updateMatrixWorld(true);
+  const rootQuat = root.getWorldQuaternion(new THREE.Quaternion());
+  const tracks = [];
+  for (const [side, sign] of [['Left', 1], ['Right', -1]]) {
+    const arm = root.getObjectByName(`mixamorig:${side}Arm`);
+    const fore = root.getObjectByName(`mixamorig:${side}ForeArm`);
+    if (!arm || !fore || !arm.parent) continue;
+    const current = fore.getWorldPosition(new THREE.Vector3()).sub(arm.getWorldPosition(new THREE.Vector3())).normalize();
+    const target = new THREE.Vector3(sign * outward, -1, 0).normalize().applyQuaternion(rootQuat);
+    const delta = new THREE.Quaternion().setFromUnitVectors(current, target);
+    const newWorld = delta.multiply(arm.getWorldQuaternion(new THREE.Quaternion()));
+    const local = arm.parent.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(newWorld);
+    tracks.push(new THREE.QuaternionKeyframeTrack(`${arm.uuid}.quaternion`, [0], local.toArray()));
+  }
+  return tracks;
 }
 
 // Physics airtime of a jump (2 * jumpVelocity / gravity) and the clip time of the landing pose.
@@ -1173,8 +1192,10 @@ export class AcademyScene {
         this.playerWalkAction = this.playerMixer.clipAction(walkClip);
         this.playerWalkAction.setLoop(THREE.LoopRepeat, Infinity);
         if (jumpClip) {
-          // Frame 0 of the jump clip is an upright pose; only the arms are kept so the body stays upright.
+          // Standing: arms hang down (computed from the bind pose), fingers from jump frame 0, the rest stays bind pose.
+          const armTracks = hangingArmTracks(source);
           const standClip = standingClipFrom(jumpClip, source);
+          standClip.tracks.push(...armTracks);
           this.playerStandAction = this.playerMixer.clipAction(standClip);
           this.playerStandAction.reset().play();
           this.playerStandAction.paused = true;

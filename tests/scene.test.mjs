@@ -320,14 +320,14 @@ test('human walk animation drops root translation while keeping skeletal tracks'
   assert.equal(removeRootTranslationTrack(clip, root), false);
 });
 
-test('standing clip keeps only shoulder, arm and hand tracks and drops leg, torso and head tracks without touching the source', () => {
+test('standing clip keeps only finger tracks and drops shoulder, arm, hand, leg, torso and head tracks without touching the source', () => {
   const names = { u1: 'mixamorig:Hips', u2: 'mixamorig:LeftUpLeg', u3: 'mixamorig:RightLeg', u4: 'mixamorig:LeftFoot', u5: 'mixamorig:RightToeBase', u6: 'mixamorig:LeftToe_End', u7: 'mixamorig:Spine', u8: 'mixamorig:LeftArm', u9: 'mixamorig:Head', u10: 'mixamorig:Spine1', u11: 'mixamorig:Spine2', u12: 'mixamorig:Neck', u13: 'mixamorig:HeadTop_End', u14: 'mixamorig:RightShoulder', u15: 'mixamorig:RightForeArm', u16: 'mixamorig:LeftHand', u17: 'mixamorig:LeftHandIndex1' };
   const root = { getObjectByProperty: (key, id) => (key === 'uuid' && names[id] ? { name: names[id] } : undefined) };
   const tracks = Object.keys(names).map((id) => ({ name: `${id}.quaternion` }));
   const clip = { name: 'Jumping', tracks, clone() { return { name: this.name, tracks: [...this.tracks], clone: this.clone }; } };
   const standing = standingClipFrom(clip, root);
   assert.equal(standing.name, 'Standing');
-  assert.deepEqual(standing.tracks.map((t) => names[t.name.split('.')[0]]), ['mixamorig:LeftArm', 'mixamorig:RightShoulder', 'mixamorig:RightForeArm', 'mixamorig:LeftHand', 'mixamorig:LeftHandIndex1']);
+  assert.deepEqual(standing.tracks.map((t) => names[t.name.split('.')[0]]), ['mixamorig:LeftHandIndex1']);
   assert.equal(clip.name, 'Jumping');
   assert.equal(clip.tracks.length, 17);
 });

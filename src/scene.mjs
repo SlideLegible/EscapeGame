@@ -277,6 +277,21 @@ export function removeRootTranslationTrack(clip, root) {
   return removed;
 }
 
+// Physics airtime of a jump (2 * jumpVelocity / gravity) and the clip time of the landing pose.
+export const JUMP_AIRTIME = (2 * 4.3) / 11.5;
+export const JUMP_CLIP_LAND_TIME = 0.8;
+const JUMP_FADE_SECONDS = 0.25;
+
+export function pickPlayerClips(clips = []) {
+  const withTracks = clips.filter((clip) => clip.tracks.length > 0);
+  const byName = (name) => withTracks.find((clip) => clip.name === name) ?? null;
+  return { walk: byName('Walking') ?? withTracks[0] ?? null, jump: byName('Jumping') };
+}
+
+export function jumpClipTime(airElapsed, airtime = JUMP_AIRTIME, landTime = JUMP_CLIP_LAND_TIME) {
+  return Math.min(1, Math.max(0, airElapsed / airtime)) * landTime;
+}
+
 export const SPECIAL_EXITS = {
   L01: { at: [34.1, -11.8], to: [-14, -6.9], text: '你從飲料機的出貨口鑽了出來' },
   L02: { at: [34.1, -23.8], to: [-14, -12.2], text: '你從飲料機底下滾了出來' },
@@ -376,6 +391,10 @@ export class AcademyScene {
     this.#buildPlayer();
     this.playerMixer = null;
     this.playerWalkAction = null;
+    this.playerJumpAction = null;
+    this.jumpAnimating = false;
+    this.jumpElapsed = 0;
+    this.jumpBlend = 0;
     this.playerModelLoad = this.#loadPlayerModel();
     this.classroomLoad = this.#loadClassroomModel();
     this.roomModelsLoad = this.#loadRoomModels();
@@ -1125,15 +1144,22 @@ export class AcademyScene {
         node.frustumCulled = false;
       });
       this.humanModel = source;
-      const walkClip = source.animations?.find((clip) => clip.tracks.length > 0);
+      const { walk: walkClip, jump: jumpClip } = pickPlayerClips(source.animations ?? []);
       if (walkClip) {
-        removeRootTranslationTrack(walkClip, source.getObjectByName('mixamorig:Hips'));
+        const hips = source.getObjectByName('mixamorig:Hips');
+        removeRootTranslationTrack(walkClip, hips);
+        if (jumpClip) removeRootTranslationTrack(jumpClip, hips);
         this.playerMixer = new THREE.AnimationMixer(source);
         this.playerWalkAction = this.playerMixer.clipAction(walkClip);
         this.playerWalkAction.setLoop(THREE.LoopRepeat, Infinity);
         this.playerWalkAction.reset().play();
         this.playerMixer.update(0);
         this.playerWalkAction.paused = true;
+        if (jumpClip) {
+          this.playerJumpAction = this.playerMixer.clipAction(jumpClip);
+          this.playerJumpAction.setLoop(THREE.LoopOnce, 1);
+          this.playerJumpAction.clampWhenFinished = true;
+        }
         this.humanRig = { kind: 'animated' };
       } else {
         this.humanRig = this.#createSkinnedPlayerRig(source);
@@ -1213,6 +1239,7 @@ export class AcademyScene {
     this.#rebuildFormMesh(this.playerGroup, formId);
     this.jumpHeight = 0;
     this.jumpVelocity = 0;
+    this.#stopJumpAnimation();
     this.playerGroup.position.y = 0;
   }
 
@@ -1383,7 +1410,53 @@ export class AcademyScene {
   jump() {
     if (!this.started || this.game.player().ending || this.game.player().form !== 'F00' || this.jumpHeight > 0) return false;
     this.jumpVelocity = 4.3;
+    this.#startJumpAnimation();
     return true;
+  }
+
+  #startJumpAnimation() {
+    const jump = this.playerJumpAction;
+    if (!jump) return;
+    jump.reset();
+    jump.paused = true;
+    jump.play();
+    jump.crossFadeFrom(this.playerWalkAction, 0.08, false);
+    this.playerWalkAction.paused = true;
+    this.jumpAnimating = true;
+    this.jumpElapsed = 0;
+    this.jumpBlend = 0;
+    this.playerMixer.update(0);
+  }
+
+  #stopJumpAnimation() {
+    if (!this.playerJumpAction) return;
+    this.jumpAnimating = false;
+    this.jumpBlend = 0;
+    this.playerJumpAction.stop();
+    this.playerWalkAction.enabled = true;
+    this.playerWalkAction.setEffectiveWeight(1);
+  }
+
+  // Returns true while the jump clip owns the pose. The clip is scrubbed by airtime so touchdown
+  // coincides with the landing pose, then it fades back into the walk pose.
+  #updateJumpAnimation(dt, moving) {
+    const jump = this.playerJumpAction;
+    if (!jump || !this.jumpAnimating) return false;
+    if (this.jumpHeight > 0 || this.jumpVelocity > 0) {
+      this.jumpElapsed += dt;
+      jump.time = jumpClipTime(this.jumpElapsed);
+      this.playerMixer.update(0);
+      return true;
+    }
+    this.jumpAnimating = false;
+    this.jumpBlend = JUMP_FADE_SECONDS;
+    jump.time = JUMP_CLIP_LAND_TIME;
+    jump.paused = false;
+    this.playerWalkAction.reset();
+    this.playerWalkAction.paused = !moving;
+    this.playerWalkAction.play();
+    this.playerWalkAction.crossFadeFrom(jump, JUMP_FADE_SECONDS, false);
+    return false;
   }
 
   move(dt) {
@@ -1479,12 +1552,18 @@ export class AcademyScene {
     if (human) {
       const gait = moving ? Math.sin(this.playerAnimationTime * 10) : 0;
       if (this.playerWalkAction) {
-        if (moving) {
+        if (this.#updateJumpAnimation(dt, moving)) {
+          // The jump clip drives the pose while airborne.
+        } else if (moving) {
           if (this.playerWalkAction.paused) {
             this.playerWalkAction.paused = false;
             this.playerWalkAction.play();
           }
           this.playerMixer.update(dt);
+          this.jumpBlend = Math.max(0, this.jumpBlend - dt);
+        } else if (this.jumpBlend > 0) {
+          this.playerMixer.update(dt);
+          this.jumpBlend = Math.max(0, this.jumpBlend - dt);
         } else if (!this.playerWalkAction.paused) {
           this.playerWalkAction.paused = true;
         }

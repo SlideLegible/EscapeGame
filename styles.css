@@ -67,6 +67,7 @@ h1 span { color: var(--lime); }
 .ending-card .eyebrow { margin-bottom: 14px; }
 .ending-card p { white-space: pre-line; }
 .ending-card .primary-button { max-width: 260px; margin-right: auto; margin-left: auto; }
+.start-card, .dialog-card, .ending-card, .story-card { -webkit-user-select: none; user-select: none; }
 .achievement-list { top: 100px; right: 25px; display: grid; gap: 8px; width: min(290px, calc(100vw - 40px)); }
 .achievement { padding: 11px 14px; border-left: 2px solid var(--lime); background: rgba(10, 21, 22, .9); box-shadow: 0 10px 26px rgba(0,0,0,.18); animation: toast-in .2s ease-out; }
 .achievement small { display: block; margin-bottom: 3px; color: var(--lime); font: 9px ui-monospace, Consolas, monospace; letter-spacing: .13em; }

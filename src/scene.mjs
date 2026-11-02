@@ -1397,7 +1397,9 @@ export class AcademyScene {
       const oldX = this.playerPosition.x, oldZ = this.playerPosition.z;
       let nx = oldX + (fx * forward + rx * right) * speed * dt;
       let nz = oldZ + (fz * forward + rz * right) * speed * dt;
-      const radius = this.game.player().form === 'F12' ? 0.38 : 0.3;
+      // The human model is narrower at the feet than the other forms' generic 0.3-unit collider.
+      // A smaller footprint keeps chair and desk clearances usable without changing obstacle geometry.
+      const radius = human ? 0.22 : this.game.player().form === 'F12' ? 0.38 : 0.3;
       const from = this.game.player().area;
       // Rooms never join directly: walking up to a room's doorway starts the transition to the room behind it.
       for (const doorway of DOORWAYS) {

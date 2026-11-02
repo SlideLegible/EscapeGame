@@ -389,17 +389,14 @@ export class AcademyScene {
   }
 
   #buildLights() {
-    this.scene.add(new THREE.HemisphereLight(0xf0dfc0, 0x39352e, 2.25));
-    const key = new THREE.DirectionalLight(0xffedcf, 2.2);
+    this.scene.add(new THREE.HemisphereLight(0x8e9b91, 0x111511, 0.42));
+    const key = new THREE.DirectionalLight(0xc4c1aa, 0.22);
     key.position.set(-12, 24, 15);
     key.castShadow = true;
     key.shadow.mapSize.set(1024, 1024);
     key.shadow.camera.left = -45; key.shadow.camera.right = 45;
     key.shadow.camera.top = 30; key.shadow.camera.bottom = -42;
     this.scene.add(key);
-    const pool = new THREE.PointLight(0xc4ef80, 26, 25, 2);
-    pool.position.set(0, 7, -9);
-    this.scene.add(pool);
   }
 
   #material(color, roughness = 0.85) {
@@ -496,11 +493,38 @@ export class AcademyScene {
     }
     const hallwayMat = this.#material(0x8a7c62);
     this.#box(this.scene, 0, -0.26, -11, 49, 0.08, 0.45, hallwayMat, false);
-    const lampMat = new THREE.MeshStandardMaterial({ color: 0xf4dfae, emissive: 0xa57e43, emissiveIntensity: 1.35 });
+    const lampMat = new THREE.MeshStandardMaterial({ color: 0xf4dfae, emissive: 0xe1a354, emissiveIntensity: 2.1 });
     for (const x of [-18, -8, 2, 12, 22]) {
       const lamp = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.08, 0.35), lampMat);
       lamp.position.set(x, 3.15, -11);
       this.scene.add(lamp);
+      const light = new THREE.PointLight(0xffc77b, 8, 11, 2);
+      light.position.set(x, 2.75, -11);
+      this.scene.add(light);
+    }
+
+    const roomFixtures = [
+      { x: 0, z: -1.2, color: 0xffd18c, intensity: 9 },
+      { x: 4.1, z: -21, color: 0xffc77b, intensity: 8 },
+      { x: -11, z: -21, color: 0xd4e6dc, intensity: 7 },
+      { x: 14.4, z: -21, color: 0xffc77b, intensity: 8 },
+      { x: 38, z: -9, color: 0xc3e7cc, intensity: 6 },
+      { x: 38, z: -21, color: 0xb7d8c0, intensity: 6 },
+    ];
+    for (const fixture of roomFixtures) {
+      const emissive = new THREE.Color(fixture.color).multiplyScalar(0.55);
+      const material = new THREE.MeshStandardMaterial({
+        color: fixture.color,
+        emissive,
+        emissiveIntensity: 1.8,
+        roughness: 0.55,
+      });
+      const panel = new THREE.Mesh(new THREE.BoxGeometry(1.45, 0.07, 0.42), material);
+      panel.position.set(fixture.x, 3.05, fixture.z);
+      this.scene.add(panel);
+      const light = new THREE.PointLight(fixture.color, fixture.intensity, 10, 2);
+      light.position.set(fixture.x, 2.62, fixture.z);
+      this.scene.add(light);
     }
   }
 

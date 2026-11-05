@@ -17,7 +17,7 @@ body { min-width: 320px; }
 #game { position: relative; isolation: isolate; background: radial-gradient(ellipse at 52% 45%, #344946, #17272b 60%, #091216); }
 #view { display: block; width: 100%; height: 100%; outline: none; touch-action: none; cursor: crosshair; }
 .scene-vignette { position: absolute; inset: 0; z-index: 1; pointer-events: none; background: radial-gradient(ellipse at center, transparent 45%, rgba(3, 9, 12, .52) 100%); }
-.hud, .room-chip, .controls, .prompt, .toast, .achievement-list { position: absolute; z-index: 2; }
+.hud, .controls, .prompt, .toast, .achievement-list { position: absolute; z-index: 2; }
 .hud { top: 24px; left: 28px; right: 28px; display: flex; align-items: center; gap: 12px; pointer-events: none; }
 .brand { display: flex; align-items: center; gap: 11px; margin-right: auto; }
 .brand-mark { display: grid; place-items: center; width: 40px; height: 40px; border: 1px solid rgba(196, 239, 128, .56); color: var(--lime); font-size: 19px; background: linear-gradient(145deg, rgba(28, 48, 43, .9), rgba(9, 20, 22, .86)); box-shadow: 0 5px 24px rgba(0, 0, 0, .2); }
@@ -27,8 +27,6 @@ body { min-width: 320px; }
 .status-label { color: #afbeb5; font-size: 11px; letter-spacing: .08em; }
 .status strong { color: var(--ink); font-size: 18px; line-height: 1.2; font-variant-numeric: tabular-nums; }
 .hud .status:nth-of-type(2) strong { color: #ffb49d; }
-.room-chip { top: 96px; left: 30px; display: flex; gap: 9px; align-items: center; color: #d5dfd5; font-size: 12px; letter-spacing: .05em; text-shadow: 0 1px 8px #061014; }
-.live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--lime); box-shadow: 0 0 11px rgba(196, 239, 128, .65); }
 .controls { left: 28px; bottom: 23px; display: flex; align-items: center; gap: 8px; padding: 11px 14px; border: 1px solid rgba(222, 239, 226, .18); border-radius: 4px; background: rgba(8, 17, 20, .78); color: #bac8c0; font-size: 11px; box-shadow: 0 10px 32px rgba(0, 0, 0, .16); backdrop-filter: blur(12px); }
 kbd { min-width: 22px; padding: 3px 5px; text-align: center; border: 1px solid rgba(222,239,226,.2); color: var(--ink); font: inherit; font-size: 9px; background: rgba(238, 248, 232, .06); }
 .drag-hint { margin-left: 10px; padding-left: 12px; border-left: 1px solid var(--line); }
@@ -100,7 +98,6 @@ h1 span { color: var(--lime); }
   .brand { width: 100%; margin-bottom: 3px; }
   .status { flex: 1; min-width: 0; padding: 7px 9px; }
   .status strong { font-size: 16px; }
-  .room-chip { top: 102px; left: 14px; }
   .controls { left: 10px; right: 10px; bottom: 10px; justify-content: center; gap: 5px; font-size: 9px; }
   .drag-hint { display: none; }
   .toast { top: 137px; }

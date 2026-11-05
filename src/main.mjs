@@ -46,7 +46,6 @@ function updateHud() {
   const seconds = game.state.remainingSeconds;
   $('timer').textContent = `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
   $('form-name').textContent = FORMS[game.player().form];
-  $('room-name').textContent = scene?.getRoomName() ?? '';
   const target = scene?.nearestTarget();
   const form = game.player().form;
   const selfHint = form === 'F08' ? 'E　讓骰子滾一圈' : form === 'F09' ? 'E　把時鐘指針撥快' : '';

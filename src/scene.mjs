@@ -261,12 +261,11 @@ export function orbitCameraView(x, z, yaw, form, pitch, jumpHeight = 0) {
   const elevation = form === 'F00' ? 0.45 : pitch;
   const reach = distance * Math.cos(elevation);
   const height = Math.max(0.5, targetY + distance * Math.sin(elevation) - (form === 'F09' ? 0.4 : 0));
-  const shoulder = form === 'F00' ? 1.1 : 0;
-  // Aim from the shoulder-offset camera toward the matching shoulder point so the view's
-  // horizontal center line stays parallel to the forward direction used by W.
+  // Straight behind the player and aimed at them, so the player stays in the middle of the view
+  // and the view's center line is the forward direction used by W.
   return {
-    position: [x - Math.sin(yaw) * reach + Math.cos(yaw) * shoulder, height, z + Math.cos(yaw) * reach + Math.sin(yaw) * shoulder],
-    target: [x + Math.cos(yaw) * shoulder, targetY, z + Math.sin(yaw) * shoulder],
+    position: [x - Math.sin(yaw) * reach, height, z + Math.cos(yaw) * reach],
+    target: [x, targetY, z],
   };
 }
 

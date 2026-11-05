@@ -85,3 +85,31 @@ test('walking through a doorway fades to black and back while the player changes
   assert.match(main, /pendingDoorway/);
   assert.match(main, /completeDoorway\(\)/);
 });
+
+test('the room name display box is removed from the page', async () => {
+  const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+  const main = await readFile(new URL('../src/main.mjs', import.meta.url), 'utf8');
+  const css = await readFile(new URL('../styles.css', import.meta.url), 'utf8');
+  assert.doesNotMatch(html, /room-chip|id=["']room-name["']|live-dot/);
+  assert.doesNotMatch(main, /room-name/);
+  assert.doesNotMatch(css, /room-chip|live-dot/);
+});
+
+test('the black screen between rooms shows the destination area name', async () => {
+  const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+  const main = await readFile(new URL('../src/main.mjs', import.meta.url), 'utf8');
+  const css = await readFile(new URL('../styles.css', import.meta.url), 'utf8');
+  assert.match(html, /id=["']fade["'][^>]*>\s*<p[^>]*id=["']fade-room["']/);
+  assert.match(main, /\$\(['"]fade-room['"]\)\.textContent\s*=\s*scene\.getRoomName\(/);
+  const read = main.indexOf('pendingDoorway.area');
+  const complete = main.indexOf('completeDoorway()');
+  assert.ok(read !== -1 && read < complete, 'destination is read before completeDoorway');
+  assert.match(css, /\.fade-room\b/);
+  assert.match(css, /\.fade\.visible\s+\.fade-room/);
+});
+
+test('room floors no longer carry a label sprite', async () => {
+  const scene = await readFile(new URL('../src/scene.mjs', import.meta.url), 'utf8');
+  assert.doesNotMatch(scene, /#label\(room\.label/);
+  assert.doesNotMatch(scene, /#label\(/);
+});

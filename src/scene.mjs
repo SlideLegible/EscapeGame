@@ -29,7 +29,7 @@ export const ITEM_POSITIONS = {
 // Item models packed from Sketchfab downloads (the pack tool lives on the art/classroom-style-prompt branch). `nodes` keeps only the named
 // nodes of a multi-object pack; `rotate` stands the model upright; `fit` is the largest
 // dimension in world units.
-const ITEM_MODELS = {
+export const ITEM_MODELS = {
   F01: { nodes: ['Soda_Trash'], fit: 0.6 },
   F02: { nodes: ['Can'], fit: 0.9 },
   F03: { fit: 0.8 },
@@ -329,6 +329,31 @@ export function dropPoint(x, z) {
   if (areaAt(x, z) === 'L01') return [-14 + (x - 38) / 3, -8];
   if (areaAt(x, z) === 'L02') return [-14 + (x - 38) / 3, -11.2];
   return [x, z];
+}
+
+// Stands an item model on the origin, scaled so its largest dimension is `fit`.
+export function normalizeItemModel(model, { nodes, rotate, fit }) {
+  model.updateMatrixWorld(true);
+  const root = new THREE.Group();
+  if (nodes) {
+    for (const name of nodes) {
+      const node = model.getObjectByName(name);
+      if (node) root.attach(node);
+    }
+  } else {
+    root.add(model);
+  }
+  if (rotate) root.rotation.set(...rotate);
+  root.updateMatrixWorld(true);
+  const bounds = new THREE.Box3().setFromObject(root);
+  const size = bounds.getSize(new THREE.Vector3());
+  const center = bounds.getCenter(new THREE.Vector3());
+  const wrapper = new THREE.Group();
+  wrapper.add(root);
+  const scale = fit / Math.max(size.x, size.y, size.z);
+  root.scale.multiplyScalar(scale);
+  root.position.set(-center.x * scale, -bounds.min.y * scale, -center.z * scale);
+  return wrapper;
 }
 
 // Scales and moves a room model as its ROOM_MODELS entry says.
@@ -638,7 +663,7 @@ export class AcademyScene {
     await Promise.all(Object.entries(ITEM_MODELS).map(async ([id, config]) => {
       try {
         const model = await loadGlb(new URL(`../assets/models/items/${id.toLowerCase()}.glb`, import.meta.url));
-        this.itemTemplates.set(id, this.#normalizeItemModel(model, config));
+        this.itemTemplates.set(id, normalizeItemModel(model, config));
       } catch (error) {
         console.error(`${id} 道具模型載入失敗，使用簡化形狀。`, error);
       }
@@ -651,30 +676,6 @@ export class AcademyScene {
     const form = this.game.player().form;
     if (this.itemTemplates.has(form)) this.setForm(form);
     this.refresh();
-  }
-
-  #normalizeItemModel(model, { nodes, rotate, fit }) {
-    model.updateMatrixWorld(true);
-    const root = new THREE.Group();
-    if (nodes) {
-      for (const name of nodes) {
-        const node = model.getObjectByName(name);
-        if (node) root.attach(node);
-      }
-    } else {
-      root.add(model);
-    }
-    if (rotate) root.rotation.set(...rotate);
-    root.updateMatrixWorld(true);
-    const bounds = new THREE.Box3().setFromObject(root);
-    const size = bounds.getSize(new THREE.Vector3());
-    const center = bounds.getCenter(new THREE.Vector3());
-    const wrapper = new THREE.Group();
-    wrapper.add(root);
-    const scale = fit / Math.max(size.x, size.y, size.z);
-    root.scale.multiplyScalar(scale);
-    root.position.set(-center.x * scale, -bounds.min.y * scale, -center.z * scale);
-    return wrapper;
   }
 
   #addClassroomClue() {

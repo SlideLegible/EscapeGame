@@ -76,7 +76,8 @@ test('the form camera eases back out slowly after the obstacle is gone', () => {
     previous = now;
   }
   assert.ok(biggestStep < 0.12, `camera backed out ${biggestStep.toFixed(2)} units in one frame`);
-  assert.ok(Math.abs(previous - Math.hypot(0, 3 - PLAYER_Y, 6)) < 0.05, 'camera ends up at its free distance');
+  // With a grid the camera always keeps its 0.3 wall clearance off the orbit point, even when nothing is in the way.
+  assert.ok(Math.abs(previous - (Math.hypot(0, 3 - PLAYER_Y, 6) - 0.3)) < 0.05, 'camera ends up at its free distance');
 });
 
 test('a snapped form camera lands on the desired point', () => {

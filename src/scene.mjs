@@ -773,7 +773,7 @@ export class AcademyScene {
         this.#box(group, 0, 1.38, 0, 1.36, 2.76, 0.78, this.#material(0x637f72));
         this.#box(group, 0, 1.62, 0.41, 0.96, 1.05, 0.035, dark, false);
         this.#box(group, 0, 0.7, 0.42, 0.88, 0.42, 0.04, this.#material(0x273e38), false);
-        this.#box(group, 0, 0.42, 0.45, 0.84, 0.07, metal, false);
+        this.#box(group, 0, 0.42, 0.45, 0.84, 0.07, 0.06, metal, false);
         for (let row = 0; row < 3; row++) for (let col = 0; col < 3; col++) {
           this.#box(group, -0.36 + col * 0.36, 2.3 - row * 0.3, 0.42, 0.25, 0.18, 0.035, this.#material([0xb57859, 0xd2b774, 0x799a82][(row + col) % 3]), false);
         }
@@ -878,8 +878,8 @@ export class AcademyScene {
         this.#box(group, 0, 1.55, 0.1, 2.3, 2.1, 0.04, this.#material(0x8e8068), false);
         for (const [x, y, color] of [[-0.55, 2.05, 0xb68069], [0.48, 1.9, 0xc3b881], [-0.15, 1.1, 0x819b85]]) {
           this.#box(group, x, y, 0.14, 0.65, 0.72, 0.045, this.#material(color), false);
-          this.#box(group, x, y + 0.12, 0.17, 0.42, 0.04, pale, false);
-          this.#box(group, x, y - 0.03, 0.17, 0.34, 0.025, pale, false);
+          this.#box(group, x, y + 0.12, 0.17, 0.42, 0.04, 0.02, pale, false);
+          this.#box(group, x, y - 0.03, 0.17, 0.34, 0.025, 0.02, pale, false);
         }
         break;
       }

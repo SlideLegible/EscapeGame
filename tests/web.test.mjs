@@ -85,3 +85,12 @@ test('walking through a doorway fades to black and back while the player changes
   assert.match(main, /pendingDoorway/);
   assert.match(main, /completeDoorway\(\)/);
 });
+
+test('the room name display box is removed from the page', async () => {
+  const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+  const main = await readFile(new URL('../src/main.mjs', import.meta.url), 'utf8');
+  const css = await readFile(new URL('../styles.css', import.meta.url), 'utf8');
+  assert.doesNotMatch(html, /room-chip|id=["']room-name["']|live-dot/);
+  assert.doesNotMatch(main, /room-name/);
+  assert.doesNotMatch(css, /room-chip|live-dot/);
+});

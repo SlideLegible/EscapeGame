@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { loadGlb } from '../src/glb.mjs';
-import { ROOM_MODELS, ITEM_MODELS, normalizeItemModel, placeRoomModel, mirrorCorridorWall, advancePlayerFacing, areaAt, areaCameraRect, bodyPathIntersectsGrid, bodyPathStepHeight, ITEM_POSITIONS, dropPoint, entryPoint, nearestCandidate, OcclusionGrid, rayRectLimit, removeRootTranslationTrack, pickPlayerClips, jumpClipTime, JUMP_CLIP_TAKEOFF_TIME, JUMP_CLIP_LAND_TIME, roomClipRect, DOORWAYS, CORRIDOR_HALF_LENGTH, SPECIAL_EXITS, OBJECT_POSITIONS, LECTERN_SIZE } from '../src/scene.mjs';
+import { orbitCameraView, ROOM_MODELS, ITEM_MODELS, normalizeItemModel, placeRoomModel, mirrorCorridorWall, advancePlayerFacing, areaAt, areaCameraRect, bodyPathIntersectsGrid, bodyPathStepHeight, ITEM_POSITIONS, dropPoint, entryPoint, nearestCandidate, OcclusionGrid, rayRectLimit, removeRootTranslationTrack, pickPlayerClips, jumpClipTime, JUMP_CLIP_TAKEOFF_TIME, JUMP_CLIP_LAND_TIME, roomClipRect, DOORWAYS, CORRIDOR_HALF_LENGTH, SPECIAL_EXITS, OBJECT_POSITIONS, LECTERN_SIZE } from '../src/scene.mjs';
 
 test('walkable room areas touch across the classroom, corridor, office, restroom, and storage thresholds', () => {
   assert.equal(areaAt(7, -6.2), 'Corridor');
@@ -517,6 +517,20 @@ test('items that appear after an interaction, or are pushed out of the drink mac
       box.min.y += 0.03;
       const hit = boxTouchesMeshes(box, await meshesOf(room));
       assert.ok(!hit, `${item} at ${x.toFixed(2)}, ${z.toFixed(2)} sinks into ${hit?.parent?.name || hit?.name} in ${room}`);
+    }
+  }
+});
+
+test('the camera keeps the player in the middle of the view, straight behind along the view direction', () => {
+  for (const form of ['F00', 'F01', 'F08', 'F09', 'F12']) {
+    for (const yaw of [0, 0.7, Math.PI / 2, -2.4, Math.PI]) {
+      const { position: [cx, , cz], target: [tx, , tz] } = orbitCameraView(3, -11, yaw, form, 0.3);
+      assert.ok(Math.hypot(tx - 3, tz + 11) < 1e-9, `${form} at yaw ${yaw} looks beside the player`);
+      // The camera sits behind the player: the line from it to the player points the way W walks.
+      const [fx, fz] = [Math.sin(yaw), -Math.cos(yaw)];
+      const [dx, dz] = [tx - cx, tz - cz];
+      assert.ok(Math.abs(dx * fz - dz * fx) < 1e-9, `${form} at yaw ${yaw} is off to the side`);
+      assert.ok(dx * fx + dz * fz > 0, `${form} at yaw ${yaw} is in front of the player`);
     }
   }
 });

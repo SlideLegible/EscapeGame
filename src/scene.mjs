@@ -529,26 +529,6 @@ export class AcademyScene {
     return bounds;
   }
 
-  #label(text, x, y, z, size = 26) {
-    const canvas = document.createElement('canvas');
-    canvas.width = 512; canvas.height = 128;
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = 'rgba(9, 20, 22, .78)';
-    ctx.fillRect(12, 18, 488, 92);
-    ctx.strokeStyle = 'rgba(196, 239, 128, .42)';
-    ctx.strokeRect(12, 18, 488, 92);
-    ctx.fillStyle = '#e6eddf';
-    ctx.font = `500 ${size}px "Microsoft JhengHei", sans-serif`;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(text, 256, 64, 460);
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false }));
-    sprite.position.set(x, y, z);
-    sprite.scale.set(2.9, 0.72, 1);
-    return sprite;
-  }
-
   #buildRooms() {
     const concrete = this.#material(0x66736a);
     const wallMaterial = this.#material(palette.wall);
@@ -567,7 +547,6 @@ export class AcademyScene {
       this.#box(group, room.x, -0.02, room.z + room.d / 2, room.w, 0.24, 0.18, border, false);
       this.#box(group, room.x - room.w / 2, -0.02, room.z, 0.18, 0.24, room.d, border, false);
       this.#box(group, room.x + room.w / 2, -0.02, room.z, 0.18, 0.24, room.d, border, false);
-      group.add(this.#label(room.label, room.x, 0.08, room.z + room.d / 2 - 1.0, 22));
       const wall = (x, z, width, depth) => this.#box(group, x, 1.42, z, width, 2.84, depth, wallMaterial, false);
       const left = room.x - room.w / 2, right = room.x + room.w / 2;
       const top = room.z + room.d / 2, bottom = room.z - room.d / 2;

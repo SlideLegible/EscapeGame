@@ -46,7 +46,7 @@ const ITEM_MODELS = {
 // Room models from Sketchfab (downloaded to assets/models/rooms/, see ATTRIBUTION.sketchfab.txt). `fitFootprint` scales to the room's
 // floor minus a margin; `scale` is used as-is (the desk and closet files are in centimetres); `fitMax` sets the largest dimension.
 // `x`/`z` default to the room centre and `y` to the floor. `replaces` lists the interaction targets whose procedural shapes are hidden; `doorOf` ties the model's visibility to that door's open state; `alignMaxX` slides the model so its largest-x edge touches that x (wall mounting).
-const ROOM_MODELS = [
+export const ROOM_MODELS = [
   { room: 'Corridor', file: 'rooms/corridor.glb', rotateY: Math.PI / 2, fitFootprint: true, mirrorNorthWall: true },
   { room: 'Restroom', file: 'rooms/restroom.glb', fitFootprint: true },
   { room: 'Office', file: 'rooms/computer_desk.glb', scale: 0.01, x: 4.1, z: -21.5 },
@@ -331,6 +331,41 @@ export function dropPoint(x, z) {
   return [x, z];
 }
 
+// Scales and moves a room model as its ROOM_MODELS entry says.
+export function placeRoomModel(model, { room, rotateY = 0, scale = 1, fitFootprint, fitMax, x, y = 0, z, alignMaxX }) {
+  const area = ROOM[room];
+  model.rotation.y = rotateY;
+  model.updateMatrixWorld(true);
+  const size = new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3());
+  let factor = scale;
+  if (fitFootprint) factor = Math.min((area.w - 0.6) / size.x, (area.d - 0.6) / size.z);
+  if (fitMax) factor = fitMax / Math.max(size.x, size.y, size.z);
+  model.scale.setScalar(factor);
+  model.updateMatrixWorld(true);
+  const bounds = new THREE.Box3().setFromObject(model);
+  const center = bounds.getCenter(new THREE.Vector3());
+  model.position.set((x ?? area.x) - center.x, y - bounds.min.y, (z ?? area.z) - center.z);
+  if (alignMaxX !== undefined) {
+    model.updateMatrixWorld(true);
+    model.position.x += alignMaxX - new THREE.Box3().setFromObject(model).max.x;
+  }
+}
+
+// Hides the corridor model's south wall (windows) and puts a mirror copy of its north wall there.
+export function mirrorCorridorWall(model) {
+  const wall = model.getObjectByName('The Japanese school corridor_Wall_0');
+  const windows = model.getObjectByName('The Japanese school corridor_Windows_0');
+  if (!wall || !windows) return;
+  windows.visible = false;
+  model.updateMatrixWorld(true);
+  const mirror = new THREE.Matrix4().makeTranslation(0, 0, 2 * CORRIDOR_MID_Z).multiply(new THREE.Matrix4().makeScale(1, 1, -1));
+  const copy = wall.clone();
+  copy.name = 'Corridor south wall (mirrored north wall)';
+  new THREE.Matrix4().copy(model.matrixWorld).invert().multiply(mirror).multiply(wall.matrixWorld)
+    .decompose(copy.position, copy.quaternion, copy.scale);
+  model.add(copy);
+}
+
 export class AcademyScene {
   #onResize;
 
@@ -584,8 +619,8 @@ export class AcademyScene {
     await Promise.all(ROOM_MODELS.map(async (config) => {
       try {
         const model = await loadGlb(new URL(`../assets/models/${config.file}`, import.meta.url));
-        this.#placeRoomModel(model, config);
-        if (config.mirrorNorthWall) this.#mirrorCorridorWall(model);
+        placeRoomModel(model, config);
+        if (config.mirrorNorthWall) mirrorCorridorWall(model);
         model.name = config.file;
         (this.roomGroups.get(config.room) ?? this.scene).add(model);
         if (config.doorOf) this.doorModels.set(config.doorOf, model);
@@ -597,39 +632,6 @@ export class AcademyScene {
       }
     }));
     this.refresh();
-  }
-
-  #placeRoomModel(model, { room, rotateY = 0, scale = 1, fitFootprint, fitMax, x, y = 0, z, alignMaxX }) {
-    const area = ROOM[room];
-    model.rotation.y = rotateY;
-    model.updateMatrixWorld(true);
-    const size = new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3());
-    let factor = scale;
-    if (fitFootprint) factor = Math.min((area.w - 0.6) / size.x, (area.d - 0.6) / size.z);
-    if (fitMax) factor = fitMax / Math.max(size.x, size.y, size.z);
-    model.scale.setScalar(factor);
-    model.updateMatrixWorld(true);
-    const bounds = new THREE.Box3().setFromObject(model);
-    const center = bounds.getCenter(new THREE.Vector3());
-    model.position.set((x ?? area.x) - center.x, y - bounds.min.y, (z ?? area.z) - center.z);
-    if (alignMaxX !== undefined) {
-      model.updateMatrixWorld(true);
-      model.position.x += alignMaxX - new THREE.Box3().setFromObject(model).max.x;
-    }
-  }
-
-  #mirrorCorridorWall(model) {
-    const wall = model.getObjectByName('The Japanese school corridor_Wall_0');
-    const windows = model.getObjectByName('The Japanese school corridor_Windows_0');
-    if (!wall || !windows) return;
-    windows.visible = false;
-    model.updateMatrixWorld(true);
-    const mirror = new THREE.Matrix4().makeTranslation(0, 0, 2 * CORRIDOR_MID_Z).multiply(new THREE.Matrix4().makeScale(1, 1, -1));
-    const copy = wall.clone();
-    copy.name = 'Corridor south wall (mirrored north wall)';
-    new THREE.Matrix4().copy(model.matrixWorld).invert().multiply(mirror).multiply(wall.matrixWorld)
-      .decompose(copy.position, copy.quaternion, copy.scale);
-    model.add(copy);
   }
 
   async #loadItemModels() {

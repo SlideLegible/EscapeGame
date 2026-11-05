@@ -102,6 +102,8 @@ const MODEL_TARGETS = new Set(['S04', 'S05', 'S09', 'S14', 'S16', 'S19', 'S20'])
 const ROOM_NAMES = Object.fromEntries(Object.entries(ROOM).map(([id, room]) => [id, room.label]));
 // Orbit camera collision: how far into the ray the player's own body is ignored, how far to stay off a wall, and the closest it may get.
 const CAMERA_BODY_CLEARANCE = 0.6, CAMERA_WALL_CLEARANCE = 0.3, CAMERA_MIN_DISTANCE = 0.45;
+// A pulled-in camera waits this long (seconds) for the way to stay clear, then eases back out at this rate (per second).
+const CAMERA_CLEAR_HOLD = 0.5, CAMERA_EASE_OUT = 1.2;
 const PLAYER_TURN_SPEED = 18;
 const palette = { wall: 0xb3a789, trim: 0x51483b, wood: 0x8d704a, light: 0xe8d8b6, dark: 0x292720, lime: 0xc4ef80 };
 
@@ -245,6 +247,31 @@ export class OcclusionGrid {
     }
     return 1;
   }
+}
+
+// One frame of the orbit camera. `state.orbit` is the smoothed, unobstructed camera point: it only chases `desired`, so
+// the pull-in below never feeds back into it. The view is then slid along the player-to-orbit line until it is clear of
+// the room rect and of the occlusion grid. It snaps in the moment something is in the way, but only eases back out after
+// the way has stayed clear for a moment, so furniture flickering past the line does not make the view shake.
+export function stepFollowCamera(state, player, desired, dt, { grid = null, rect = null, snap = false } = {}) {
+  const orbit = state.orbit;
+  const smooth = snap ? 1 : 1 - Math.exp(-10 * dt);
+  orbit.x += (desired.x - orbit.x) * smooth; orbit.y += (desired.y - orbit.y) * smooth; orbit.z += (desired.z - orbit.z) * smooth;
+  const dx = orbit.x - player.x, dy = orbit.y - player.y, dz = orbit.z - player.z;
+  const length = Math.hypot(dx, dy, dz);
+  if (length < 1e-6) return { x: orbit.x, y: orbit.y, z: orbit.z };
+  let t = 1;
+  if (rect) t = Math.min(t, rayRectLimit(player.x, player.z, dx, dz, rect));
+  if (grid) t = Math.min(t, grid.firstHit(player.x, player.y, player.z, orbit.x, orbit.y, orbit.z, Math.min(1, CAMERA_BODY_CLEARANCE / length)) - CAMERA_WALL_CLEARANCE / length);
+  t = Math.max(t, Math.min(1, CAMERA_MIN_DISTANCE / length));
+  const target = t * length;
+  if (snap || !(state.distance <= length) || target < state.distance) { state.distance = target; state.clear = 0; }
+  else {
+    state.clear = (state.clear ?? 0) + dt;
+    if (state.clear > CAMERA_CLEAR_HOLD) state.distance += (target - state.distance) * (1 - Math.exp(-CAMERA_EASE_OUT * dt));
+  }
+  const k = Math.min(state.distance, length) / length;
+  return { x: player.x + dx * k, y: player.y + dy * k, z: player.z + dz * k };
 }
 
 export function bodyPathIntersectsGrid(grid, fromX, fromZ, toX, toZ, radius = 0.3, height = 1.3, baseY = 0) {
@@ -467,6 +494,7 @@ export class AcademyScene {
     this.playerMaterials = new Map();
     this.cameraTarget = new THREE.Vector3();
     this.cameraDesired = new THREE.Vector3();
+    this.cameraFollow = { orbit: { x: 0, y: 0, z: 0 } };
     this.mapTarget = new THREE.Vector3(7, 0, -11);
     this.lastCameraUpdate = 0;
     this.occlusion = null;
@@ -1635,6 +1663,8 @@ export class AcademyScene {
     if (this.game.player().canSeeWholeMap) {
       this.cameraDesired.set(7, 50, -14);
       this.camera.position.lerp(this.cameraDesired, smooth);
+      Object.assign(this.cameraFollow.orbit, this.camera.position);
+      this.cameraFollow.distance = undefined;
       this.camera.lookAt(this.mapTarget);
       return;
     }
@@ -1647,30 +1677,16 @@ export class AcademyScene {
     const shoulder = this.game.player().form === 'F00' ? 1.1 : 0;
     this.cameraDesired.set(this.playerPosition.x - Math.sin(this.yaw) * reach + Math.cos(this.yaw) * shoulder, height,
       this.playerPosition.z + Math.cos(this.yaw) * reach + Math.sin(this.yaw) * shoulder);
-    this.camera.position.lerp(this.cameraDesired, smooth);
-    this.#pullCameraIn(this.playerPosition.x, targetY, this.playerPosition.z);
+    const player = { x: this.playerPosition.x, y: targetY, z: this.playerPosition.z };
+    const pulled = stepFollowCamera(this.cameraFollow, player, this.cameraDesired, dt, {
+      rect: areaCameraRect(this.game.player().area), grid: this.game.player().form !== 'F00' ? this.occlusion : null, snap: smooth === 1,
+    });
+    this.camera.position.set(pulled.x, pulled.y, pulled.z);
     // Aim from the shoulder-offset camera toward the matching shoulder point so the view's
     // horizontal center line stays parallel to the forward direction used by W.
     this.cameraTarget.set(this.playerPosition.x + Math.cos(this.yaw) * shoulder, targetY,
       this.playerPosition.z + Math.sin(this.yaw) * shoulder);
     this.camera.lookAt(this.cameraTarget);
-  }
-
-  // Slides the camera along its line to the player until it is clear of the room walls and of any model in the way,
-  // so the view angle never changes when something is in the way, only the distance.
-  #pullCameraIn(px, py, pz) {
-    const cam = this.camera.position;
-    const dx = cam.x - px, dy = cam.y - py, dz = cam.z - pz;
-    const length = Math.hypot(dx, dy, dz);
-    if (length < 1e-6) return;
-    let t = 1;
-    const rect = areaCameraRect(this.game.player().area);
-    if (rect) t = Math.min(t, rayRectLimit(px, pz, dx, dz, rect));
-    if (this.occlusion && this.game.player().form !== 'F00') {
-      t = Math.min(t, this.occlusion.firstHit(px, py, pz, cam.x, cam.y, cam.z, Math.min(1, CAMERA_BODY_CLEARANCE / length)) - CAMERA_WALL_CLEARANCE / length);
-    }
-    t = Math.max(t, Math.min(1, CAMERA_MIN_DISTANCE / length));
-    cam.set(px + dx * t, py + dy * t, pz + dz * t);
   }
 
   // Builds the camera occlusion grid and the walls the player bumps into from every static, visible mesh once the

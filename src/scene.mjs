@@ -12,16 +12,33 @@ const ROOM = {
   L02: { label: '飲料機底下', x: 38, z: -21, w: 9, d: 8, color: 0x50564e },
 };
 
+// Inner faces of the corridor model's walls, measured on the model: the north wall (classroom side) and the mirrored
+// south wall. Corridor objects stand on the flat wall between its pillars (x ≈ -13.1, -2.7, 7.7) and painted doors.
+const CORRIDOR_WALL_Z = { north: -7.9, south: -13.86 };
+
+// The drink machine stands with one side against the north wall, so both its front (S03, facing east along the
+// corridor) and its back (S04, the gap under it, facing west) can be reached.
+const DRINK_MACHINE = { x: -10.2, z: -8.59, rotateY: Math.PI / 2 };
+
+// A point `ahead` of the drink machine's front (negative: behind it) and `beside` it, toward the corridor's middle.
+function besideDrinkMachine(ahead, beside = 0) {
+  const { x, z, rotateY } = DRINK_MACHINE;
+  return [x + Math.sin(rotateY) * ahead + Math.cos(rotateY) * beside, z + Math.cos(rotateY) * ahead - Math.sin(rotateY) * beside];
+}
+
 export const OBJECT_POSITIONS = {
-  S01: [0, -14], S02: [-6, -10], S03: [-14, -10], S04: [-14, -10.7], S05: [4.08, -13.8],
-  S06: [6.1, -20], S07: [5.6, -20], S08: [6.1, -24], S09: [-6.85, -18], S10: [4, -10],
+  S01: [0, -13.74], S02: [-4.5, -8.16], S03: besideDrinkMachine(0), S04: besideDrinkMachine(-0.7), S05: [4.08, -13.8],
+  S06: [6.1, -20], S07: [5.6, -20], S08: [6.1, -24], S09: [-6.85, -18], S10: [5.9, -13.52],
   S11: [-12, -19], S12: [-8, -23], S13: [-9, -17], S14: [-7.65, 0], S15: [19.08, -22],
-  S16: [-6.32, 0], S17: [-3, -10], S18: [2.1, -24], S19: [-5.55, -5.45], S20: [-5.65, 0.35],
+  S16: [-6.32, 0], S17: [0, -7.96], S18: [2.1, -24], S19: [-5.55, -5.45], S20: [-5.65, 0.35],
   S21: [13.9, -22],
 };
 
+// Turns of the interaction targets whose fronts do not face +z, matching their models.
+const OBJECT_FACING = { S03: DRINK_MACHINE.rotateY, S04: DRINK_MACHINE.rotateY, S09: Math.PI / 2, S15: -Math.PI / 2, S17: Math.PI };
+
 export const ITEM_POSITIONS = {
-  F01: [-4.8, -11], F02: [38, -9], F03: [38, -21], F04: [4.8, -9.3], F05: [5.1, -20.8],
+  F01: [-4.5, -9], F02: [38, -9], F03: [38, -21], F04: [5.9, -12.6], F05: [5.1, -20.8],
   F06: [4.9, -24], F07: [-7.7, -18.2], F08: [-5.2, 0.9], F09: [-5, 2.2],
   F11: [11.9, -22], F12: [-5, -2.8],
 };
@@ -45,7 +62,7 @@ export const ITEM_MODELS = {
 
 // Room models from Sketchfab (downloaded to assets/models/rooms/, see ATTRIBUTION.sketchfab.txt). `fitFootprint` scales to the room's
 // floor minus a margin; `scale` is used as-is (the desk and closet files are in centimetres); `fitMax` sets the largest dimension.
-// `x`/`z` default to the room centre and `y` to the floor. `replaces` lists the interaction targets whose procedural shapes are hidden; `doorOf` ties the model's visibility to that door's open state; `alignMaxX` slides the model so its largest-x edge touches that x (wall mounting).
+// `x`/`z` default to the room centre and `y` to the floor. `replaces` lists the interaction targets whose procedural shapes are hidden; `doorOf` ties the model's visibility to that door's open state; `alignMaxX`, `alignMinZ` and `alignMaxZ` slide the model so that edge touches that coordinate (wall mounting).
 export const ROOM_MODELS = [
   { room: 'Corridor', file: 'rooms/corridor.glb', rotateY: Math.PI / 2, fitFootprint: true, mirrorNorthWall: true },
   { room: 'Restroom', file: 'rooms/restroom.glb', fitFootprint: true },
@@ -55,11 +72,12 @@ export const ROOM_MODELS = [
   { room: 'GuardRoom', file: 'items/f10.glb', rotateY: -Math.PI / 2, fitMax: 1.0, x: 13.9, z: -22, replaces: ['S21'] },
   // Interaction-object models (assets/models/objects/sNN.glb, packed by scripts/pack-scene-objects.py). Sizes follow the old procedural shapes
   // because interaction range and collision still use their bounds. S04 (under the vending machine) reuses the S03 model.
-  { room: 'Corridor', file: 'objects/s01.glb', fitMax: 2.9, x: 0, z: -14, replaces: ['S01'] },
-  { room: 'Corridor', file: 'objects/s02.glb', fitMax: 1.0, x: -6, z: -10, replaces: ['S02'] },
-  { room: 'Corridor', file: 'objects/s03.glb', fitMax: 2.76, x: -14, z: -10, replaces: ['S03', 'S04'] },
-  { room: 'Corridor', file: 'objects/s10.glb', fitMax: 1.1, x: 4, z: -10, replaces: ['S10'] },
-  { room: 'Corridor', file: 'objects/s17.glb', fitMax: 2.4, y: 0.85, x: -3, z: -10, replaces: ['S17'] },
+  // Corridor objects stand against its walls: the gate and the flowerpot (beside the office door) on the south wall, the rest on the north wall.
+  { room: 'Corridor', file: 'objects/s01.glb', fitMax: 2.9, x: 0, alignMinZ: CORRIDOR_WALL_Z.south, replaces: ['S01'] },
+  { room: 'Corridor', file: 'objects/s02.glb', fitMax: 1.0, x: -4.5, alignMaxZ: CORRIDOR_WALL_Z.north, replaces: ['S02'] },
+  { room: 'Corridor', file: 'objects/s03.glb', rotateY: DRINK_MACHINE.rotateY, fitMax: 2.76, x: DRINK_MACHINE.x, alignMaxZ: CORRIDOR_WALL_Z.north, replaces: ['S03', 'S04'] },
+  { room: 'Corridor', file: 'objects/s10.glb', fitMax: 1.1, x: 5.9, alignMinZ: CORRIDOR_WALL_Z.south, replaces: ['S10'] },
+  { room: 'Corridor', file: 'objects/s17.glb', rotateY: Math.PI, fitMax: 2.4, y: 0.85, x: 0, alignMaxZ: CORRIDOR_WALL_Z.north, replaces: ['S17'] },
   { room: 'Office', file: 'objects/s06.glb', fitMax: 1.6, x: 6.1, z: -20, replaces: ['S06'] },
   { room: 'Office', file: 'objects/s07.glb', rotateY: -Math.PI / 2, fitMax: 0.7, y: 0.785, x: 5.6, z: -20, replaces: ['S07'] }, // on the S06 desk top
   { room: 'GuardRoom', file: 'objects/s15.glb', rotateY: -Math.PI / 2, fitMax: 1.2, y: 0.9, z: -22, alignMaxX: 19.29, replaces: ['S15'] },
@@ -297,8 +315,8 @@ export function jumpClipTime(airElapsed, airtime = JUMP_AIRTIME, landTime = JUMP
 }
 
 export const SPECIAL_EXITS = {
-  L01: { at: [34.1, -11.8], to: [-14, -6.9], text: '你從飲料機的出貨口鑽了出來' },
-  L02: { at: [34.1, -23.8], to: [-14, -12.2], text: '你從飲料機底下滾了出來' },
+  L01: { at: [34.1, -11.8], to: besideDrinkMachine(2.2, 0.16), text: '你從飲料機的出貨口鑽了出來' },
+  L02: { at: [34.1, -23.8], to: besideDrinkMachine(-2.2, 0.16), text: '你從飲料機底下滾了出來' },
 };
 
 // Targets behind or beside the camera direction cost extra, so the one the player faces wins.
@@ -325,9 +343,12 @@ export function entryPoint(area) {
   return area === 'L01' ? [35.5, -9] : [35.5, -21];
 }
 
+// An item left inside the drink machine lands in front of it, one left under it lands behind it; where it was inside
+// spreads it along the machine's side, clear of the machine and the wall.
 export function dropPoint(x, z) {
-  if (areaAt(x, z) === 'L01') return [-14 + (x - 38) / 3, -8];
-  if (areaAt(x, z) === 'L02') return [-14 + (x - 38) / 3, -11.2];
+  const area = areaAt(x, z);
+  if (area === 'L01') return besideDrinkMachine(1.05, 0.16 - (x - 38) / 12);
+  if (area === 'L02') return besideDrinkMachine(-1.05, 0.16 - (x - 38) / 12);
   return [x, z];
 }
 
@@ -357,7 +378,7 @@ export function normalizeItemModel(model, { nodes, rotate, fit }) {
 }
 
 // Scales and moves a room model as its ROOM_MODELS entry says.
-export function placeRoomModel(model, { room, rotateY = 0, scale = 1, fitFootprint, fitMax, x, y = 0, z, alignMaxX }) {
+export function placeRoomModel(model, { room, rotateY = 0, scale = 1, fitFootprint, fitMax, x, y = 0, z, alignMaxX, alignMinZ, alignMaxZ }) {
   const area = ROOM[room];
   model.rotation.y = rotateY;
   model.updateMatrixWorld(true);
@@ -370,9 +391,12 @@ export function placeRoomModel(model, { room, rotateY = 0, scale = 1, fitFootpri
   const bounds = new THREE.Box3().setFromObject(model);
   const center = bounds.getCenter(new THREE.Vector3());
   model.position.set((x ?? area.x) - center.x, y - bounds.min.y, (z ?? area.z) - center.z);
-  if (alignMaxX !== undefined) {
+  if (alignMaxX !== undefined || alignMinZ !== undefined || alignMaxZ !== undefined) {
     model.updateMatrixWorld(true);
-    model.position.x += alignMaxX - new THREE.Box3().setFromObject(model).max.x;
+    const placed = new THREE.Box3().setFromObject(model);
+    if (alignMaxX !== undefined) model.position.x += alignMaxX - placed.max.x;
+    if (alignMinZ !== undefined) model.position.z += alignMinZ - placed.min.z;
+    if (alignMaxZ !== undefined) model.position.z += alignMaxZ - placed.max.z;
   }
 }
 
@@ -863,8 +887,7 @@ export class AcademyScene {
       const group = this.#objectShape(id);
       const [x, z] = OBJECT_POSITIONS[id];
       group.position.set(x, 0, z);
-      if (id === 'S09') group.rotation.y = Math.PI / 2;
-      if (id === 'S15') group.rotation.y = -Math.PI / 2; // wall-mounted on the east wall, front toward -x
+      group.rotation.y = OBJECT_FACING[id] ?? 0;
       group.userData.targetId = id;
       group.userData.interactionOnly = MODEL_TARGETS.has(id);
       group.name = `${id} ${label}`;

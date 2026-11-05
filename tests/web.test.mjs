@@ -129,3 +129,27 @@ test('the controls tell the player that clicking a nearby object also interacts 
   assert.match(html.match(/<div class="start-foot">.*?<\/div>/s)[0], /點擊/);
   assert.match(readme, /^- 滑鼠點擊[^\n]*互動/m);
 });
+
+// A box shape missing its depth gets its material as the depth: its geometry turns NaN, and so do the bounds the
+// E key measures to, so that target (the noticeboard and the drink machine did this) can never be picked.
+test('every procedural box gives a position, a full size and a material, so its target can be reached with E', async () => {
+  const scene = await readFile(new URL('../src/scene.mjs', import.meta.url), 'utf8');
+  const calls = [];
+  for (const match of scene.matchAll(/this\.#box\(/g)) {
+    const args = [];
+    let depth = 1, current = '';
+    for (let i = match.index + match[0].length; depth; i++) {
+      const c = scene[i];
+      if ('([{'.includes(c)) depth++;
+      else if (')]}'.includes(c) && --depth === 0) break;
+      if (c === ',' && depth === 1) { args.push(current.trim()); current = ''; } else current += c;
+    }
+    args.push(current.trim());
+    calls.push({ line: scene.slice(0, match.index).split('\n').length, args });
+  }
+  assert.ok(calls.length > 50);
+  for (const { line, args } of calls) {
+    const withShadowFlag = /^(true|false)$/.test(args.at(-1));
+    assert.equal(args.length, withShadowFlag ? 9 : 8, `src/scene.mjs:${line} box(${args.join(', ')})`);
+  }
+});

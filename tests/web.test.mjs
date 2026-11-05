@@ -113,3 +113,10 @@ test('room floors no longer carry a label sprite', async () => {
   assert.doesNotMatch(scene, /#label\(room\.label/);
   assert.doesNotMatch(scene, /#label\(/);
 });
+
+test('corridor ceiling has no yellow lamp boxes but keeps its point lights', async () => {
+  const scene = await readFile(new URL('../src/scene.mjs', import.meta.url), 'utf8');
+  assert.doesNotMatch(scene, /BoxGeometry\(2\.2,\s*0\.08,\s*0\.35\)/);
+  assert.doesNotMatch(scene, /lampMat/);
+  assert.match(scene, /for \(const x of \[-18, -8, 2, 12, 22\]\) \{[\s\S]*?new THREE\.PointLight\(0xffc77b, 8, 11, 2\)[\s\S]*?light\.position\.set\(x, 2\.75, -11\)/);
+});

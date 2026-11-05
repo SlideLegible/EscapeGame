@@ -17,7 +17,8 @@ const ROOM = {
 const CORRIDOR_WALL_Z = { north: -7.9, south: -13.86 };
 
 // The drink machine stands with one side against the north wall, so both its front (S03, facing east along the
-// corridor) and its back (S04, the gap under it, facing west) can be reached.
+// corridor) and its back (S04, the gap under it, facing west) can be reached. S04 sits on the model's back face, so its
+// 0.3-deep strip lies inside the machine: a player pressed against the back is just outside it, and nearest to it.
 const DRINK_MACHINE = { x: -10.2, z: -8.59, rotateY: Math.PI / 2 };
 
 // A point `ahead` of the drink machine's front (negative: behind it) and `beside` it, toward the corridor's middle.
@@ -27,7 +28,7 @@ function besideDrinkMachine(ahead, beside = 0) {
 }
 
 export const OBJECT_POSITIONS = {
-  S01: [0, -13.74], S02: [-4.5, -8.16], S03: besideDrinkMachine(0), S04: besideDrinkMachine(-0.7), S05: [4.08, -13.8],
+  S01: [0, -13.74], S02: [-4.5, -8.16], S03: besideDrinkMachine(0), S04: besideDrinkMachine(-0.51), S05: [4.08, -13.8],
   S06: [6.1, -20], S07: [5.6, -20], S08: [6.1, -24], S09: [-6.85, -18], S10: [5.9, -13.52],
   S11: [-12, -19], S12: [-8, -23], S13: [-9, -17], S14: [-7.65, 0], S15: [19.08, -22],
   S16: [-6.32, 0], S17: [0, -7.96], S18: [2.1, -24], S19: [-5.55, -5.45], S20: [-5.65, 0.35],

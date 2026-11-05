@@ -120,3 +120,12 @@ test('corridor ceiling has no yellow lamp boxes but keeps its point lights', asy
   assert.doesNotMatch(scene, /lampMat/);
   assert.match(scene, /for \(const x of \[-18, -8, 2, 12, 22\]\) \{[\s\S]*?new THREE\.PointLight\(0xffc77b, 8, 11, 2\)[\s\S]*?light\.position\.set\(x, 2\.75, -11\)/);
 });
+
+test('the controls tell the player that clicking a nearby object also interacts with it', async () => {
+  const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+  const readme = await readFile(new URL('../README.md', import.meta.url), 'utf8');
+  const controls = html.match(/<div class="controls">.*?<\/div>/s)[0];
+  assert.match(controls, /點擊[^<]*<\/kbd><span>互動/);
+  assert.match(html.match(/<div class="start-foot">.*?<\/div>/s)[0], /點擊/);
+  assert.match(readme, /^- 滑鼠點擊[^\n]*互動/m);
+});

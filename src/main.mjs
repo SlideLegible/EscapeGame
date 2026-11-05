@@ -221,12 +221,15 @@ function startGame() {
 
 function passDoorway() {
   fading = true;
+  $('fade-room').textContent = scene.getRoomName(scene.pendingDoorway.area);
   fade.classList.add('visible');
   setTimeout(() => {
     scene.completeDoorway();
     updateHud();
-    fade.classList.remove('visible');
-    setTimeout(() => { fading = false; }, 250);
+    setTimeout(() => {
+      fade.classList.remove('visible');
+      setTimeout(() => { fading = false; }, 250);
+    }, 750);
   }, 250);
 }
 

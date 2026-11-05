@@ -581,11 +581,7 @@ export class AcademyScene {
     }
     const hallwayMat = this.#material(0x8a7c62);
     this.#box(this.scene, 0, -0.26, -11, 49, 0.08, 0.45, hallwayMat, false);
-    const lampMat = new THREE.MeshStandardMaterial({ color: 0xf4dfae, emissive: 0xe1a354, emissiveIntensity: 2.1 });
     for (const x of [-18, -8, 2, 12, 22]) {
-      const lamp = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.08, 0.35), lampMat);
-      lamp.position.set(x, 3.15, -11);
-      this.scene.add(lamp);
       const light = new THREE.PointLight(0xffc77b, 8, 11, 2);
       light.position.set(x, 2.75, -11);
       this.scene.add(light);

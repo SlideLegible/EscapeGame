@@ -1,7 +1,9 @@
 import * as THREE from '../vendor/three.module.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { advancePlayerFacing, areaAt, areaCameraRect, bodyPathIntersectsGrid, bodyPathStepHeight, ITEM_POSITIONS, dropPoint, entryPoint, nearestCandidate, OcclusionGrid, rayRectLimit, removeRootTranslationTrack, pickPlayerClips, jumpClipTime, JUMP_CLIP_TAKEOFF_TIME, JUMP_CLIP_LAND_TIME, roomClipRect, DOORWAYS, CORRIDOR_HALF_LENGTH, SPECIAL_EXITS, OBJECT_POSITIONS, LECTERN_SIZE } from '../src/scene.mjs';
+import { readFile } from 'node:fs/promises';
+import { loadGlb } from '../src/glb.mjs';
+import { ROOM_MODELS, ITEM_MODELS, normalizeItemModel, placeRoomModel, mirrorCorridorWall, advancePlayerFacing, areaAt, areaCameraRect, bodyPathIntersectsGrid, bodyPathStepHeight, ITEM_POSITIONS, dropPoint, entryPoint, nearestCandidate, OcclusionGrid, rayRectLimit, removeRootTranslationTrack, pickPlayerClips, jumpClipTime, JUMP_CLIP_TAKEOFF_TIME, JUMP_CLIP_LAND_TIME, roomClipRect, DOORWAYS, CORRIDOR_HALF_LENGTH, SPECIAL_EXITS, OBJECT_POSITIONS, LECTERN_SIZE } from '../src/scene.mjs';
 
 test('walkable room areas touch across the classroom, corridor, office, restroom, and storage thresholds', () => {
   assert.equal(areaAt(7, -6.2), 'Corridor');
@@ -54,26 +56,58 @@ test('leaving a special location does not land the player on an item pushed out 
   }
 });
 
-test('approaching the drink machine from the front reaches the machine, and from the back reaches its underside', () => {
+// The drink machine's front (+z of its model) turned by its placement, and the direction along its face.
+const machineModel = ROOM_MODELS.find(({ file }) => file === 'objects/s03.glb');
+const machineFront = [Math.sin(machineModel.rotateY ?? 0), Math.cos(machineModel.rotateY ?? 0)];
+const machineSide = [machineFront[1], -machineFront[0]];
+const fromMachine = ([x, z]) => {
   const [mx, mz] = OBJECT_POSITIONS.S03;
-  const nearer = (x, z) => {
-    const machine = Math.hypot(x - mx, z - mz);
+  return { ahead: (x - mx) * machineFront[0] + (z - mz) * machineFront[1], beside: (x - mx) * machineSide[0] + (z - mz) * machineSide[1] };
+};
+const besideMachine = (ahead, beside) => [
+  OBJECT_POSITIONS.S03[0] + machineFront[0] * ahead + machineSide[0] * beside,
+  OBJECT_POSITIONS.S03[1] + machineFront[1] * ahead + machineSide[1] * beside,
+];
+// Inner faces of the corridor model's walls (the south one is the mirrored north wall), measured on the model.
+const CORRIDOR_WALLS = { north: -7.9, south: -13.86 };
+
+test('approaching the drink machine from the front reaches the machine, and from the back reaches its underside', () => {
+  const nearer = ([x, z]) => {
+    const machine = Math.hypot(x - OBJECT_POSITIONS.S03[0], z - OBJECT_POSITIONS.S03[1]);
     const underside = Math.hypot(x - OBJECT_POSITIONS.S04[0], z - OBJECT_POSITIONS.S04[1]);
     return machine < underside ? 'S03' : 'S04';
   };
-  for (const dx of [-0.5, 0, 0.5]) {
-    assert.equal(nearer(mx + dx, mz + 1.2), 'S03');
-    assert.equal(nearer(mx + dx, mz - 1.2), 'S04');
+  for (const beside of [-0.5, 0, 0.5]) {
+    assert.equal(nearer(besideMachine(1.2, beside)), 'S03');
+    assert.equal(nearer(besideMachine(-1.2, beside)), 'S04');
   }
+  assert.ok(Math.abs(fromMachine(OBJECT_POSITIONS.S04).beside) < 0.05, 'the underside is right behind the machine');
   assert.equal(areaAt(...OBJECT_POSITIONS.S04), 'Corridor');
 });
 
 test('leaving each special location puts the player on the side of the machine it was entered from', () => {
-  const [, mz] = OBJECT_POSITIONS.S03;
-  assert.ok(SPECIAL_EXITS.L01.to[1] > mz);
-  assert.ok(SPECIAL_EXITS.L02.to[1] < mz);
-  assert.ok(dropPoint(38, -9)[1] > mz);
-  assert.ok(dropPoint(38, -21)[1] < mz);
+  assert.ok(fromMachine(SPECIAL_EXITS.L01.to).ahead > 0);
+  assert.ok(fromMachine(SPECIAL_EXITS.L02.to).ahead < 0);
+  assert.ok(fromMachine(dropPoint(38, -9)).ahead > 0);
+  assert.ok(fromMachine(dropPoint(38, -21)).ahead < 0);
+});
+
+test('the drink machine stands with one side against a wall, so its front and back both face along the corridor', () => {
+  assert.ok(Math.abs(machineFront[1]) < 1e-9, 'the front faces along the corridor');
+  for (const [x, z] of [besideMachine(1.2, 0), besideMachine(-1.2, 0)]) {
+    assert.equal(areaAt(x, z), 'Corridor');
+    assert.ok(Math.abs(x) < CORRIDOR_HALF_LENGTH - 0.3, 'there is room to stand in front of and behind the machine');
+  }
+});
+
+test('items left by the drink machine and the spots the player leaves it to are on the corridor floor, clear of the walls', () => {
+  const points = [SPECIAL_EXITS.L01.to, SPECIAL_EXITS.L02.to];
+  for (const x of [33.5, 38, 42.5]) points.push(dropPoint(x, -9), dropPoint(x, -21));
+  for (const [x, z] of points) {
+    assert.equal(areaAt(x, z), 'Corridor');
+    assert.ok(z < CORRIDOR_WALLS.north - 0.3 && z > CORRIDOR_WALLS.south + 0.3, `${x}, ${z} is in a wall`);
+    assert.ok(Math.abs(fromMachine([x, z]).ahead) > 0.9, `${x}, ${z} is inside the machine`);
+  }
 });
 
 test('there is no storage room behind the restroom', () => {
@@ -124,12 +158,20 @@ test('the same spot reaches the lectern when the player turns to face it', () =>
 });
 
 test('facing the drink machine from the front or the back still picks the machine or its underside', () => {
+  // The interaction boxes of the machine (1.36 wide, 0.78 deep) and the strip behind it, turned with the machine.
+  const turned = (halfWidth, fromAhead, toAhead) => {
+    const corners = [[-halfWidth, fromAhead], [halfWidth, fromAhead], [-halfWidth, toAhead], [halfWidth, toAhead]]
+      .map(([side, ahead]) => [machineFront[0] * ahead - machineSide[0] * side, machineFront[1] * ahead - machineSide[1] * side]);
+    const xs = corners.map(([x]) => x), zs = corners.map(([, z]) => z);
+    return { min: { x: Math.min(...xs), z: Math.min(...zs) }, max: { x: Math.max(...xs), z: Math.max(...zs) } };
+  };
   const machine = () => [
-    { id: 'S03', x: OBJECT_POSITIONS.S03[0], z: OBJECT_POSITIONS.S03[1], bounds: box(1.36, 0.78) },
-    { id: 'S04', x: OBJECT_POSITIONS.S04[0], z: OBJECT_POSITIONS.S04[1], bounds: { min: { x: -0.68, z: 0 }, max: { x: 0.68, z: 0.3 } } },
+    { id: 'S03', x: OBJECT_POSITIONS.S03[0], z: OBJECT_POSITIONS.S03[1], bounds: turned(0.68, -0.39, 0.39) },
+    { id: 'S04', x: OBJECT_POSITIONS.S04[0], z: OBJECT_POSITIONS.S04[1], bounds: turned(0.68, 0, 0.3) },
   ];
-  assert.equal(nearestCandidate(-14, -9, 0, machine()).id, 'S03');
-  assert.equal(nearestCandidate(-14, -11.3, Math.PI, machine()).id, 'S04');
+  const facing = ([dx, dz]) => Math.atan2(dx, -dz);
+  assert.equal(nearestCandidate(...besideMachine(1, 0), facing([-machineFront[0], -machineFront[1]]), machine()).id, 'S03');
+  assert.equal(nearestCandidate(...besideMachine(-1.3, 0), facing(machineFront), machine()).id, 'S04');
 });
 
 test('nothing farther than the reach distance is picked', () => {
@@ -347,4 +389,134 @@ test('jump clip time maps airtime onto the takeoff-to-touchdown span of the clip
   assert.equal(jumpClipTime(-1, 0.75, 1.07, 0.55), 0.55);
   assert.equal(JUMP_CLIP_TAKEOFF_TIME, 0.55);
   assert.equal(JUMP_CLIP_LAND_TIME, 1.07);
+});
+
+// Loads a bundled GLB in Node: the loader's fetch and image decoding are browser APIs, so they read the file instead.
+async function loadModel(file) {
+  const browser = { fetch: globalThis.fetch, Image: globalThis.Image };
+  globalThis.fetch = async (url) => {
+    const bytes = await readFile(url);
+    return { ok: true, arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) };
+  };
+  globalThis.Image = class { decode() { return Promise.resolve(); } };
+  try {
+    return await loadGlb(new URL(`../assets/models/${file}`, import.meta.url));
+  } finally {
+    globalThis.fetch = browser.fetch;
+    if (browser.Image) globalThis.Image = browser.Image; else delete globalThis.Image;
+  }
+}
+
+test('every corridor object stands against a corridor wall, on the flat wall between its pillars and doors', async () => {
+  const corridorConfig = ROOM_MODELS.find(({ file }) => file === 'rooms/corridor.glb');
+  const corridor = await loadModel(corridorConfig.file);
+  placeRoomModel(corridor, corridorConfig);
+  mirrorCorridorWall(corridor);
+  corridor.updateMatrixWorld(true);
+  const shown = (node) => { for (let n = node; n; n = n.parent) if (!n.visible) return false; return true; };
+  const walls = [];
+  corridor.traverse((node) => { if (node.isMesh && shown(node)) walls.push(node); });
+  const ray = new THREE.Raycaster();
+
+  const objects = ROOM_MODELS.filter(({ room, file }) => room === 'Corridor' && file.startsWith('objects/'));
+  assert.deepEqual(objects.flatMap(({ replaces }) => replaces).sort(), ['S01', 'S02', 'S03', 'S04', 'S10', 'S17']);
+  for (const config of objects) {
+    const model = await loadModel(config.file);
+    placeRoomModel(model, config);
+    const bounds = new THREE.Box3().setFromObject(model);
+    const center = bounds.getCenter(new THREE.Vector3());
+    const north = center.z > (CORRIDOR_WALLS.north + CORRIDOR_WALLS.south) / 2;
+    const face = north ? bounds.max.z : bounds.min.z;
+    assert.ok(Math.abs(face - (north ? CORRIDOR_WALLS.north : CORRIDOR_WALLS.south)) < 0.03, `${config.file} is not against the wall (${face.toFixed(2)})`);
+    // Rays from inside the model to the wall behind it meet the wall right at the model's back: no gap, and no pillar in the way.
+    for (const x of [bounds.min.x + 0.1, center.x, bounds.max.x - 0.1]) {
+      for (const y of [bounds.min.y + 0.15, center.y]) {
+        ray.set(new THREE.Vector3(x, y, center.z), new THREE.Vector3(0, 0, north ? 1 : -1));
+        const hit = ray.intersectObjects(walls, false)[0];
+        assert.ok(hit, `${config.file}: no wall behind x=${x.toFixed(2)}`);
+        assert.ok(Math.abs(hit.point.z - face) < 0.03, `${config.file}: wall at ${hit.point.z.toFixed(2)} behind x=${x.toFixed(2)}, back at ${face.toFixed(2)}`);
+      }
+    }
+    for (const { sides } of DOORWAYS) {
+      const side = sides.Corridor;
+      if (!side || (side.line > (CORRIDOR_WALLS.north + CORRIDOR_WALLS.south) / 2) !== north) continue;
+      assert.ok(bounds.max.x < side.span[0] - 0.3 || bounds.min.x > side.span[1] + 0.3, `${config.file} blocks a doorway`);
+    }
+    for (const id of config.replaces.filter((target) => target !== 'S04')) {
+      const [x, z] = OBJECT_POSITIONS[id];
+      assert.ok(Math.hypot(x - center.x, z - center.z) < 0.05, `${id} target is not where its model stands`);
+    }
+  }
+});
+
+test('items found in the corridor bin and flowerpot appear in front of them', () => {
+  for (const [item, object] of [['F01', 'S02'], ['F04', 'S10']]) {
+    const [x, z] = ITEM_POSITIONS[item];
+    const [ox, oz] = OBJECT_POSITIONS[object];
+    assert.equal(areaAt(x, z), 'Corridor');
+    assert.ok(z < CORRIDOR_WALLS.north - 0.3 && z > CORRIDOR_WALLS.south + 0.3, `${item} is in a wall`);
+    assert.ok(Math.hypot(x - ox, z - oz) < 1.6, `${item} is far from ${object}`);
+    assert.ok(Math.abs(z - (CORRIDOR_WALLS.north + CORRIDOR_WALLS.south) / 2) < Math.abs(oz - (CORRIDOR_WALLS.north + CORRIDOR_WALLS.south) / 2), `${item} is not in front of ${object}`);
+  }
+});
+
+// World-space triangles of every shown mesh under `root`.
+function shownTriangles(root) {
+  root.updateMatrixWorld(true);
+  const shown = (node) => { for (let n = node; n; n = n.parent) if (!n.visible) return false; return true; };
+  const meshes = [];
+  root.traverse((node) => { if (node.isMesh && shown(node)) meshes.push(node); });
+  return meshes.map((mesh) => ({ mesh, bounds: new THREE.Box3().setFromObject(mesh) }));
+}
+
+function boxTouchesMeshes(box, meshes) {
+  const triangle = new THREE.Triangle();
+  for (const { mesh, bounds } of meshes) {
+    if (!bounds.intersectsBox(box)) continue;
+    const position = mesh.geometry.attributes.position;
+    const index = mesh.geometry.index;
+    const count = index ? index.count : position.count;
+    for (let i = 0; i + 2 < count; i += 3) {
+      triangle.a.fromBufferAttribute(position, index ? index.getX(i) : i).applyMatrix4(mesh.matrixWorld);
+      triangle.b.fromBufferAttribute(position, index ? index.getX(i + 1) : i + 1).applyMatrix4(mesh.matrixWorld);
+      triangle.c.fromBufferAttribute(position, index ? index.getX(i + 2) : i + 2).applyMatrix4(mesh.matrixWorld);
+      if (box.intersectsTriangle(triangle)) return mesh;
+    }
+  }
+  return null;
+}
+
+test('items that appear after an interaction, or are pushed out of the drink machine, do not sink into any model', async () => {
+  // Where each item can show up in a room that has models: its spawn spot, and for the drink machine's items the drops beside it.
+  const spots = { F01: [ITEM_POSITIONS.F01], F04: [ITEM_POSITIONS.F04], F05: [ITEM_POSITIONS.F05], F06: [ITEM_POSITIONS.F06], F07: [ITEM_POSITIONS.F07] };
+  for (const item of ['F01', 'F02', 'F03']) {
+    for (const x of [33.5, 38, 42.5]) (spots[item] ??= []).push(dropPoint(x, -9), dropPoint(x, -21));
+  }
+  const roomMeshes = new Map();
+  const meshesOf = async (room) => {
+    if (!roomMeshes.has(room)) {
+      const scene = new THREE.Group();
+      for (const config of ROOM_MODELS.filter((entry) => entry.room === room)) {
+        const model = await loadModel(config.file);
+        placeRoomModel(model, config);
+        if (config.mirrorNorthWall) mirrorCorridorWall(model);
+        scene.add(model);
+      }
+      roomMeshes.set(room, shownTriangles(scene));
+    }
+    return roomMeshes.get(room);
+  };
+  for (const [item, points] of Object.entries(spots)) {
+    const template = normalizeItemModel(await loadModel(`items/${item.toLowerCase()}.glb`), ITEM_MODELS[item]);
+    for (const [x, z] of points) {
+      const room = areaAt(x, z);
+      template.position.set(x, 0, z);
+      template.updateMatrixWorld(true);
+      // Resting on the floor is fine; anything else the item's box meets is a model it sinks into.
+      const box = new THREE.Box3().setFromObject(template);
+      box.min.y += 0.03;
+      const hit = boxTouchesMeshes(box, await meshesOf(room));
+      assert.ok(!hit, `${item} at ${x.toFixed(2)}, ${z.toFixed(2)} sinks into ${hit?.parent?.name || hit?.name} in ${room}`);
+    }
+  }
 });

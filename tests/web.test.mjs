@@ -107,3 +107,9 @@ test('the black screen between rooms shows the destination area name', async () 
   assert.match(css, /\.fade-room\b/);
   assert.match(css, /\.fade\.visible\s+\.fade-room/);
 });
+
+test('room floors no longer carry a label sprite', async () => {
+  const scene = await readFile(new URL('../src/scene.mjs', import.meta.url), 'utf8');
+  assert.doesNotMatch(scene, /#label\(room\.label/);
+  assert.doesNotMatch(scene, /#label\(/);
+});

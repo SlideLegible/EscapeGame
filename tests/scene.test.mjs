@@ -534,3 +534,25 @@ test('the camera keeps the player in the middle of the view, straight behind alo
     }
   }
 });
+
+test('standing right up against the drink machine picks the machine at its front and its underside at its back', () => {
+  // The interaction boxes of the machine (1.36 wide, 0.78 deep) and the strip behind it (0.3 deep from S04), turned with the machine.
+  const turned = (halfWidth, fromAhead, toAhead) => {
+    const corners = [[-halfWidth, fromAhead], [halfWidth, fromAhead], [-halfWidth, toAhead], [halfWidth, toAhead]]
+      .map(([side, ahead]) => [machineFront[0] * ahead - machineSide[0] * side, machineFront[1] * ahead - machineSide[1] * side]);
+    const xs = corners.map(([x]) => x), zs = corners.map(([, z]) => z);
+    return { min: { x: Math.min(...xs), z: Math.min(...zs) }, max: { x: Math.max(...xs), z: Math.max(...zs) } };
+  };
+  const machine = [
+    { id: 'S03', x: OBJECT_POSITIONS.S03[0], z: OBJECT_POSITIONS.S03[1], bounds: turned(0.68, -0.39, 0.39) },
+    { id: 'S04', x: OBJECT_POSITIONS.S04[0], z: OBJECT_POSITIONS.S04[1], bounds: turned(0.68, 0, 0.3) },
+  ];
+  const facing = ([dx, dz]) => Math.atan2(dx, -dz);
+  // The machine model is about 1.01 deep, so the closest the player stands is a little over 0.5 from its middle.
+  for (const ahead of [0.6, 0.67, 0.75, 1]) {
+    for (const beside of [-0.3, 0, 0.3]) {
+      assert.equal(nearestCandidate(...besideMachine(ahead, beside), facing([-machineFront[0], -machineFront[1]]), machine).id, 'S03', `front ${ahead}, ${beside}`);
+      assert.equal(nearestCandidate(...besideMachine(-ahead, beside), facing(machineFront), machine).id, 'S04', `back ${ahead}, ${beside}`);
+    }
+  }
+});

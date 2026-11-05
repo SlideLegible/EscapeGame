@@ -253,6 +253,23 @@ export class OcclusionGrid {
 // the pull-in below never feeds back into it. The view is then slid along the player-to-orbit line until it is clear of
 // the room rect and of the occlusion grid. It snaps in the moment something is in the way, but only eases back out after
 // the way has stayed clear for a moment, so furniture flickering past the line does not make the view shake.
+// Where the orbit camera wants to be for a player at (x, z) seen along `yaw`, and the point it looks at.
+// The camera orbits on a sphere around the player: pitch is its elevation angle and only the mouse changes it.
+export function orbitCameraView(x, z, yaw, form, pitch, jumpHeight = 0) {
+  const distance = form === 'F12' ? 8.5 : form === 'F08' ? 6.2 : form === 'F00' ? 3.8 : 7.2;
+  const targetY = (form === 'F00' ? 1.05 : 0.78) + jumpHeight * 0.35;
+  const elevation = form === 'F00' ? 0.45 : pitch;
+  const reach = distance * Math.cos(elevation);
+  const height = Math.max(0.5, targetY + distance * Math.sin(elevation) - (form === 'F09' ? 0.4 : 0));
+  const shoulder = form === 'F00' ? 1.1 : 0;
+  // Aim from the shoulder-offset camera toward the matching shoulder point so the view's
+  // horizontal center line stays parallel to the forward direction used by W.
+  return {
+    position: [x - Math.sin(yaw) * reach + Math.cos(yaw) * shoulder, height, z + Math.cos(yaw) * reach + Math.sin(yaw) * shoulder],
+    target: [x + Math.cos(yaw) * shoulder, targetY, z + Math.sin(yaw) * shoulder],
+  };
+}
+
 export function stepFollowCamera(state, player, desired, dt, { grid = null, rect = null, snap = false } = {}) {
   const orbit = state.orbit;
   const smooth = snap ? 1 : 1 - Math.exp(-10 * dt);
@@ -1668,24 +1685,14 @@ export class AcademyScene {
       this.camera.lookAt(this.mapTarget);
       return;
     }
-    const distance = this.game.player().form === 'F12' ? 8.5 : this.game.player().form === 'F08' ? 6.2 : this.game.player().form === 'F00' ? 3.8 : 7.2;
-    // The camera orbits on a sphere around the player: pitch is its elevation angle and only the mouse changes it.
-    const targetY = (this.game.player().form === 'F00' ? 1.05 : 0.78) + this.jumpHeight * 0.35;
-    const pitch = this.game.player().form === 'F00' ? 0.45 : this.pitch;
-    const reach = distance * Math.cos(pitch);
-    const height = Math.max(0.5, targetY + distance * Math.sin(pitch) - (this.game.player().form === 'F09' ? 0.4 : 0));
-    const shoulder = this.game.player().form === 'F00' ? 1.1 : 0;
-    this.cameraDesired.set(this.playerPosition.x - Math.sin(this.yaw) * reach + Math.cos(this.yaw) * shoulder, height,
-      this.playerPosition.z + Math.cos(this.yaw) * reach + Math.sin(this.yaw) * shoulder);
-    const player = { x: this.playerPosition.x, y: targetY, z: this.playerPosition.z };
+    const view = orbitCameraView(this.playerPosition.x, this.playerPosition.z, this.yaw, this.game.player().form, this.pitch, this.jumpHeight);
+    this.cameraDesired.set(...view.position);
+    const player = { x: this.playerPosition.x, y: view.target[1], z: this.playerPosition.z };
     const pulled = stepFollowCamera(this.cameraFollow, player, this.cameraDesired, dt, {
       rect: areaCameraRect(this.game.player().area), grid: this.game.player().form !== 'F00' ? this.occlusion : null, snap: smooth === 1,
     });
     this.camera.position.set(pulled.x, pulled.y, pulled.z);
-    // Aim from the shoulder-offset camera toward the matching shoulder point so the view's
-    // horizontal center line stays parallel to the forward direction used by W.
-    this.cameraTarget.set(this.playerPosition.x + Math.cos(this.yaw) * shoulder, targetY,
-      this.playerPosition.z + Math.sin(this.yaw) * shoulder);
+    this.cameraTarget.set(...view.target);
     this.camera.lookAt(this.cameraTarget);
   }
 
